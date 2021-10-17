@@ -1,4 +1,4 @@
-p(X,Z) :- b(X,Y), c(Y,Z).
+p(X,Z) :- b(X,Y), c(Y, Z).
 
 % DOM %
 dom(1..2).
@@ -61,10 +61,10 @@ r1_z(2) :- sat.
 % hier koennte man sonst noch auf lange bodies aufteilen (verketten)
 % muss man wsl. fuer treewidth spaeter eh machen...
 % wir wollen ja iwie dom^arity
-% fp(X,Z) :- p(X,Z), b(X,Y), c(Y,Z), y(Y).
+fp(X,Z) :- p(X,Z), b(X,Y), c(Y,Z), y(Y).
 
-fp1(Y,Z) :- c(Y,Z), y(Y).				%1 body
-fp(X,Z) :- fp1(Y,Z), p(X,Z), b(X,Y).	%1 body + 1 head
+%fp1(Y,Z) :- c(Y,Z), y(Y).				%1 body
+%fp(X,Z) :- fp1(Y,Z), p(X,Z), b(X,Y).	%1 body + 1 head
 
 :- not fp(X,Z), p(X,Z).
 
@@ -75,4 +75,6 @@ c(2,1).
 b(1,1).
 c(1,2).
 c(1,1).
+
+#show p/2.
 
