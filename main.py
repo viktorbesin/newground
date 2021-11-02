@@ -20,13 +20,10 @@ class ClingoApp(object):
             parse_files(files, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
-
-
-
-        # for f in files:
-        #     ctl.load(f)
-        # if not files:
-        #     ctl.load("-")
+                if not term_transformer.shows:
+                    for f in transformer.shows.keys():
+                        for l in transformer.shows[f]:
+                            parse_string(f"#show {f}/{l}.", lambda stm: bld.add(stm))
 
         ctl.ground([("base", [])])
 
@@ -41,6 +38,7 @@ class NglpDlpTransformer(Transformer):
         self.cur_var = []
         self.cur_func = []
         self.cur_func_sign = []
+        self.shows = {}
         self.counter = 0
 
     def _reset_after_rule(self):
@@ -120,8 +118,12 @@ class NglpDlpTransformer(Transformer):
                 fixed += f", r{self.counter}_{r}_f({r})"
 
             # r1_p_f(X,Z) :- b(X,Y),c(Y,Z), r1_Y_f(Y).
-            # print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- {','.join([str(f) for f in self.cur_func])}{fixed}.")
-            parse_string(f"r{self.counter}_{head.name}_f({','.join(var)}) :- {','.join([str(f) for f in self.cur_func[1:]])}{fixed}.", lambda stm: self.bld.add(stm))
+            # print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
+            #              f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
+            #              f"{fixed}.")
+            parse_string(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
+                         f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
+                         f"{fixed}.", lambda stm: self.bld.add(stm))
             # :- not r1_p_f(X,Z), p(X,Z).
             # print(f":- not r{self.counter}_{head.name}_f({','.join(var)}), {str(head)}.")
             parse_string(f":- not r{self.counter}_{head.name}_f({','.join(var)}), {str(head)}.", lambda stm: self.bld.add(stm))
@@ -148,6 +150,12 @@ class NglpDlpTransformer(Transformer):
         return node
 
     def visit_Function(self, node):
+        # shows
+        if node.name in self.shows:
+            self.shows[node.name].add(len(re.sub(r'^.*?\(', '', str(node))[:-1].split(',')))
+        else:
+            self.shows[node.name] = {len(re.sub(r'^.*?\(', '', str(node))[:-1].split(','))}
+
         self.cur_func.append(node)
         self.visit_children(node)
         return node
@@ -165,10 +173,15 @@ class NglpDlpTransformer(Transformer):
 class TermTransformer(Transformer):
     def __init__(self):
         self.terms = []
+        self.shows = False
 
     def visit_SymbolicTerm(self, node):
         if (str(node) not in self.terms):
             self.terms.append(str(node))
+        return node
+
+    def visit_ShowSignature(self, node):
+        self.shows = True
         return node
 
 if __name__ == "__main__":
