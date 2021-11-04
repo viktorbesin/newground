@@ -20,15 +20,26 @@ class ClingoApp(object):
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
                 print (":- not sat.")
+                #parse_string(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.", lambda stm: self.bld.add(stm))
+                print(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.")
+
+                # :- not r1_p_f(X,Z), not r2_p_f(X,Z), ... , rk_p_f(X,Z), p(X,Z).
+                # {p(D0,D1) : dom(D0),dom(D1)}..
+                for p in transformer.foundness:
+                    for arity in transformer.foundness[p]:
+                        if arity > 0:
+                            doms = ','.join(f"dom(D{i})" for i in range (1,arity+1))
+                            vars  = ','.join(f'V{i}' for i in range(1, arity+1))
+                            print(f"{{{p}({','.join(f'D{i}' for i in range (1,arity+1))}) : {doms}}}.")
+                            print(f":- {p}({vars}), {','.join(f'not r{c}_{p}_f({vars})' for c in transformer.foundness[p][arity])}.")
+                        else:
+                            print(f"{{{p}}}.")
+                            print(f":- {p}, {','.join(f'not r{c}_{p}_f' for c in transformer.foundness[p][arity])}.")
+
                 if not term_transformer.shows:
                     for f in transformer.shows.keys():
                         for l in transformer.shows[f]:
-                            parse_string(f"#show {f}/{l}.", lambda stm: bld.add(stm))
                             print (f"#show {f}/{l}.")
-
-        #ctl.ground([("base", [])])
-
-        #ctl.solve()
 
 class NglpDlpTransformer(Transformer):  
     def __init__(self, bld, terms):
@@ -40,6 +51,7 @@ class NglpDlpTransformer(Transformer):
         self.cur_func = []
         self.cur_func_sign = []
         self.shows = {}
+        self.foundness ={}
         self.counter = 0
 
     def _reset_after_rule(self):
@@ -65,13 +77,10 @@ class NglpDlpTransformer(Transformer):
                     s += f"r{self.counter}_{v}({t}), "
 
                 s = s[:-2] + "."
-                # parse_string("r1_x(1), r1_x(2), r1_x(3).", lambda stm: self.bld.add(stm))
-                parse_string(s, lambda stm: self.bld.add(stm))
                 print (s)
 
                 for t in self.terms:
                     # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                    parse_string(f"r{self.counter}_{v}({t}) :- sat.", lambda stm: self.bld.add(stm))
                     print(f"r{self.counter}_{v}({t}) :- sat.")
 
             # SAT per rule
@@ -95,16 +104,8 @@ class NglpDlpTransformer(Transformer):
                     else:
                         atom = f"{f.name}"
 
-                    parse_string(f"sat_r{self.counter} :- {interpretation}{'' if self.cur_func_sign[self.cur_func.index(f)] or f is head else 'not'} {atom}.", lambda stm: self.bld.add(stm))
                     print (f"sat_r{self.counter} :- {interpretation}{'' if self.cur_func_sign[self.cur_func.index(f)] or f is head else 'not'} {atom}.")
 
-            # parse_string("sat_r1 :- r1_x(1), r1_y(1), r1_z(1), not b(1,1).", lambda stm: self.bld.add(stm))
-            # parse_string("sat_r1 :- r1_x(1), r1_y(1), r1_z(1), not c(1,1).", lambda stm: self.bld.add(stm))
-            # parse_string("sat_r1 :- r1_x(1), r1_y(1), r1_z(1), p(1,1).", lambda stm: self.bld.add(stm))
-
-            parse_string(f"sat :- sat_r{self.counter}.", lambda stm: self.bld.add(stm))
-            print (f"sat :- sat_r{self.counter}.")
-            # parse_string("sat: - sat_r1.", lambda stm: self.bld.add(stm))
 
             # FOUND
             var = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')
@@ -113,8 +114,6 @@ class NglpDlpTransformer(Transformer):
             # for every var not in head -> fix one
             fixed = ""
             for r in rem:
-                # # parse_string("1{y(D) : dom(D)}1 :- p(X,Z).", lambda stm: self.bld.add(stm))
-                parse_string(f"1{{r{self.counter}_{r}_f(D) : dom(D)}}1 :- {head}.", lambda stm: self.bld.add(stm))
                 print (f"1{{r{self.counter}_{r}_f(D) : dom(D)}}1 :- {head}.")
                 fixed += f", r{self.counter}_{r}_f({r})"
 
@@ -122,24 +121,15 @@ class NglpDlpTransformer(Transformer):
             print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
                          f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
                          f"{fixed}.")
-            parse_string(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
-                         f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
-                         f"{fixed}.", lambda stm: self.bld.add(stm))
-            # :- not r1_p_f(X,Z), p(X,Z).
-            print(f":- not r{self.counter}_{head.name}_f({','.join(var)}), {str(head)}.")
-            parse_string(f":- not r{self.counter}_{head.name}_f({','.join(var)}), {str(head)}.", lambda stm: self.bld.add(stm))
 
-            #I
-            # {p(D0,D1) : dom(D0),dom(D1)}..
-            doms = []
-            for i in range(0, len(var)):
-                doms.append(f"D{i}")
-            if len(doms) > 0:
-                print (f"{{{head.name}({','.join(doms)}) : {','.join([f'dom({d})' for d in doms])}}}.")
-                parse_string(f"{{{head.name}({','.join(doms)}) : {','.join([f'dom({d})' for d in doms])}}}.", lambda stm: self.bld.add(stm))
+            # for :- not r1_p_f(X,Z), not r2_p_f(X,Z), ... , rk_p_f(X,Z), p(X,Z).
+            if head.name not in self.foundness:
+                self.foundness[head.name] = {}
+                self.foundness[head.name][len(var)] = [self.counter]
+            elif len(var) not in self.foundness[head.name]:
+                self.foundness[head.name][len(var)] = [self.counter]
             else:
-                print(f"{{{head.name}}}.")
-                parse_string(f"{{{head.name}}}.", lambda stm: self.bld.add(stm))
+                self.foundness[head.name][len(var)].append(self.counter)
 
             self._reset_after_rule()
 
