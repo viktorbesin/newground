@@ -35,6 +35,8 @@ class ClingoApp(object):
                         else:
                             print(f"{{{p}}}.")
                             print(f":- {p}, {','.join(f'not r{c}_{p}_f' for c in transformer.foundness[p][arity])}.")
+                for t in transformer.terms:
+                    print (f"dom({t}).")
 
                 if not term_transformer.shows:
                     for f in transformer.shows.keys():
@@ -47,6 +49,7 @@ class NglpDlpTransformer(Transformer):
         self.bld = bld
         self.terms = terms
 
+        self.cur_anon = 0
         self.cur_var = []
         self.cur_func = []
         self.cur_func_sign = []
@@ -58,26 +61,31 @@ class NglpDlpTransformer(Transformer):
         self.cur_var = []
         self.cur_func = []
         self.cur_func_sign = []
+        self.cur_anon = 0
+        self.ng = False
+        #self.head = None
 
     def visit_Rule(self, node):
         # check if AST is non-ground
         self.visit_children(node)
-        
+
         # if so: handle grounding
         if self.ng:
-            self.ng = False
             self.counter += 1
-            head = self.cur_func[0]
+            if str(node.head) != "#false":
+                head = self.cur_func[0]
+            else:
+                head = None
 
             # MOD
             # domaining per rule variable
             for v in self.cur_var: # variables
-                s = ""
+                disjunction = ""
                 for t in self.terms: # domain
-                    s += f"r{self.counter}_{v}({t}), "
+                    disjunction += f"r{self.counter}_{v}({t}), "
 
-                s = s[:-2] + "."
-                print (s)
+                disjunction = disjunction[:-2] + "."
+                print (disjunction)
 
                 for t in self.terms:
                     # r1_x(1) :- sat. r1_x(2) :- sat. ...
@@ -97,7 +105,7 @@ class NglpDlpTransformer(Transformer):
                     # vars in atom
                     var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
                     for v in var:
-                        atom += f"{c[self.cur_var.index(v)]},"
+                        atom += f"{c[self.cur_var.index(v)]}," if v in self.cur_var else f"{v},"
 
                     if len(atom) > 0:
                         atom = f"{f.name}({atom[:-1]})"
@@ -108,28 +116,29 @@ class NglpDlpTransformer(Transformer):
 
 
             # FOUND
-            var = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')
-            rem = [v for v in self.cur_var if v not in var] # remaining variables not included in head atom
+            if head is not None:
+                var = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')
+                rem = [v for v in self.cur_var if v not in var] # remaining variables not included in head atom
 
-            # for every var not in head -> fix one
-            fixed = ""
-            for r in rem:
-                print (f"1{{r{self.counter}_{r}_f(D) : dom(D)}}1 :- {head}.")
-                fixed += f", r{self.counter}_{r}_f({r})"
+                # for every var not in head -> fix one
+                fixed = ""
+                for r in rem:
+                    print (f"1{{r{self.counter}_{r}_f(D) : dom(D)}}1 :- {head}.")
+                    fixed += f", r{self.counter}_{r}_f({r})"
 
-            # r1_p_f(X,Z) :- b(X,Y),c(Y,Z), r1_Y_f(Y).
-            print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
-                         f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
-                         f"{fixed}.")
+                # r1_p_f(X,Z) :- b(X,Y),c(Y,Z), r1_Y_f(Y).
+                print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
+                             f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
+                             f"{fixed}.")
 
-            # for :- not r1_p_f(X,Z), not r2_p_f(X,Z), ... , rk_p_f(X,Z), p(X,Z).
-            if head.name not in self.foundness:
-                self.foundness[head.name] = {}
-                self.foundness[head.name][len(var)] = [self.counter]
-            elif len(var) not in self.foundness[head.name]:
-                self.foundness[head.name][len(var)] = [self.counter]
-            else:
-                self.foundness[head.name][len(var)].append(self.counter)
+                # for :- not r1_p_f(X,Z), not r2_p_f(X,Z), ... , rk_p_f(X,Z), p(X,Z).
+                if head.name not in self.foundness:
+                    self.foundness[head.name] = {}
+                    self.foundness[head.name][len(var)] = [self.counter]
+                elif len(var) not in self.foundness[head.name]:
+                    self.foundness[head.name][len(var)] = [self.counter]
+                else:
+                    self.foundness[head.name][len(var)].append(self.counter)
 
             self._reset_after_rule()
 
@@ -150,13 +159,17 @@ class NglpDlpTransformer(Transformer):
         else:
             self.shows[node.name] = {len(re.sub(r'^.*?\(', '', str(node))[:-1].split(','))}
 
+        node = node.update(**self.visit_children(node))
         self.cur_func.append(node)
-        self.visit_children(node)
+
         return node
 
     def visit_Variable(self, node):
         self.ng = True
-        if (str(node) not in self.cur_var):
+        if (str(node) not in self.cur_var) and str(node) not in self.terms:
+            if str(node) == '_':
+                node = node.update(name=f"Anon{self.cur_anon}")
+                self.cur_anon += 1
             self.cur_var.append(str(node))
         return node
 
@@ -168,6 +181,13 @@ class TermTransformer(Transformer):
     def __init__(self):
         self.terms = []
         self.shows = False
+
+    def visit_Interval(self, node):
+        print(node)
+        for i in range(int(str(node.left)), int(str(node.right))+1):
+            if (str(i) not in self.terms):
+                self.terms.append(str(i))
+        return node
 
     def visit_SymbolicTerm(self, node):
         if (str(node) not in self.terms):
