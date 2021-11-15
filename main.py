@@ -31,10 +31,10 @@ class ClingoApp(object):
                             doms = ','.join(f"dom(D{i})" for i in range (1,arity+1))
                             vars  = ','.join(f'V{i}' for i in range(1, arity+1))
                             print(f"{{{p}({','.join(f'D{i}' for i in range (1,arity+1))}) : {doms}}}.")
-                            print(f":- {p}({vars}), {','.join(f'not r{c}_{p}_f({vars})' for c in transformer.foundness[p][arity])}.")
+                            print(f":- {','.join(f'r{c}_unfound({vars})' for c in transformer.foundness[p][arity])}.")
                         else:
                             print(f"{{{p}}}.")
-                            print(f":- {p}, {','.join(f'not r{c}_{p}_f' for c in transformer.foundness[p][arity])}.")
+                            print(f":- {', '.join(f'r{c}_unfound' for c in transformer.foundness[p][arity])}.")
                 for t in transformer.terms:
                     print (f"dom({t}).")
 
@@ -120,16 +120,23 @@ class NglpDlpTransformer(Transformer):
                 var = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')
                 rem = [v for v in self.cur_var if v not in var] # remaining variables not included in head atom
 
-                # for every var not in head -> fix one
-                fixed = ""
                 for r in rem:
-                    print (f"1{{r{self.counter}_{r}_f(D) : dom(D)}}1 :- {head}.")
-                    fixed += f", r{self.counter}_{r}_f({r})"
+                    # 1{r1_Z(D,X,Y) : dom(D)}1 :- p(X,Y).
+                    print (f"1{{r{self.counter}_{r}({','.join([r]+var)}) : dom({r})}}1 :- {head}.")
+
+                for f in self.cur_func:
+                    if f != head:
+                        # TODO: check if head has arguments
+                        f_var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
+                        f_rem = [f"r{self.counter}_{v}({','.join([v]+var)})" for v in f_var if v in rem]
+                        # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
+                        print (f"r{self.counter}_unfound({','.join(var)}) :- "
+                               f"{', '.join([str(head)]+[f'not {str(f)}' if not self.cur_func_sign[self.cur_func.index(f)] else str(f)] + f_rem)}.")
 
                 # r1_p_f(X,Z) :- b(X,Y),c(Y,Z), r1_Y_f(Y).
-                print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
-                             f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
-                             f"{fixed}.")
+                # print(f"r{self.counter}_{head.name}_f({','.join(var)}) :- "
+                #              f"{','.join([f'not {str(f)}' if self.cur_func_sign[self.cur_func.index(f)] else str(f) for f in self.cur_func[1:]])}"
+                #              f"{fixed}.")
 
                 # for :- not r1_p_f(X,Z), not r2_p_f(X,Z), ... , rk_p_f(X,Z), p(X,Z).
                 if head.name not in self.foundness:
@@ -177,6 +184,7 @@ class NglpDlpTransformer(Transformer):
         return node
 
 
+# TODO: save facts
 class TermTransformer(Transformer):
     def __init__(self):
         self.terms = []
