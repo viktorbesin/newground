@@ -258,13 +258,15 @@ class TermTransformer(Transformer):
         pred = str(node.head).split('(', 1)[0]
         arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
         arity = len(arguments)
-        if self.ng and str(node.head) != "#false":
-            # save pred and arity for later use
-            if pred not in self.ng_heads:
-                self.ng_heads[pred] = {arity}
-            else:
-                self.ng_heads[pred].add(arity)
+
+        if self.ng:
             self.ng = False
+            if str(node.head) != "#false":
+                # save pred and arity for later use
+                if pred not in self.ng_heads:
+                    self.ng_heads[pred] = {arity}
+                else:
+                    self.ng_heads[pred].add(arity)
         elif node.body.__len__() == 0:
             arguments = ','.join(arguments)
             if pred not in self.facts:
