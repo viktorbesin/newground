@@ -38,6 +38,7 @@ class ClingoApp(object):
 
 class NglpDlpTransformer(Transformer):  
     def __init__(self, bld, terms, facts, ng_heads):
+        self.rules = False
         self.ng = False
         self.bld = bld
         self.terms = terms
@@ -63,6 +64,10 @@ class NglpDlpTransformer(Transformer):
         #self.head = None
 
     def visit_Rule(self, node):
+        if not self.rules:
+            self._reset_after_rule()
+            print (node)
+            return node
         # check if AST is non-ground
         self.visit_children(node)
 
@@ -248,6 +253,13 @@ class NglpDlpTransformer(Transformer):
         return node
 
     def visit_SymbolicTerm(self, node):
+        return node
+
+    def visit_Program(self, node):
+        if node.name == 'rules':
+            self.rules = True
+        else:
+            self.rules = False
         return node
     
     def _addToFoundednessCheck(self, pred, arity, combination, rule):
