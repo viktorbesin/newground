@@ -50,7 +50,7 @@ class ClingoApp(object):
 
 class NglpDlpTransformer(Transformer):  
     def __init__(self, bld, terms, facts, ng_heads):
-        self.ng = False        
+        self.ng = False
         self.bld = bld
         self.terms = terms
         self.facts = facts
@@ -177,8 +177,6 @@ class NglpDlpTransformer(Transformer):
 
                     self._addToFoundednessCheck(head.name, len(arguments), head_interpretation, self.counter)
 
-            self._reset_after_rule()
-
         else:
             # foundation needed?
             pred = str(node.head).split('(', 1)[0]
@@ -200,6 +198,8 @@ class NglpDlpTransformer(Transformer):
                 self.g_counter = chr(ord(self.g_counter) + 1)
             # print rule as it is
             print(node)
+
+        self._reset_after_rule()
         return node
 
     def visit_Literal(self, node):
