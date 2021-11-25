@@ -26,20 +26,8 @@ class ClingoApp(object):
                 for p in transformer.f:
                     for arity in transformer.f[p]:
                         for c in transformer.f[p][arity]:
-                            print(f":- {','.join(f'r{r}_unfound({c})' for r in transformer.f[p][arity][c])}.")
+                            print(f":- {', '.join([f'{p}({c})'] + [f'r{r}_unfound({c})' for r in transformer.f[p][arity][c]])}.")
 
-                # :- not r1_p_f(X,Z), not r2_p_f(X,Z), ... , rk_p_f(X,Z), p(X,Z).
-                # {p(D0,D1) : dom(D0),dom(D1)}..
-                # for p in transformer.foundness:
-                #     for arity in transformer.foundness[p]:
-                #         if arity > 0:
-                #             doms = ','.join(f"dom(D{i})" for i in range (1,arity+1))
-                #             vars  = ','.join(f'V{i}' for i in range(1, arity+1))
-                #             print(f"{{{p}({','.join(f'D{i}' for i in range (1,arity+1))}) : {doms}}}.")
-                #             print(f":- {','.join(f'r{c}_unfound({vars})' for c in transformer.foundness[p][arity])}.")
-                #         else:
-                #             print(f"{{{p}}}.")
-                #             print(f":- {', '.join(f'r{c}_unfound' for c in transformer.foundness[p][arity])}.")
                 for t in transformer.terms:
                     print (f"dom({t}).")
 
@@ -101,31 +89,24 @@ class NglpDlpTransformer(Transformer):
                     print(f"r{self.counter}_{v}({t}) :- sat.")
 
             # SAT per rule
-            arguments = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
-            var = list(dict.fromkeys(arguments))  # arguments (without duplicates / incl. terms)
-            actual_vars = list(
-                dict.fromkeys([a for a in arguments if a in self.cur_var]))  # which have to be grounded per combination
+            combinations = [p for p in itertools.product(self.terms, repeat=len(self.cur_var))]
 
-            combinations = [p for p in itertools.product(self.terms, repeat=len(actual_vars))]
-
-            # for every func
+            # reduce duplicates; track combinations
             sat_per_f = {}
             for f in self.cur_func:
-                # sat_per_f.add(f)
                 sat_per_f[f] = []
 
             # for every combination
             for c in combinations:
-                # for every atom
-                # interpretation = ""
-                # for v in self.cur_var:
-                #     interpretation += f"r{self.counter}_{v}({c[self.cur_var.index(v)]}), "
                 for f in self.cur_func:
                     f_args = ""
                     # vars in atom
                     var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
                     interpretation = ""
-                    i_lst = [c[self.cur_var.index(v)] for v in var if v in self.cur_var]
+                    i_lst = []
+                    for v in var:
+                        if v in self.cur_var:
+                            i_lst.append(c[self.cur_var.index(v)])
 
                     if i_lst in sat_per_f[f]:
                         continue
@@ -157,6 +138,12 @@ class NglpDlpTransformer(Transformer):
                 print(f"{{{head} : {','.join(f'dom({v})' for v in actual_vars)}}}.")
 
                 combinations = [p for p in itertools.product(self.terms, repeat=len(actual_vars)+len(rem))]
+
+                # reduce duplicates; track combinations
+                found_per_f = {}
+                for f in self.cur_func:
+                    found_per_f[str(f)] = []
+
                 for c in combinations:
                     interpretation = []
                     # TODO: check for terms here
@@ -181,6 +168,17 @@ class NglpDlpTransformer(Transformer):
                             f_var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # body-pred vars; can include terms
                             f_rem = [f"r{self.counter}_{v}({','.join([c[len(actual_vars)+rem.index(v)]] + interpretation)})" for v in f_var if v in rem]
                             f_args = ""
+
+                            i_lst = []
+                            for v in var+f_var:
+                                if v in self.cur_var:
+                                    i_lst.append(c[self.cur_var.index(v)])
+
+                            if i_lst in found_per_f[str(f)]:
+                                continue
+                            else:
+                                found_per_f[str(f)].append(i_lst)
+
                             for v in f_var:
                                 f_args += f"{c[self.cur_var.index(v)]}," if v in actual_vars else \
                                     (f"{v}," if v in self.terms else f"{c[len(actual_vars)+rem.index(v)]},")
@@ -193,7 +191,7 @@ class NglpDlpTransformer(Transformer):
                             f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
                             # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
                             print(f"r{self.counter}_unfound({','.join(interpretation)}) :- "
-                                  f"{', '.join([head_atom_interpretation] + [f_interpretation] + f_rem)}.")
+                                  f"{', '.join([f_interpretation] + f_rem)}.")
 
                     self._addToFoundednessCheck(head.name, len(arguments), head_interpretation, self.counter)
 
