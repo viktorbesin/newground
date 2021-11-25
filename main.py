@@ -101,19 +101,39 @@ class NglpDlpTransformer(Transformer):
                     print(f"r{self.counter}_{v}({t}) :- sat.")
 
             # SAT per rule
-            combinations = [p for p in itertools.product(self.terms, repeat=len(self.cur_var))]
+            arguments = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+            var = list(dict.fromkeys(arguments))  # arguments (without duplicates / incl. terms)
+            actual_vars = list(
+                dict.fromkeys([a for a in arguments if a in self.cur_var]))  # which have to be grounded per combination
+
+            combinations = [p for p in itertools.product(self.terms, repeat=len(actual_vars))]
+
+            # for every func
+            sat_per_f = {}
+            for f in self.cur_func:
+                # sat_per_f.add(f)
+                sat_per_f[f] = []
+
             # for every combination
             for c in combinations:
                 # for every atom
-                interpretation = ""
-                for v in self.cur_var:
-                    interpretation += f"r{self.counter}_{v}({c[self.cur_var.index(v)]}), "
-
+                # interpretation = ""
+                # for v in self.cur_var:
+                #     interpretation += f"r{self.counter}_{v}({c[self.cur_var.index(v)]}), "
                 for f in self.cur_func:
                     f_args = ""
                     # vars in atom
                     var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
+                    interpretation = ""
+                    i_lst = [c[self.cur_var.index(v)] for v in var if v in self.cur_var]
+
+                    if i_lst in sat_per_f[f]:
+                        continue
+                    else:
+                        sat_per_f[f].append(i_lst)
+
                     for v in var:
+                        interpretation += f"r{self.counter}_{v}({c[self.cur_var.index(v)]}), " if v in self.cur_var else f""
                         f_args += f"{c[self.cur_var.index(v)]}," if v in self.cur_var else f"{v},"
 
                     if len(f_args) > 0:
