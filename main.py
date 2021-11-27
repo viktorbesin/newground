@@ -96,31 +96,23 @@ class NglpDlpTransformer(Transformer):
             # SAT per rule
             combinations = [p for p in itertools.product(self.terms, repeat=len(self.cur_var))]
 
-            # reduce duplicates; track combinations
-            sat_per_f = {}
+            combs = {}
+            # create combinations
             for f in self.cur_func:
-                sat_per_f[f] = []
+                arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
+                var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
+                actual_vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
+                #combs[tuple(actual_vars)] = [p for p in itertools.product(self.terms, repeat=len(actual_vars))]
+                combinations = [p for p in itertools.product(self.terms, repeat=len(actual_vars))]
 
-            # for every combination
-            for c in combinations:
-                for f in self.cur_func:
+                var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
+                for c in combinations:
                     f_args = ""
                     # vars in atom
-                    var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
                     interpretation = ""
-                    i_lst = []
                     for v in var:
-                        if v in self.cur_var:
-                            i_lst.append(c[self.cur_var.index(v)])
-
-                    if i_lst in sat_per_f[f]:
-                        continue
-                    else:
-                        sat_per_f[f].append(i_lst)
-
-                    for v in var:
-                        interpretation += f"r{self.counter}_{v}({c[self.cur_var.index(v)]}), " if v in self.cur_var else f""
-                        f_args += f"{c[self.cur_var.index(v)]}," if v in self.cur_var else f"{v},"
+                        interpretation += f"r{self.counter}_{v}({c[actual_vars.index(v)]}), " if v in self.cur_var else f""
+                        f_args += f"{c[actual_vars.index(v)]}," if v in self.cur_var else f"{v},"
 
                     if len(f_args) > 0:
                         f_args = f"{f.name}({f_args[:-1]})"
@@ -130,11 +122,47 @@ class NglpDlpTransformer(Transformer):
                     print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
 
 
+            #print(combs)
+            # reduce duplicates; track combinations
+            sat_per_f = {}
+            for f in self.cur_func:
+                sat_per_f[f] = []
+
+            # for every combination
+            # for c in combinations:
+            #     for f in self.cur_func:
+            #         f_args = ""
+            #         # vars in atom
+            #         var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
+            #         interpretation = ""
+            #         i_lst = []
+            #         for v in var:
+            #             if v in self.cur_var:
+            #                 i_lst.append(c[self.cur_var.index(v)])
+            #
+            #         if i_lst in sat_per_f[f]:
+            #             continue
+            #         else:
+            #             sat_per_f[f].append(i_lst)
+            #
+            #         for v in var:
+            #             interpretation += f"r{self.counter}_{v}({c[self.cur_var.index(v)]}), " if v in self.cur_var else f""
+            #             f_args += f"{c[self.cur_var.index(v)]}," if v in self.cur_var else f"{v},"
+            #
+            #         if len(f_args) > 0:
+            #             f_args = f"{f.name}({f_args[:-1]})"
+            #         else:
+            #             f_args = f"{f.name}"
+            #
+            #         print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
+
+
             # FOUND
             if head is not None:
-                arguments = re.sub(r'^.*?\(', '', str(head))[:-1].split(',') # all arguments (incl. duplicates / terms)
-                var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
-                actual_vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
+                # head only
+                h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',') # all arguments (incl. duplicates / terms)
+                var = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
+                actual_vars = list (dict.fromkeys([a for a in h_args if a in self.cur_var])) # which have to be grounded per combination
 
                 rem = [v for v in self.cur_var if v not in var] # remaining variables not included in head atom (without facts)
                 head_c = set() # only one guess for each combination of other variables; save those
@@ -149,44 +177,53 @@ class NglpDlpTransformer(Transformer):
                 for f in self.cur_func:
                     found_per_f[str(f)] = []
 
-                for c in combinations:
-                    interpretation = []
-                    # TODO: check for terms here
-                    for v in arguments:
-                        interpretation.append(c[actual_vars.index(v)] if v in actual_vars else v)
-                    head_interpretation = ','.join(interpretation)
-                    head_atom_interpretation = head.name + f'({head_interpretation})' if len(var) > 0 else head
+                #new
+                for f in self.cur_func:  # all predicates
+                    if f != head:  # only for the body
+                        # TODO: check if head has arguments
+                        f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+                        f_var = list(dict.fromkeys(f_args)) # arguments (without duplicates / incl. terms)
+                        f_rem = [v for v in f_var if v in rem and v not in actual_vars] # remaining vars for current function
 
-                    if head.name in self.facts and len(arguments) in self.facts[head.name] and head_interpretation in self.facts[head.name][len(arguments)]:
-                        # no foundation check for this combination, its a fact!
-                        continue
+                        combs = [p for p in itertools.product(self.terms, repeat=len(actual_vars)+len(f_rem))]
 
-                    if head_interpretation not in head_c:
-                        head_c.add(head_interpretation)
-                        for r in rem:
-                            # 1{r1_Z(D,X,Y) : dom(D)}1 :- p(X,Y).
-                            print(f"1{{r{self.counter}_{r}({','.join([r] + interpretation)}): dom({r})}}1 :- {head_atom_interpretation}.")
+                        for c in combs:
+                            interpretation = []
+                            # TODO: check for terms here
+                            for v in h_args:
+                                interpretation.append(c[actual_vars.index(v)] if v in actual_vars else v)
+                            head_interpretation = ','.join(interpretation)
+                            head_atom_interpretation = head.name + f'({head_interpretation})' if len(var) > 0 else head
+                            
+                            # fact-check
+                            if head.name in self.facts and len(h_args) in self.facts[head.name] and head_interpretation in self.facts[head.name][len(h_args)]:
+                                # no foundation check for this combination, its a fact!
+                                continue
 
-                    for f in self.cur_func: # all predicates
-                        if f != head: # only for the body
-                            # TODO: check if head has arguments
-                            f_var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # body-pred vars; can include terms
-                            f_rem = [f"r{self.counter}_{v}({','.join([c[len(actual_vars)+rem.index(v)]] + interpretation)})" for v in f_var if v in rem]
+                            f_rem_atoms = [f"r{self.counter}_{v}({','.join([c[len(actual_vars) + f_rem.index(v)]] + interpretation)})"
+                                for v in f_var if v in rem]
                             f_args = ""
 
+                            # duplicate check
                             i_lst = []
                             for v in var+f_var:
                                 if v in self.cur_var:
                                     i_lst.append(c[self.cur_var.index(v)])
-
                             if i_lst in found_per_f[str(f)]:
                                 continue
                             else:
                                 found_per_f[str(f)].append(i_lst)
 
+                            # only one guess for each combination of other variables
+                            if head_interpretation not in head_c:
+                                head_c.add(head_interpretation)
+                                for r in rem:
+                                    # 1{r1_Z(D,X,Y) : dom(D)}1 :- p(X,Y).
+                                    print(f"1{{r{self.counter}_{r}({','.join([r] + interpretation)}): dom({r})}}1 :- {head_atom_interpretation}.")
+
                             for v in f_var:
                                 f_args += f"{c[self.cur_var.index(v)]}," if v in actual_vars else \
-                                    (f"{v}," if v in self.terms else f"{c[len(actual_vars)+rem.index(v)]},")
+                                        (f"{v}," if v in self.terms else f"{c[len(actual_vars)+f_rem.index(v)]},")
 
                             if len(f_args) > 0:
                                 f_interpretation = f"{f.name}({f_args[:-1]})"
@@ -196,9 +233,60 @@ class NglpDlpTransformer(Transformer):
                             f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
                             # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
                             print(f"r{self.counter}_unfound({','.join(interpretation)}) :- "
-                                  f"{', '.join([f_interpretation] + f_rem)}.")
+                                  f"{', '.join([f_interpretation] + f_rem_atoms)}.")
 
-                    self._addToFoundednessCheck(head.name, len(arguments), head_interpretation, self.counter)
+                            self._addToFoundednessCheck(head.name, len(h_args), head_interpretation, self.counter)
+
+                # for c in combinations:
+                #     interpretation = []
+                #     # TODO: check for terms here
+                #     for v in arguments:
+                #         interpretation.append(c[actual_vars.index(v)] if v in actual_vars else v)
+                #     head_interpretation = ','.join(interpretation)
+                #     head_atom_interpretation = head.name + f'({head_interpretation})' if len(var) > 0 else head
+                #
+                #     if head.name in self.facts and len(arguments) in self.facts[head.name] and head_interpretation in self.facts[head.name][len(arguments)]:
+                #         # no foundation check for this combination, its a fact!
+                #         continue
+                #
+                #     if head_interpretation not in head_c:
+                #         head_c.add(head_interpretation)
+                #         for r in rem:
+                #             # 1{r1_Z(D,X,Y) : dom(D)}1 :- p(X,Y).
+                #             print(f"1{{r{self.counter}_{r}({','.join([r] + interpretation)}): dom({r})}}1 :- {head_atom_interpretation}.")
+                #
+                #     for f in self.cur_func: # all predicates
+                #         if f != head: # only for the body
+                #             # TODO: check if head has arguments
+                #             f_var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # body-pred vars; can include terms
+                #             f_rem = [f"r{self.counter}_{v}({','.join([c[len(actual_vars)+rem.index(v)]] + interpretation)})" for v in f_var if v in rem]
+                #             f_args = ""
+                #
+                #             i_lst = []
+                #             for v in var+f_var:
+                #                 if v in self.cur_var:
+                #                     i_lst.append(c[self.cur_var.index(v)])
+                #
+                #             if i_lst in found_per_f[str(f)]:
+                #                 continue
+                #             else:
+                #                 found_per_f[str(f)].append(i_lst)
+                #
+                #             for v in f_var:
+                #                 f_args += f"{c[self.cur_var.index(v)]}," if v in actual_vars else \
+                #                     (f"{v}," if v in self.terms else f"{c[len(actual_vars)+rem.index(v)]},")
+                #
+                #             if len(f_args) > 0:
+                #                 f_interpretation = f"{f.name}({f_args[:-1]})"
+                #             else:
+                #                 f_interpretation = f"{f.name}"
+                #
+                #             f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
+                #             # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
+                #             print(f"r{self.counter}_unfound({','.join(interpretation)}) :- "
+                #                   f"{', '.join([f_interpretation] + f_rem)}.")
+
+                    #self._addToFoundednessCheck(head.name, len(arguments), head_interpretation, self.counter)
 
         else:
             # foundation needed?
