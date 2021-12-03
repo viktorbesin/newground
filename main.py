@@ -26,7 +26,16 @@ class ClingoApp(object):
                 for p in transformer.f:
                     for arity in transformer.f[p]:
                         for c in transformer.f[p][arity]:
-                            print(f":- {', '.join([f'{p}({c})'] + [f'r{r}_unfound({c})' for r in transformer.f[p][arity][c]])}.")
+                            rule_sets = []
+                            for r in transformer.f[p][arity][c]:
+                                sum_sets = []
+                                for subset in transformer.f[p][arity][c][r]:
+                                    # print ([c[int(i)] for i in subset])
+                                    sum_sets.append(f"1:r{r}_unfound{'_'+''.join(subset) if len(subset) < arity else ''}" + (f"({','.join([c[int(i)] for i in subset])})" if len(subset)>0 else ""))
+                                sum_atom = f"#sum {{{'; '.join(sum_sets)}}} >= 1"
+                                rule_sets.append(sum_atom)
+                            head = ','.join(c)
+                            print(f":- {', '.join([f'{p}({head})'] + rule_sets)}.")
 
                 for t in transformer.terms:
                     print (f"dom({t}).")
@@ -97,9 +106,9 @@ class NglpDlpTransformer(Transformer):
             for f in self.cur_func:
                 arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
                 var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
-                actual_vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
+                h_vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
 
-                combinations = [p for p in itertools.product(self.terms, repeat=len(actual_vars))]
+                combinations = [p for p in itertools.product(self.terms, repeat=len(h_vars))]
 
                 var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
                 for c in combinations:
@@ -107,8 +116,8 @@ class NglpDlpTransformer(Transformer):
                     # vars in atom
                     interpretation = ""
                     for v in var:
-                        interpretation += f"r{self.counter}_{v}({c[actual_vars.index(v)]}), " if v in self.cur_var else f""
-                        f_args += f"{c[actual_vars.index(v)]}," if v in self.cur_var else f"{v},"
+                        interpretation += f"r{self.counter}_{v}({c[h_vars.index(v)]}), " if v in self.cur_var else f""
+                        f_args += f"{c[h_vars.index(v)]}," if v in self.cur_var else f"{v},"
 
                     if len(f_args) > 0:
                         f_args = f"{f.name}({f_args[:-1]})"
@@ -117,100 +126,152 @@ class NglpDlpTransformer(Transformer):
 
                     print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
 
-
             # reduce duplicates; track combinations
             sat_per_f = {}
             for f in self.cur_func:
                 sat_per_f[f] = []
 
-            # FOUND
+            # FOUND NEW
             if head is not None:
-                # head only
-                h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',') # all arguments (incl. duplicates / terms)
-                var = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
-                actual_vars = list (dict.fromkeys([a for a in h_args if a in self.cur_var])) # which have to be grounded per combination
+                # head
+                h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+                h_args_nd = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
+                h_vars = list(dict.fromkeys(
+                    [a for a in h_args if a in self.cur_var]))  # which have to be grounded per combination
 
-                rem = [v for v in self.cur_var if v not in var] # remaining variables not included in head atom (without facts)
+                rem = [v for v in self.cur_var if
+                       v not in h_vars]  # remaining variables not included in head atom (without facts)
 
                 # GUESS head
-                print(f"{{{head} : {','.join(f'dom({v})' for v in actual_vars)}}}.")
+                print(f"{{{head} : {','.join(f'dom({v})' for v in h_vars)}}}.")
 
-                found_per_f = {} # reduce duplicates; track combinations
-                head_c = {} # only one guess for each combination of other variables; save those
-                for f in self.cur_func:
-                    head_c[str(f)] = set()
-                    found_per_f[str(f)] = []
+                guesses_rem = {}
+                guesses_comb = {}  # only one guess for each combination of other variables; save those
 
-                for f in self.cur_func:  # all predicates
-                    if f != head:  # only for the body
-                        # TODO: check if head has arguments
+                # decide which body atom handles rem vars
+                for r in rem:
+                    guesses_comb[str(r)] = set()
+                    max = None
+                    vars_not_needed = None
+                    for f in self.cur_func:
                         f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
-                        f_var = list(dict.fromkeys(f_args)) # arguments (without duplicates / incl. terms)
-                        f_rem = [v for v in f_var if v in rem and v not in actual_vars] # remaining vars for current function
 
-                        combs = [p for p in itertools.product(self.terms, repeat=len(actual_vars)+len(f_rem))]
+                        if f != head and r in f_args:
+                            f_vars = list(dict.fromkeys([a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
+                            f_vars_needed = [f for f in f_vars if f in h_vars]
+                            if vars_not_needed is None or (len(h_vars)-len(f_vars_needed)) > vars_not_needed:
+                                max = f
+                                vars_not_needed = len(h_vars)-len(f_vars_needed)
+                    guesses_rem[r] = max
+
+                # over every body-atom
+                for f in self.cur_func:
+                    if f != head:
+                        f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+                        f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
+                        f_vars = list(dict.fromkeys(
+                            [a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
+
+                        f_rem = [v for v in f_vars if
+                                 v in rem]  # remaining vars for current function
+
+                        f_vars_needed = [f for f in f_vars if f in h_vars]  # vars needed for foundation of f: if A does not play role in f we can exclude it from combinations
+
+                        combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
 
                         for c in combs:
-                            interpretation = []
-                            # TODO: check for terms here
-                            for v in h_args:
-                                interpretation.append(c[actual_vars.index(v)] if v in actual_vars else v)
-                            head_interpretation = ','.join(interpretation)
-                            head_atom_interpretation = head.name + f'({head_interpretation})' if len(var) > 0 else head
-                            
-                            # fact-check
-                            if head.name in self.facts and len(h_args) in self.facts[head.name] and head_interpretation in self.facts[head.name][len(h_args)]:
-                                # no foundation check for this combination, its a fact!
-                                continue
+                            interpretation = [] # interpretation-list
+                            interpretation_uncomplete = [] # uncomplete; without removed vars
+                            nnv = [] # not needed vars
+                            combs_covered = [] # combinations covered with the (reduced combinations); len=1 when no variable is removed
+                            for id, v in enumerate(h_args):
+                                if v not in f_vars_needed and v not in self.terms:
+                                    nnv.append(v)
+                                else:
+                                    interpretation_uncomplete.append(c[f_vars_needed.index(v)] if v in f_vars_needed else v)
+                                interpretation.append(c[f_vars_needed.index(v)] if v in f_vars_needed else v)
 
-                            f_rem_atoms = [f"r{self.counter}_{v}({','.join([c[len(actual_vars) + f_rem.index(v)]] + interpretation)})"
-                                for v in f_var if v in rem]
-                            f_args = ""
+                            head_interpretation = ','.join(interpretation) # can include vars
+                            head_atom_interpretation = head.name + f'({head_interpretation})' if len(var) > 0 else head # can include vars
 
-                            # only one guess for each combination of other variables
-                            if head_interpretation not in head_c[str(f)]:
-                                head_c[str(f)].add(head_interpretation)
-                                for r in f_rem:
-                                    # 1{r1_Z(D,X,Y) : dom(D)}1 :- p(X,Y).
-                                    print(f"1{{r{self.counter}_{r}({','.join([r] + interpretation)}): dom({r})}}1 :- {head_atom_interpretation}.")
+                            nnv = list(dict.fromkeys(nnv))
 
-                            for v in f_var:
-                                f_args += f"{c[self.cur_var.index(v)]}," if v in actual_vars else \
-                                        (f"{v}," if v in self.terms else f"{c[len(actual_vars)+f_rem.index(v)]},")
+                            if len(nnv) > 0:
+                                combs_left_out = [p for p in itertools.product(self.terms, repeat=len(nnv))] # combinations for vars left out in head
+                                # create combinations covered for later use in constraints
+                                for clo in combs_left_out:
+                                    covered = interpretation.copy()
+                                    for id, item in enumerate(covered):
+                                        if item in nnv:
+                                            covered[id] = clo[nnv.index(item)]
+                                    combs_covered.append(covered)
+                            else:
+                                combs_covered.append(interpretation)
 
-                            if len(f_args) > 0:
-                                f_interpretation = f"{f.name}({f_args[:-1]})"
+                            # check if atom is used for rem-guess -> make rem guess
+                            combs_covered_tuples = [tuple(cc) for cc in combs_covered]
+                            for r in f_rem:
+                                if guesses_rem[r] == f:
+                                    if len(nnv) == 0:  # removed none
+                                        if combs_covered_tuples[0] not in guesses_comb[r]:
+                                            print(f"1{{r{self.counter}f_{r}({','.join([r] + interpretation_uncomplete)}): dom({r})}}1 :- {head_atom_interpretation}.")
+                                            guesses_comb[str(r)].add(combs_covered_tuples[0])
+                                    elif len(nnv) == len(h_vars):  # removed all
+                                        if not any(cc in guesses_comb[str(r)] for cc in combs_covered_tuples):
+                                            print(f"1{{r{self.counter}f_{r}({','.join([r] + interpretation_uncomplete)}): dom({r})}}1.")
+                                            for cc in combs_covered_tuples:
+                                                guesses_comb[str(r)].add(cc)
+                                    else:  # remove some
+                                        if not any(cc in guesses_comb[str(r)] for cc in combs_covered_tuples):
+                                            print(f"1{{r{self.counter}f_{r}({','.join([r] + interpretation)}): dom({r})}}1. :- {head_atom_interpretation}, {','.join(f'dom({v})' for v in nnv)}.")
+                                            for cc in combs_covered_tuples:
+                                                guesses_comb[str(r)].add(cc)
+
+                            index_vars = [str(h_args.index(v)) for v in h_args if v in f_vars_needed or v in self.terms]
+
+                            # generate body for unfound-rule
+                            f_args_unf = ""
+                            for v in f_args:
+                                f_args_unf += f"{c[f_vars_needed.index(v)]}," if v in f_vars_needed else \
+                                        (f"{v}," if v in self.terms else f"{c[len(f_vars_needed)+f_rem.index(v)]},")
+
+                            if len(f_args_unf) > 0:
+                                f_interpretation = f"{f.name}({f_args_unf[:-1]})"
                             else:
                                 f_interpretation = f"{f.name}"
 
+                            f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + (interpretation if len(f_vars_needed) > 0 else interpretation_uncomplete))})" for v in f_args_nd if v in rem]
+
                             f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
                             # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
-                            print(f"r{self.counter}_unfound({','.join(interpretation)}) :- "
+                            unfound_atom = f"r{self.counter}_unfound" + (f"_{''.join(index_vars)}" if len(f_vars_needed)<len(h_vars) else "") + (f"({','.join(interpretation_uncomplete)})" if len(interpretation_uncomplete)>0 else "")
+                            print(unfound_atom  + f" :- "
                                   f"{', '.join([f_interpretation] + f_rem_atoms)}.")
 
-                            self._addToFoundednessCheck(head.name, len(h_args), head_interpretation, self.counter)
+                            # predicate arity combinations rule indices
+                            self._addToFoundednessCheck(head.name, len(h_args), combs_covered, self.counter, index_vars)
 
-        else:
-            # foundation needed?
-            pred = str(node.head).split('(', 1)[0]
-            arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
-            arity = len(arguments)
-            arguments = ','.join(arguments)
-
-            if pred in self.ng_heads and arity in self.ng_heads[pred] \
-                    and not (pred in self.facts and arity in self.facts[pred] and arguments in self.facts[pred][arity]):
-
-                for body_atom in node.body:
-                    if str(body_atom).startswith("not "):
-                        neg = ""
-                    else:
-                        neg = "not "
-                    print(f"r{self.g_counter}_unfound({arguments}) :- "
-                          f"{ neg + str(body_atom)}.")
-                self._addToFoundednessCheck(pred, arity, arguments, self.g_counter)
-                self.g_counter = chr(ord(self.g_counter) + 1)
-            # print rule as it is
-            print(node)
+        # else: # TODO: update to foundation-check
+        #     # foundation needed?
+        #     pred = str(node.head).split('(', 1)[0]
+        #     arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
+        #     arity = len(arguments)
+        #     arguments = ','.join(arguments)
+        #
+        #     if pred in self.ng_heads and arity in self.ng_heads[pred] \
+        #             and not (pred in self.facts and arity in self.facts[pred] and arguments in self.facts[pred][arity]):
+        #
+        #         for body_atom in node.body:
+        #             if str(body_atom).startswith("not "):
+        #                 neg = ""
+        #             else:
+        #                 neg = "not "
+        #             print(f"r{self.g_counter}_unfound({arguments}) :- "
+        #                   f"{ neg + str(body_atom)}.")
+        #         self._addToFoundednessCheck(pred, arity, arguments, self.g_counter)
+        #         self.g_counter = chr(ord(self.g_counter) + 1)
+        #     # print rule as it is
+        #     print(node)
 
         self._reset_after_rule()
         return node
@@ -252,18 +313,28 @@ class NglpDlpTransformer(Transformer):
             self.rules = False
         return node
     
-    def _addToFoundednessCheck(self, pred, arity, combination, rule):
-        if pred not in self.f:
-            self.f[pred] = {}
-            self.f[pred][arity] = {}
-            self.f[pred][arity][combination] = {rule}
-        elif arity not in self.f[pred]:
-            self.f[pred][arity] = {}
-            self.f[pred][arity][combination] = {rule}
-        elif combination not in self.f[pred][arity]:
-            self.f[pred][arity][combination] = {rule}
-        else:
-            self.f[pred][arity][combination].add(rule)
+    def _addToFoundednessCheck(self, pred, arity, combinations, rule, indices):
+        indices = tuple(indices)
+
+        for c in combinations:
+            c = tuple(c)
+            if pred not in self.f:
+                self.f[pred] = {}
+                self.f[pred][arity] = {}
+                self.f[pred][arity][c] = {}
+                self.f[pred][arity][c][rule] = {indices}
+            elif arity not in self.f[pred]:
+                self.f[pred][arity] = {}
+                self.f[pred][arity][c] = {}
+                self.f[pred][arity][c][rule] = {indices}
+            elif c not in self.f[pred][arity]:
+                self.f[pred][arity][c] = {}
+                self.f[pred][arity][c][rule] = {indices}
+            elif rule not in self.f[pred][arity][c]:
+                self.f[pred][arity][c][rule] = {indices}
+            else:
+                self.f[pred][arity][c][rule].add(indices)
+        #print (self.f)
 
 class TermTransformer(Transformer):
     def __init__(self):
