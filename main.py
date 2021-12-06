@@ -153,6 +153,7 @@ class NglpDlpTransformer(Transformer):
                     guesses_comb[str(r)] = set()
                     max = None
                     vars_not_needed = None
+                    vars_needed = None
                     for f in self.cur_func:
                         f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
 
@@ -162,7 +163,8 @@ class NglpDlpTransformer(Transformer):
                             if vars_not_needed is None or (len(h_vars)-len(f_vars_needed)) > vars_not_needed:
                                 max = f
                                 vars_not_needed = len(h_vars)-len(f_vars_needed)
-                    guesses_rem[r] = max
+                                vars_needed = f_vars_needed
+                    guesses_rem[r] = {max: vars_needed}
 
                 # over every body-atom
                 for f in self.cur_func:
@@ -211,7 +213,7 @@ class NglpDlpTransformer(Transformer):
                             # check if atom is used for rem-guess -> make rem guess
                             combs_covered_tuples = [tuple(cc) for cc in combs_covered]
                             for r in f_rem:
-                                if guesses_rem[r] == f:
+                                if f in guesses_rem[r]:
                                     if len(nnv) == 0:  # removed none
                                         if combs_covered_tuples[0] not in guesses_comb[r]:
                                             print(f"1{{r{self.counter}f_{r}({','.join([r] + interpretation_uncomplete)}): dom({r})}}1 :- {head_atom_interpretation}.")
@@ -240,7 +242,8 @@ class NglpDlpTransformer(Transformer):
                             else:
                                 f_interpretation = f"{f.name}"
 
-                            f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + (interpretation if len(f_vars_needed) > 0 else interpretation_uncomplete))})" for v in f_args_nd if v in rem]
+                            #f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + (interpretation if len(f_vars_needed) > 0 else interpretation_uncomplete))})" for v in f_args_nd if v in rem]
+                            f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in guesses_rem[v].values()])})" for v in f_args_nd if v in rem]
 
                             f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
                             # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
