@@ -147,8 +147,6 @@ class NglpDlpTransformer(Transformer):
                 # GUESS head
                 print(f"{{{head} : {','.join(f'dom({v})' for v in h_vars)}}}.")
 
-                guesses_rem = {}
-                guesses_comb = {}  # only one guess for each combination of other variables; save those
                 g_r = {}
 
                 # path checking
@@ -179,6 +177,8 @@ class NglpDlpTransformer(Transformer):
                         else: # removed some
                             print(
                                 f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}, {doms}.")
+
+                #print (self.facts)
 
                 # over every body-atom
                 for f in self.cur_func:
@@ -223,8 +223,15 @@ class NglpDlpTransformer(Transformer):
                                     for id, item in enumerate(covered):
                                         if item in nnv:
                                             covered[id] = clo[nnv.index(item)]
+                                    if head.name in self.facts and len(h_args) in self.facts[
+                                        head.name] and ','.join(covered) in self.facts[head.name][len(h_args)]:
+                                        # no foundation check for this combination, its a fact!
+                                        continue
                                     combs_covered.append(covered)
                             else:
+                                if head.name in self.facts and len(h_args) in self.facts[head.name] and head_interpretation in self.facts[head.name][len(h_args)]:
+                                    # no foundation check for this combination, its a fact!
+                                    continue
                                 combs_covered.append(interpretation)
 
                             index_vars = [str(h_args.index(v)) for v in h_args if v in f_vars_needed or v in self.terms]
@@ -252,27 +259,26 @@ class NglpDlpTransformer(Transformer):
                             # predicate arity combinations rule indices
                             self._addToFoundednessCheck(head.name, len(h_args), combs_covered, self.counter, index_vars)
 
-        # else: # TODO: update to foundation-check
-        #     # foundation needed?
-        #     pred = str(node.head).split('(', 1)[0]
-        #     arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
-        #     arity = len(arguments)
-        #     arguments = ','.join(arguments)
-        #
-        #     if pred in self.ng_heads and arity in self.ng_heads[pred] \
-        #             and not (pred in self.facts and arity in self.facts[pred] and arguments in self.facts[pred][arity]):
-        #
-        #         for body_atom in node.body:
-        #             if str(body_atom).startswith("not "):
-        #                 neg = ""
-        #             else:
-        #                 neg = "not "
-        #             print(f"r{self.g_counter}_unfound({arguments}) :- "
-        #                   f"{ neg + str(body_atom)}.")
-        #         self._addToFoundednessCheck(pred, arity, arguments, self.g_counter)
-        #         self.g_counter = chr(ord(self.g_counter) + 1)
-        #     # print rule as it is
-        #     print(node)
+        else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
+            pred = str(node.head).split('(', 1)[0]
+            arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
+            arity = len(arguments)
+            arguments = ','.join(arguments)
+
+            if pred in self.ng_heads and arity in self.ng_heads[pred] \
+                    and not (pred in self.facts and arity in self.facts[pred] and arguments in self.facts[pred][arity]):
+
+                for body_atom in node.body:
+                    if str(body_atom).startswith("not "):
+                        neg = ""
+                    else:
+                        neg = "not "
+                    print(f"r{self.g_counter}_unfound({arguments}) :- "
+                          f"{ neg + str(body_atom)}.")
+                self._addToFoundednessCheck(pred, arity, [arguments.split(',')], self.g_counter, range(0,arity))
+                self.g_counter = chr(ord(self.g_counter) + 1)
+            # print rule as it is
+            print(node)
 
         self._reset_after_rule()
         return node
@@ -313,7 +319,7 @@ class NglpDlpTransformer(Transformer):
         else:
             self.rules = False
         return node
-    
+
     def _addToFoundednessCheck(self, pred, arity, combinations, rule, indices):
         indices = tuple(indices)
 
