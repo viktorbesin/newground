@@ -3,7 +3,7 @@ import itertools
 import re
 
 import clingo
-from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule
+from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
 from pprint import pprint
 
 import networkx as nx
@@ -60,6 +60,7 @@ class NglpDlpTransformer(Transformer):
         self.cur_var = []
         self.cur_func = []
         self.cur_func_sign = []
+        self.cur_comp = []
         self.shows = shows
         self.foundness ={}
         self.f = {}
@@ -70,6 +71,7 @@ class NglpDlpTransformer(Transformer):
         self.cur_var = []
         self.cur_func = []
         self.cur_func_sign = []
+        self.cur_comp = []
         self.cur_anon = 0
         self.ng = False
         #self.head = None
@@ -112,7 +114,7 @@ class NglpDlpTransformer(Transformer):
 
                 combinations = [p for p in itertools.product(self.terms, repeat=len(h_vars))]
 
-                var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
+                #var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
                 for c in combinations:
                     f_args = ""
                     # vars in atom
@@ -127,6 +129,26 @@ class NglpDlpTransformer(Transformer):
                         f_args = f"{f.name}"
 
                     print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
+
+            for f in self.cur_comp:
+                arguments = [str(f.left), str(f.right)] # all arguments (incl. duplicates / terms)
+                var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
+                vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
+
+                combinations = [p for p in itertools.product(self.terms, repeat=len(vars))]
+
+                for c in combinations:
+                    f_args = ""
+                    # vars in atom
+                    interpretation = ""
+                    for v in var:
+                        interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
+                        f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
+
+                    comp = self._getCompOperator(f.comparison)
+                    f_args = f"not {c[vars.index(var[0])] if var[0] in vars else var[0]} {comp} {c[vars.index(var[1])] if var[1] in vars else var[1]}"
+
+                    print (f"sat_r{self.counter} :- {interpretation}{f_args}.")
 
             # reduce duplicates; track combinations
             sat_per_f = {}
@@ -159,6 +181,9 @@ class NglpDlpTransformer(Transformer):
                             for v2 in f_vars:
                                 g.add_edge(v1,v2)
 
+                for comp in self.cur_comp:
+                    g.add_edge(str(comp.left), str(comp.left))
+
                 for r in rem:
                     g_r[r] = []
                     for n in nx.dfs_postorder_nodes(g, source=r):
@@ -178,8 +203,6 @@ class NglpDlpTransformer(Transformer):
                             print(
                                 f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}, {doms}.")
 
-                #print (self.facts)
-
                 # over every body-atom
                 for f in self.cur_func:
                     if f != head:
@@ -189,52 +212,14 @@ class NglpDlpTransformer(Transformer):
 
                         f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
 
-                        f_vars_needed = [f for f in f_vars if f in h_vars] # bounded head vars which are needed for foundation
-                        for r in f_rem:
-                            for n in nx.dfs_postorder_nodes(g, source=r):
-                                if n in h_vars and n not in f_vars_needed:
-                                    f_vars_needed.append(n)
-
+                        f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
 
                         combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
 
                         for c in combs:
-                            interpretation = [] # interpretation-list
-                            interpretation_incomplete = [] # uncomplete; without removed vars
-                            nnv = [] # not needed vars
-                            combs_covered = [] # combinations covered with the (reduced combinations); len=1 when no variable is removed
-                            for id, v in enumerate(h_args):
-                                if v not in f_vars_needed and v not in self.terms:
-                                    nnv.append(v)
-                                else:
-                                    interpretation_incomplete.append(c[f_vars_needed.index(v)] if v in f_vars_needed else v)
-                                interpretation.append(c[f_vars_needed.index(v)] if v in f_vars_needed else v)
-
-                            head_interpretation = ','.join(interpretation) # can include vars
-                            head_atom_interpretation = head.name + f'({head_interpretation})' if len(var) > 0 else head # can include vars
-
-                            nnv = list(dict.fromkeys(nnv))
-
-                            if len(nnv) > 0:
-                                combs_left_out = [p for p in itertools.product(self.terms, repeat=len(nnv))] # combinations for vars left out in head
-                                # create combinations covered for later use in constraints
-                                for clo in combs_left_out:
-                                    covered = interpretation.copy()
-                                    for id, item in enumerate(covered):
-                                        if item in nnv:
-                                            covered[id] = clo[nnv.index(item)]
-                                    if head.name in self.facts and len(h_args) in self.facts[
-                                        head.name] and ','.join(covered) in self.facts[head.name][len(h_args)]:
-                                        # no foundation check for this combination, its a fact!
-                                        continue
-                                    combs_covered.append(covered)
-                            else:
-                                if head.name in self.facts and len(h_args) in self.facts[head.name] and head_interpretation in self.facts[head.name][len(h_args)]:
-                                    # no foundation check for this combination, its a fact!
-                                    continue
-                                combs_covered.append(interpretation)
-
-                            index_vars = [str(h_args.index(v)) for v in h_args if v in f_vars_needed or v in self.terms]
+                            interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
+                            if combs_covered is None or combs_covered == []:
+                                continue
 
                             # generate body for unfound-rule
                             f_args_unf = ""
@@ -247,7 +232,6 @@ class NglpDlpTransformer(Transformer):
                             else:
                                 f_interpretation = f"{f.name}"
 
-                            #f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + (interpretation if len(f_vars_needed) > 0 else interpretation_incomplete))})" for v in f_args_nd if v in rem]
                             f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})" for v in f_args_nd if v in rem]
 
                             f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
@@ -258,6 +242,37 @@ class NglpDlpTransformer(Transformer):
 
                             # predicate arity combinations rule indices
                             self._addToFoundednessCheck(head.name, len(h_args), combs_covered, self.counter, index_vars)
+
+                for f in self.cur_comp:
+                    f_args = [str(f.left), str(f.right)]  # all arguments (incl. duplicates / terms)
+                    f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
+                    f_vars = list(dict.fromkeys([a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
+
+                    f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
+                    f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+
+                    combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
+                    for c in combs:
+                        interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
+                        if combs_covered is None or combs_covered == []:
+                            continue
+                        # generate body for unfound-rule
+                        f_args_unf_left = f"{c[f_vars_needed.index(f_args[0])]}" if f_args[0] in f_vars_needed else (f"{f_args[0]}" if f_args[0] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[0])]}")
+                        f_args_unf_right = f"{c[f_vars_needed.index(f_args[1])]}" if f_args[1] in f_vars_needed else (f"{f_args[1]}" if f_args[1] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[1])]}")
+
+                        f_rem_atoms = [
+                            f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})"
+                            for v in f_args_nd if v in rem]
+
+                        unfound_atom = f"r{self.counter}_unfound" + (
+                            f"_{''.join(index_vars)}" if len(f_vars_needed) < len(h_vars) else "") + (
+                                           f"({','.join(interpretation_incomplete)})" if len(
+                                               interpretation_incomplete) > 0 else "")
+                        print(unfound_atom + f" :- "
+                                             f"{', '.join([f'not {f_args_unf_left} {self._getCompOperator(f.comparison)} {f_args_unf_right}'] + f_rem_atoms)}.")
+
+
+
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
             pred = str(node.head).split('(', 1)[0]
@@ -285,7 +300,8 @@ class NglpDlpTransformer(Transformer):
 
     def visit_Literal(self, node):
         if str(node) != "#false":
-            self.cur_func_sign.append(str(node).startswith("not "))
+            if node.atom.ast_type is clingo.ast.ASTType.SymbolicAtom: # comparisons are reversed by parsing, therefore always using not is sufficient
+                self.cur_func_sign.append(str(node).startswith("not "))
         self.visit_children(node)
         return node
 
@@ -319,6 +335,80 @@ class NglpDlpTransformer(Transformer):
         else:
             self.rules = False
         return node
+
+    def visit_Comparison(self, node):
+        # currently implements only terms/variables
+        assert(node.left.ast_type is clingo.ast.ASTType.Variable or node.left.ast_type is clingo.ast.ASTType.SymbolicTerm)
+        assert (node.right.ast_type is clingo.ast.ASTType.Variable or node.right.ast_type is clingo.ast.ASTType.SymbolicTerm)
+
+        self.cur_comp.append(node)
+        self.visit_children(node)
+        return node
+
+    def _getCompOperator(self, comp):
+        if comp is int(clingo.ast.ComparisonOperator.Equal):
+            return "="
+        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
+            return "!="
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
+            return ">="
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
+            return ">"
+        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
+            return "<="
+        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
+            return "<"
+        else:
+            assert(False) # not implemented
+
+    def _getVarsNeeded(self, h_vars, f_vars, f_rem, g):
+        f_vars_needed = [f for f in f_vars if f in h_vars]  # bounded head vars which are needed for foundation
+        for r in f_rem:
+            for n in nx.dfs_postorder_nodes(g, source=r):
+                if n in h_vars and n not in f_vars_needed:
+                    f_vars_needed.append(n)
+        return f_vars_needed
+
+    def _generateCombinationInformation(self, h_args, f_vars_needed, c, head):
+        interpretation = []  # interpretation-list
+        interpretation_incomplete = []  # uncomplete; without removed vars
+        nnv = []  # not needed vars
+        combs_covered = []  # combinations covered with the (reduced combinations); len=1 when no variable is removed
+        for id, v in enumerate(h_args):
+            if v not in f_vars_needed and v not in self.terms:
+                nnv.append(v)
+            else:
+                interpretation_incomplete.append(c[f_vars_needed.index(v)] if v in f_vars_needed else v)
+            interpretation.append(c[f_vars_needed.index(v)] if v in f_vars_needed else v)
+
+        head_interpretation = ','.join(interpretation)  # can include vars
+
+        nnv = list(dict.fromkeys(nnv))
+
+        if len(nnv) > 0:
+            combs_left_out = [p for p in
+                              itertools.product(self.terms, repeat=len(nnv))]  # combinations for vars left out in head
+            # create combinations covered for later use in constraints
+            for clo in combs_left_out:
+                covered = interpretation.copy()
+                for id, item in enumerate(covered):
+                    if item in nnv:
+                        covered[id] = clo[nnv.index(item)]
+                if head.name in self.facts and len(h_args) in self.facts[
+                    head.name] and ','.join(covered) in self.facts[head.name][len(h_args)]:
+                    # no foundation check for this combination, its a fact!
+                    continue
+                combs_covered.append(covered)
+        else:
+            if head.name in self.facts and len(h_args) in self.facts[head.name] and head_interpretation in \
+                    self.facts[head.name][len(h_args)]:
+                # no foundation check for this combination, its a fact!
+                return None, None, None, None
+            combs_covered.append(interpretation)
+
+        index_vars = [str(h_args.index(v)) for v in h_args if v in f_vars_needed or v in self.terms]
+
+        return interpretation, interpretation_incomplete, combs_covered, index_vars
 
     def _addToFoundednessCheck(self, pred, arity, combinations, rule, indices):
         indices = tuple(indices)
