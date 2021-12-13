@@ -106,30 +106,8 @@ class NglpDlpTransformer(Transformer):
                     # r1_x(1) :- sat. r1_x(2) :- sat. ...
                     print(f"r{self.counter}_{v}({t}) :- sat.")
 
-            # create combinations
-            for f in self.cur_func:
-                arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
-                var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
-                h_vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
-
-                combinations = [p for p in itertools.product(self.terms, repeat=len(h_vars))]
-
-                #var = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')
-                for c in combinations:
-                    f_args = ""
-                    # vars in atom
-                    interpretation = ""
-                    for v in var:
-                        interpretation += f"r{self.counter}_{v}({c[h_vars.index(v)]}), " if v in self.cur_var else f""
-                        f_args += f"{c[h_vars.index(v)]}," if v in self.cur_var else f"{v},"
-
-                    if len(f_args) > 0:
-                        f_args = f"{f.name}({f_args[:-1]})"
-                    else:
-                        f_args = f"{f.name}"
-
-                    print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
-
+            # SAT
+            covered_cmp = {} # reduce SAT rules when compare-operators are pre-checked
             for f in self.cur_comp:
                 arguments = [str(f.left), str(f.right)] # all arguments (incl. duplicates / terms)
                 var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
@@ -137,18 +115,49 @@ class NglpDlpTransformer(Transformer):
 
                 combinations = [p for p in itertools.product(self.terms, repeat=len(vars))]
 
+                vars_set = frozenset(vars)
+                if vars_set not in covered_cmp:
+                    covered_cmp[vars_set] = set()
+
                 for c in combinations:
-                    f_args = ""
-                    # vars in atom
-                    interpretation = ""
-                    for v in var:
-                        interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
-                        f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
+                    c_varset = tuple([c[vars.index(v)] for v in vars_set])
+                    if c_varset not in covered_cmp[vars_set]:
+                        f_args = ""
+                        # vars in atom
+                        interpretation = ""
+                        for v in var:
+                            interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
+                            f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
+                        c1 = int(c[vars.index(var[0])] if var[0] in vars else var[0])
+                        c2 = int(c[vars.index(var[1])] if var[1] in vars else var[1])
+                        if not self._compareTerms(f.comparison, c1, c2):
+                            covered_cmp[vars_set].add(c_varset)
+                            print (f"sat_r{self.counter} :- {interpretation[:-2]}.")
 
-                    comp = self._getCompOperator(f.comparison)
-                    f_args = f"not {c[vars.index(var[0])] if var[0] in vars else var[0]} {comp} {c[vars.index(var[1])] if var[1] in vars else var[1]}"
+            for f in self.cur_func:
+                arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
+                var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
+                vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
 
-                    print (f"sat_r{self.counter} :- {interpretation}{f_args}.")
+                combinations = [p for p in itertools.product(self.terms, repeat=len(vars))]
+                vars_set = frozenset(vars)
+
+                for c in combinations:
+                    c_varset = tuple([c[vars.index(v)] for v in vars_set])
+                    if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
+                        f_args = ""
+                        # vars in atom
+                        interpretation = ""
+                        for v in var:
+                            interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
+                            f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
+
+                        if len(f_args) > 0:
+                            f_args = f"{f.name}({f_args[:-1]})"
+                        else:
+                            f_args = f"{f.name}"
+
+                        print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
 
             # reduce duplicates; track combinations
             sat_per_f = {}
@@ -203,6 +212,55 @@ class NglpDlpTransformer(Transformer):
                             print(
                                 f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}, {doms}.")
 
+                covered_cmp = {}
+                # for every cmp operator
+                for f in self.cur_comp:
+                    f_args = [str(f.left), str(f.right)]  # all arguments (incl. duplicates / terms)
+                    f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
+                    f_vars = list(dict.fromkeys(
+                        [a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
+
+                    f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
+                    f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+
+                    vars_set = frozenset(f_vars_needed + f_rem)
+                    if vars_set not in covered_cmp:
+                        covered_cmp[vars_set] = set()
+
+                    combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
+                    for c in combs:
+                        c_varset = tuple(
+                            [c[f_vars_needed.index(v)] if v in f_vars_needed else c[len(f_vars_needed) + f_rem.index(v)]
+                             for v in vars_set])
+                        if c_varset not in covered_cmp[vars_set]:
+                            interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(
+                                h_args, f_vars_needed, c, head)
+                            if combs_covered is None or combs_covered == []:
+                                continue
+                            # generate body for unfound-rule
+                            f_args_unf_left = f"{c[f_vars_needed.index(f_args[0])]}" if f_args[
+                                                                                            0] in f_vars_needed else (
+                                f"{f_args[0]}" if f_args[
+                                                      0] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[0])]}")
+                            f_args_unf_right = f"{c[f_vars_needed.index(f_args[1])]}" if f_args[
+                                                                                             1] in f_vars_needed else (
+                                f"{f_args[1]}" if f_args[
+                                                      1] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[1])]}")
+
+                            if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
+                                f_rem_atoms = [
+                                    f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})"
+                                    for v in f_args_nd if v in rem]
+
+                                covered_cmp[vars_set].add(c_varset)
+
+                                unfound_atom = f"r{self.counter}_unfound" + (
+                                    f"_{''.join(index_vars)}" if len(f_vars_needed) < len(h_vars) else "") + (
+                                                   f"({','.join(interpretation_incomplete)})" if len(
+                                                       interpretation_incomplete) > 0 else "")
+                                print(unfound_atom + (
+                                    f" :- {', '.join(f_rem_atoms)}" if len(f_rem_atoms) > 0 else "") + ".")
+
                 # over every body-atom
                 for f in self.cur_func:
                     if f != head:
@@ -214,64 +272,41 @@ class NglpDlpTransformer(Transformer):
 
                         f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
 
+                        vars_set = frozenset(f_vars_needed + f_rem)
+
                         combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
 
                         for c in combs:
-                            interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
-                            if combs_covered is None or combs_covered == []:
-                                continue
+                            c_varset = tuple(
+                                [c[f_vars_needed.index(v)] if v in f_vars_needed else c[
+                                    len(f_vars_needed) + f_rem.index(v)]
+                                 for v in vars_set])
+                            if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
+                                interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
+                                if combs_covered is None or combs_covered == []:
+                                    continue
 
-                            # generate body for unfound-rule
-                            f_args_unf = ""
-                            for v in f_args:
-                                f_args_unf += f"{c[f_vars_needed.index(v)]}," if v in f_vars_needed else \
-                                        (f"{v}," if v in self.terms else f"{c[len(f_vars_needed)+f_rem.index(v)]},")
+                                # generate body for unfound-rule
+                                f_args_unf = ""
+                                for v in f_args:
+                                    f_args_unf += f"{c[f_vars_needed.index(v)]}," if v in f_vars_needed else \
+                                            (f"{v}," if v in self.terms else f"{c[len(f_vars_needed)+f_rem.index(v)]},")
 
-                            if len(f_args_unf) > 0:
-                                f_interpretation = f"{f.name}({f_args_unf[:-1]})"
-                            else:
-                                f_interpretation = f"{f.name}"
+                                if len(f_args_unf) > 0:
+                                    f_interpretation = f"{f.name}({f_args_unf[:-1]})"
+                                else:
+                                    f_interpretation = f"{f.name}"
 
-                            f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})" for v in f_args_nd if v in rem]
+                                f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})" for v in f_args_nd if v in rem]
 
-                            f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
-                            # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
-                            unfound_atom = f"r{self.counter}_unfound" + (f"_{''.join(index_vars)}" if len(f_vars_needed)<len(h_vars) else "") + (f"({','.join(interpretation_incomplete)})" if len(interpretation_incomplete)>0 else "")
-                            print(unfound_atom  + f" :- "
-                                  f"{', '.join([f_interpretation] + f_rem_atoms)}.")
+                                f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
+                                # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
+                                unfound_atom = f"r{self.counter}_unfound" + (f"_{''.join(index_vars)}" if len(f_vars_needed)<len(h_vars) else "") + (f"({','.join(interpretation_incomplete)})" if len(interpretation_incomplete)>0 else "")
+                                print(unfound_atom  + f" :- "
+                                      f"{', '.join([f_interpretation] + f_rem_atoms)}.")
 
-                            # predicate arity combinations rule indices
-                            self._addToFoundednessCheck(head.name, len(h_args), combs_covered, self.counter, index_vars)
-
-                for f in self.cur_comp:
-                    f_args = [str(f.left), str(f.right)]  # all arguments (incl. duplicates / terms)
-                    f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
-                    f_vars = list(dict.fromkeys([a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
-
-                    f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
-                    f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
-
-                    combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
-                    for c in combs:
-                        interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
-                        if combs_covered is None or combs_covered == []:
-                            continue
-                        # generate body for unfound-rule
-                        f_args_unf_left = f"{c[f_vars_needed.index(f_args[0])]}" if f_args[0] in f_vars_needed else (f"{f_args[0]}" if f_args[0] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[0])]}")
-                        f_args_unf_right = f"{c[f_vars_needed.index(f_args[1])]}" if f_args[1] in f_vars_needed else (f"{f_args[1]}" if f_args[1] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[1])]}")
-
-                        f_rem_atoms = [
-                            f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})"
-                            for v in f_args_nd if v in rem]
-
-                        unfound_atom = f"r{self.counter}_unfound" + (
-                            f"_{''.join(index_vars)}" if len(f_vars_needed) < len(h_vars) else "") + (
-                                           f"({','.join(interpretation_incomplete)})" if len(
-                                               interpretation_incomplete) > 0 else "")
-                        print(unfound_atom + f" :- "
-                                             f"{', '.join([f'not {f_args_unf_left} {self._getCompOperator(f.comparison)} {f_args_unf_right}'] + f_rem_atoms)}.")
-
-
+                                # predicate arity combinations rule indices
+                                self._addToFoundednessCheck(head.name, len(h_args), combs_covered, self.counter, index_vars)
 
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -358,6 +393,22 @@ class NglpDlpTransformer(Transformer):
             return "<="
         elif comp is int(clingo.ast.ComparisonOperator.LessThan):
             return "<"
+        else:
+            assert(False) # not implemented
+
+    def _compareTerms(self, comp, c1, c2):
+        if comp is int(clingo.ast.ComparisonOperator.Equal):
+            return c1 == c2
+        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
+            return c1 != c2
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
+            return c1 >= c2
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
+            return c1 > c2
+        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
+            return c1 <= c2
+        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
+            return c1 < c2
         else:
             assert(False) # not implemented
 
