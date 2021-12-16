@@ -37,7 +37,7 @@ class ClingoApp(object):
                                 sum_atom = f"#sum {{{'; '.join(sum_sets)}}} >= 1"
                                 rule_sets.append(sum_atom)
                             head = ','.join(c)
-                            print(f":- {', '.join([f'{p}({head})'] + rule_sets)}.")
+                            print(f":- {', '.join([f'{p}' +(f'({head})' if len(head)>0 else '')] + rule_sets)}.")
 
                 for t in transformer.terms:
                     print (f"dom({t}).")
@@ -136,9 +136,14 @@ class NglpDlpTransformer(Transformer):
                             print (f"sat_r{self.counter} :- {interpretation[:-2]}.")
 
             for f in self.cur_func:
+                args_len = len(f.arguments)
+                if (args_len == 0):
+                    print(
+                        f"sat_r{self.counter} :-{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else ' not'} {f}.")
+                    continue
                 arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
-                var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
-                vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
+                var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
+                vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) if args_len > 0 else [] # which have to be grounded per combination
 
                 combinations = [p for p in itertools.product(self.terms, repeat=len(vars))]
                 vars_set = frozenset(vars)
@@ -169,6 +174,7 @@ class NglpDlpTransformer(Transformer):
             # FOUND NEW
             if head is not None:
                 # head
+                h_args_len = len(head.arguments)
                 h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
                 h_args_nd = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
                 h_vars = list(dict.fromkeys(
@@ -178,15 +184,16 @@ class NglpDlpTransformer(Transformer):
                        v not in h_vars]  # remaining variables not included in head atom (without facts)
 
                 # GUESS head
-                print(f"{{{head} : {','.join(f'dom({v})' for v in h_vars)}}}.")
+                print(f"{{{head}" + (f" : {','.join(f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
 
                 g_r = {}
 
                 # path checking
                 g = nx.Graph()
                 for f in self.cur_func:
+                    f_args_len = len(f.arguments)
                     f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
-                    if f != head:
+                    if f != head and f_args_len > 0:
                         f_vars = list(dict.fromkeys([a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
                         for v1 in f_vars:
                             for v2 in f_vars:
@@ -203,7 +210,7 @@ class NglpDlpTransformer(Transformer):
 
                     needed_combs = [p for p in itertools.product(self.terms, repeat=len(g_r[r]))]
                     for c in needed_combs:
-                        head_interpretation = f"{head.name}({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})"
+                        head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
                         rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
                         doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
                         if len(h_vars) == len(g_r[r]):  # removed none
@@ -264,10 +271,14 @@ class NglpDlpTransformer(Transformer):
                                                        interpretation_incomplete) > 0 else "")
                                 print(unfound_atom + (
                                     f" :- {', '.join(f_rem_atoms)}" if len(f_rem_atoms) > 0 else "") + ".")
+                                #print (f"{h_args_len} | {combs_covered} | {index_vars}")
+                                self._addToFoundednessCheck(head.name, h_args_len, combs_covered, self.counter,
+                                                            index_vars)
 
                 # over every body-atom
                 for f in self.cur_func:
                     if f != head:
+                        f_args_len = len(f.arguments)
                         f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
                         f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
                         f_vars = list(dict.fromkeys([a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
@@ -292,12 +303,12 @@ class NglpDlpTransformer(Transformer):
                                     continue
 
                                 # generate body for unfound-rule
-                                f_args_unf = ""
-                                for v in f_args:
-                                    f_args_unf += f"{c[f_vars_needed.index(v)]}," if v in f_vars_needed else \
-                                            (f"{v}," if v in self.terms else f"{c[len(f_vars_needed)+f_rem.index(v)]},")
-
-                                if len(f_args_unf) > 0:
+                                if f_args_len > 0:
+                                    f_args_unf = ""
+                                    for v in f_args:
+                                        f_args_unf += f"{c[f_vars_needed.index(v)]}," if v in f_vars_needed else \
+                                            (
+                                                f"{v}," if v in self.terms else f"{c[len(f_vars_needed) + f_rem.index(v)]},")
                                     f_interpretation = f"{f.name}({f_args_unf[:-1]})"
                                 else:
                                     f_interpretation = f"{f.name}"
@@ -311,7 +322,7 @@ class NglpDlpTransformer(Transformer):
                                       f"{', '.join([f_interpretation] + f_rem_atoms)}.")
 
                                 # predicate arity combinations rule indices
-                                self._addToFoundednessCheck(head.name, len(h_args), combs_covered, self.counter, index_vars)
+                                self._addToFoundednessCheck(head.name, h_args_len, combs_covered, self.counter, index_vars)
 
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -421,7 +432,6 @@ class NglpDlpTransformer(Transformer):
         for key in base:
             if key.issubset(current):
                 c = tuple([c_varset[current.index(p)] for p in list(key)])
-                #print (f"check for: {c} in {key}")
                 if c in base[key]:
                     return True
         return False
@@ -439,6 +449,10 @@ class NglpDlpTransformer(Transformer):
         interpretation_incomplete = []  # uncomplete; without removed vars
         nnv = []  # not needed vars
         combs_covered = []  # combinations covered with the (reduced combinations); len=1 when no variable is removed
+
+        if h_args == ['']: # catch head/0
+            return interpretation, interpretation_incomplete, [['']],  [str(h_args.index(v)) for v in h_args if v in f_vars_needed or v in self.terms]
+
         for id, v in enumerate(h_args):
             if v not in f_vars_needed and v not in self.terms:
                 nnv.append(v)
