@@ -1,1 +1,1 @@
-./noclingo $1 | clingo --project
+./noclingo.sh $1 | clingo --stats=2 --project

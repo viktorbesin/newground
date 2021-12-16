@@ -1,2 +1,2 @@
-dom(1..400).
-e(X,Y) :- dom(X), dom(Y).
+xdom(1..400).
+e(X,Y) :- xdom(X), xdom(Y).
