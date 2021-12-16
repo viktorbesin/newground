@@ -121,7 +121,8 @@ class NglpDlpTransformer(Transformer):
 
                 for c in combinations:
                     c_varset = tuple([c[vars.index(v)] for v in vars_set])
-                    if c_varset not in covered_cmp[vars_set]:
+                    if not self._checkForCoveredSubsets(covered_cmp, list(vars_set),c_varset):  # smaller sets are also possible
+                    #if c_varset not in covered_cmp[vars_set]:
                         f_args = ""
                         # vars in atom
                         interpretation = ""
@@ -144,7 +145,8 @@ class NglpDlpTransformer(Transformer):
 
                 for c in combinations:
                     c_varset = tuple([c[vars.index(v)] for v in vars_set])
-                    if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
+                    if not self._checkForCoveredSubsets(covered_cmp, list(vars_set), c_varset):  # smaller sets are also possible
+                    #if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
                         f_args = ""
                         # vars in atom
                         interpretation = ""
@@ -232,7 +234,9 @@ class NglpDlpTransformer(Transformer):
                         c_varset = tuple(
                             [c[f_vars_needed.index(v)] if v in f_vars_needed else c[len(f_vars_needed) + f_rem.index(v)]
                              for v in vars_set])
-                        if c_varset not in covered_cmp[vars_set]:
+
+                        if not self._checkForCoveredSubsets(covered_cmp, list(vars_set), c_varset): # smaller sets are also possible
+                        #if c_varset not in covered_cmp[vars_set]:  # smaller sets are also possible
                             interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(
                                 h_args, f_vars_needed, c, head)
                             if combs_covered is None or combs_covered == []:
@@ -281,7 +285,8 @@ class NglpDlpTransformer(Transformer):
                                 [c[f_vars_needed.index(v)] if v in f_vars_needed else c[
                                     len(f_vars_needed) + f_rem.index(v)]
                                  for v in vars_set])
-                            if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
+                            if not self._checkForCoveredSubsets(covered_cmp, list(vars_set),c_varset):  # smaller sets are also possible
+                            #if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
                                 interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
                                 if combs_covered is None or combs_covered == []:
                                     continue
@@ -411,6 +416,15 @@ class NglpDlpTransformer(Transformer):
             return c1 < c2
         else:
             assert(False) # not implemented
+
+    def _checkForCoveredSubsets(self, base, current, c_varset):
+        for key in base:
+            if key.issubset(current):
+                c = tuple([c_varset[current.index(p)] for p in list(key)])
+                #print (f"check for: {c} in {key}")
+                if c in base[key]:
+                    return True
+        return False
 
     def _getVarsNeeded(self, h_vars, f_vars, f_rem, g):
         f_vars_needed = [f for f in f_vars if f in h_vars]  # bounded head vars which are needed for foundation
