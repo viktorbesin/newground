@@ -359,9 +359,9 @@ class NglpDlpTransformer(Transformer):
     def visit_Function(self, node):
         # shows
         if node.name in self.shows:
-            self.shows[node.name].add(len(re.sub(r'^.*?\(', '', str(node))[:-1].split(',')))
+            self.shows[node.name].add(len(node.arguments))
         else:
-            self.shows[node.name] = {len(re.sub(r'^.*?\(', '', str(node))[:-1].split(','))}
+            self.shows[node.name] = {len(node.arguments)}
 
         node = node.update(**self.visit_children(node))
         self.cur_func.append(node)
@@ -548,9 +548,9 @@ class TermTransformer(Transformer):
     def visit_Function(self, node):
         # shows
         if node.name in self.shows:
-            self.shows[node.name].add(len(re.sub(r'^.*?\(', '', str(node))[:-1].split(',')))
+            self.shows[node.name].add(len(node.arguments))
         else:
-            self.shows[node.name] = {len(re.sub(r'^.*?\(', '', str(node))[:-1].split(','))}
+            self.shows[node.name] = {len(node.arguments)}
         self.visit_children(node)
         return node
 
