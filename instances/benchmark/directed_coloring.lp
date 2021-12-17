@@ -1,8 +1,8 @@
 %xdom(1..400).
-{ g(X,Y); b(X,Y); r(X,Y) } :- e(X,Y). 
+{ g(X,Y); b(X,Y); r(X,Y) } :- edge(X,Y). 
 :- g(X,Y), b(X,Y).
-:- g(X,Y), r(X,Y). %; r(X,Y) } :- e(X,Y). 
-:- r(X,Y), b(X,Y). %; r(X,Y) } :- e(X,Y). 
+:- g(X,Y), r(X,Y). %; r(X,Y) } :- edge(X,Y). 
+:- r(X,Y), b(X,Y). %; r(X,Y) } :- edge(X,Y). 
 %1 { g(X,Y), b(X,Y), r(X,Y) } 1 :- xdom(X),xdom(Y). 
 %
 #program rules.

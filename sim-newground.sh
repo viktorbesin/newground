@@ -1,1 +1,1 @@
-python3 main.py $* | wc
+$(dirname "$0")/newground.sh $* | wc
