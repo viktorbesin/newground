@@ -1,1 +1,1 @@
-clingo --stats=2 --project
+clingo --stats=2 --project -q
