@@ -10,9 +10,10 @@ manNok(M,W) :- manAssignsScore(M,W,Smw), W1 <> W, manAssignsScore(M,W1,Smw1),   
 
 womanNok(M,W) :- womanAssignsScore(W,M,Swm),        womanAssignsScore(W,M1,Swm1), Swm >= Swm1, match(M1,W).
 
+% strong stability condition
+:- manNok(M,W), womanNok(M,W).
+
 #program rules.
 % no polygamy
 :- match(M1,W), match(M,W), M <> M1.
 :- match(M,W), match(M,W1), W <> W1.
-% strong stability condition
-:- match(M,W1), manNok(M,W), womanNok(M,W), W1 <> W.
