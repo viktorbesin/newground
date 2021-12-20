@@ -1,3 +1,5 @@
+vertex(X) :- edge(X,_).
+vertex(Y) :- edge(_,Y).
 keep(X) :- vertex(X), not delete(X).
 delete(X) :- vertex(X), not keep(X).
 :- delete(X), vertex(Y), not keep(Y), X != Y.
