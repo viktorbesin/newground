@@ -4,6 +4,7 @@ import re
 
 import clingo
 from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
+from clingo.control import Control
 from pprint import pprint
 
 import networkx as nx
@@ -11,9 +12,13 @@ import networkx as nx
 class ClingoApp(object):
     def __init__(self, name):
         self.program_name = name
+        self.sub_doms = {}
 
     def main(self, ctl, files):
-        term_transformer = TermTransformer()
+        # read subdomains in #program insts.
+        self._readSubDoms(ctl,files)
+
+        term_transformer = TermTransformer(self.sub_doms)
         parse_files(files, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
@@ -46,6 +51,18 @@ class ClingoApp(object):
                     for f in transformer.shows.keys():
                         for l in transformer.shows[f]:
                             print (f"#show {f}/{l}.")
+
+    def _readSubDoms(self, ctl_insts, files):
+        #ctl_insts = Control()
+        for f in files:
+            ctl_insts.load(f)
+        ctl_insts.ground([("insts", [])])
+        for k in ctl_insts.symbolic_atoms:
+            if(str(k.symbol).startswith('_dom_')):
+                var = str(k.symbol).split("(", 1)[0]
+                atom = re.sub(r'^.*?\(', '', str(k.symbol))[:-1]
+                _addToSubdom(self.sub_doms, var, atom)
+
 
 class NglpDlpTransformer(Transformer):  
     def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms):
@@ -521,9 +538,9 @@ class NglpDlpTransformer(Transformer):
                 self.f[pred][arity][c][rule].add(indices)
 
 class TermTransformer(Transformer):
-    def __init__(self):
+    def __init__(self, sub_doms):
         self.terms = []
-        self.sub_doms = {}
+        self.sub_doms = sub_doms
         self.facts = {}
         self.ng_heads = {}
         self.ng = False
@@ -575,13 +592,13 @@ class TermTransformer(Transformer):
         for i in range(int(str(node.left)), int(str(node.right))+1):
             if (str(i) not in self.terms):
                 self.terms.append(str(i))
-            self._addToSubdom(self.current_f, str(i))
+            _addToSubdom(self.sub_doms, self.current_f, str(i))
         return node
 
     def visit_SymbolicTerm(self, node):
         if (str(node) not in self.terms):
             self.terms.append(str(node))
-        self._addToSubdom(self.current_f, str(node))
+        _addToSubdom(self.sub_doms, self.current_f, str(node))
         return node
 
     def visit_ShowSignature(self, node):
@@ -589,17 +606,17 @@ class TermTransformer(Transformer):
         print (node)
         return node
 
-    def _addToSubdom(self, var, value):
-        if var.startswith('_dom_'):
-            var = var[5:]
-        else:
-            return
+def _addToSubdom(sub_doms, var, value):
+    if var.startswith('_dom_'):
+        var = var[5:]
+    else:
+        return
 
-        if var not in self.sub_doms:
-            self.sub_doms[var] = []
-            self.sub_doms[var].append(value)
-        elif value not in self.sub_doms[var]:
-            self.sub_doms[var].append(value)
+    if var not in sub_doms:
+        sub_doms[var] = []
+        sub_doms[var].append(value)
+    elif value not in sub_doms[var]:
+        sub_doms[var].append(value)
 
 if __name__ == "__main__":
     # no output from clingo itself
