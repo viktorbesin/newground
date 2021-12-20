@@ -4,6 +4,7 @@ import re
 
 import clingo
 from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
+from clingo.control import Control
 from pprint import pprint
 
 import networkx as nx
@@ -11,13 +12,17 @@ import networkx as nx
 class ClingoApp(object):
     def __init__(self, name):
         self.program_name = name
+        self.sub_doms = {}
 
     def main(self, ctl, files):
-        term_transformer = TermTransformer()
+        # read subdomains in #program insts.
+        self._readSubDoms(ctl,files)
+
+        term_transformer = TermTransformer(self.sub_doms)
         parse_files(files, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
-            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows)
+            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms)
             parse_files(files, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
@@ -47,14 +52,27 @@ class ClingoApp(object):
                         for l in transformer.shows[f]:
                             print (f"#show {f}/{l}.")
 
+    def _readSubDoms(self, ctl_insts, files):
+        #ctl_insts = Control()
+        for f in files:
+            ctl_insts.load(f)
+        ctl_insts.ground([("insts", [])])
+        for k in ctl_insts.symbolic_atoms:
+            if(str(k.symbol).startswith('_dom_')):
+                var = str(k.symbol).split("(", 1)[0]
+                atom = re.sub(r'^.*?\(', '', str(k.symbol))[:-1]
+                _addToSubdom(self.sub_doms, var, atom)
+
+
 class NglpDlpTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows):
+    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms):
         self.rules = False
         self.ng = False
         self.bld = bld
         self.terms = terms
         self.facts = facts
         self.ng_heads = ng_heads
+        self.sub_doms = sub_doms
 
         self.cur_anon = 0
         self.cur_var = []
@@ -96,15 +114,25 @@ class NglpDlpTransformer(Transformer):
             # domaining per rule variable
             for v in self.cur_var: # variables
                 disjunction = ""
-                for t in self.terms: # domain
-                    disjunction += f"r{self.counter}_{v}({t}), "
+                if v in self.sub_doms:
+                    for t in self.sub_doms[v]: # domain
+                        disjunction += f"r{self.counter}_{v}({t}), "
+                else:
+                    for t in self.terms: # domain
+                        disjunction += f"r{self.counter}_{v}({t}), "
 
                 disjunction = disjunction[:-2] + "."
                 print (disjunction)
 
-                for t in self.terms:
-                    # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                    print(f"r{self.counter}_{v}({t}) :- sat.")
+                if v in self.sub_doms:
+                    for t in self.sub_doms[v]: # domain
+                        # r1_x(1) :- sat. r1_x(2) :- sat. ...
+                        print(f"r{self.counter}_{v}({t}) :- sat.")
+                else:
+                    for t in self.terms: # domain
+                        # r1_x(1) :- sat. r1_x(2) :- sat. ...
+                        print(f"r{self.counter}_{v}({t}) :- sat.")
+
 
             # SAT
             covered_cmp = {} # reduce SAT rules when compare-operators are pre-checked
@@ -113,7 +141,8 @@ class NglpDlpTransformer(Transformer):
                 var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
                 vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
 
-                combinations = [p for p in itertools.product(self.terms, repeat=len(vars))]
+                dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in vars]
+                combinations = [p for p in itertools.product(*dom_list)]
 
                 vars_set = frozenset(vars)
                 if vars_set not in covered_cmp:
@@ -145,7 +174,8 @@ class NglpDlpTransformer(Transformer):
                 var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
                 vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) if args_len > 0 else [] # which have to be grounded per combination
 
-                combinations = [p for p in itertools.product(self.terms, repeat=len(vars))]
+                dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in vars]
+                combinations = [p for p in itertools.product(*dom_list)]
                 vars_set = frozenset(vars)
 
                 for c in combinations:
@@ -184,7 +214,7 @@ class NglpDlpTransformer(Transformer):
                        v not in h_vars]  # remaining variables not included in head atom (without facts)
 
                 # GUESS head
-                print(f"{{{head}" + (f" : {','.join(f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
+                print(f"{{{head}" + (f" : {','.join(f'_dom_{v}({v})' if v in self.sub_doms else f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
 
                 g_r = {}
 
@@ -208,7 +238,8 @@ class NglpDlpTransformer(Transformer):
                         if n in h_vars:
                             g_r[r].append(n)
 
-                    needed_combs = [p for p in itertools.product(self.terms, repeat=len(g_r[r]))]
+                    dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in g_r[r]]
+                    needed_combs = [p for p in itertools.product(*dom_list)]
                     for c in needed_combs:
                         head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
                         rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
@@ -289,7 +320,8 @@ class NglpDlpTransformer(Transformer):
 
                         vars_set = frozenset(f_vars_needed + f_rem)
 
-                        combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
+                        dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in f_vars_needed+f_rem]
+                        combs = [p for p in itertools.product(*dom_list)]
 
                         for c in combs:
                             c_varset = tuple(
@@ -465,8 +497,8 @@ class NglpDlpTransformer(Transformer):
         nnv = list(dict.fromkeys(nnv))
 
         if len(nnv) > 0:
-            combs_left_out = [p for p in
-                              itertools.product(self.terms, repeat=len(nnv))]  # combinations for vars left out in head
+            dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in nnv]
+            combs_left_out = [p for p in itertools.product(*dom_list)]  # combinations for vars left out in head
             # create combinations covered for later use in constraints
             for clo in combs_left_out:
                 covered = interpretation.copy()
@@ -512,13 +544,15 @@ class NglpDlpTransformer(Transformer):
                 self.f[pred][arity][c][rule].add(indices)
 
 class TermTransformer(Transformer):
-    def __init__(self):
+    def __init__(self, sub_doms):
         self.terms = []
+        self.sub_doms = sub_doms
         self.facts = {}
         self.ng_heads = {}
         self.ng = False
         self.show = False
         self.shows = {}
+        self.current_f = None
 
     def visit_Rule(self, node):
         self.visit_children(node)
@@ -546,7 +580,9 @@ class TermTransformer(Transformer):
         return node
 
     def visit_Function(self, node):
+        self.current_f = str(node).split("(", 1)[0] if len(node.arguments) > 0 else node
         # shows
+        #if not str(node.name).startswith('_dom_'):
         if node.name in self.shows:
             self.shows[node.name].add(len(node.arguments))
         else:
@@ -562,11 +598,13 @@ class TermTransformer(Transformer):
         for i in range(int(str(node.left)), int(str(node.right))+1):
             if (str(i) not in self.terms):
                 self.terms.append(str(i))
+            _addToSubdom(self.sub_doms, self.current_f, str(i))
         return node
 
     def visit_SymbolicTerm(self, node):
         if (str(node) not in self.terms):
             self.terms.append(str(node))
+        _addToSubdom(self.sub_doms, self.current_f, str(node))
         return node
 
     def visit_ShowSignature(self, node):
@@ -574,6 +612,17 @@ class TermTransformer(Transformer):
         print (node)
         return node
 
+def _addToSubdom(sub_doms, var, value):
+    if var.startswith('_dom_'):
+        var = var[5:]
+    else:
+        return
+
+    if var not in sub_doms:
+        sub_doms[var] = []
+        sub_doms[var].append(value)
+    elif value not in sub_doms[var]:
+        sub_doms[var].append(value)
 
 if __name__ == "__main__":
     # no output from clingo itself
