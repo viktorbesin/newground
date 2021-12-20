@@ -124,9 +124,15 @@ class NglpDlpTransformer(Transformer):
                 disjunction = disjunction[:-2] + "."
                 print (disjunction)
 
-                for t in self.terms:
-                    # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                    print(f"r{self.counter}_{v}({t}) :- sat.")
+                if v in self.sub_doms:
+                    for t in self.sub_doms[v]: # domain
+                        # r1_x(1) :- sat. r1_x(2) :- sat. ...
+                        print(f"r{self.counter}_{v}({t}) :- sat.")
+                else:
+                    for t in self.terms: # domain
+                        # r1_x(1) :- sat. r1_x(2) :- sat. ...
+                        print(f"r{self.counter}_{v}({t}) :- sat.")
+
 
             # SAT
             covered_cmp = {} # reduce SAT rules when compare-operators are pre-checked
