@@ -97,7 +97,10 @@ class NglpDlpTransformer(Transformer):
     def visit_Rule(self, node):
         if not self.rules:
             self._reset_after_rule()
-            print (node)
+            if str(node.head) == "#false": # catch constraints and print manually since clingo uses #false
+                print(f":- {', '.join(str(n) for n in node.body)}.")
+            else:
+                print(node)
             return node
         # check if AST is non-ground
         self.visit_children(node)
