@@ -1,6 +1,7 @@
 import sys
 import itertools
 import re
+import argparse
 
 import clingo
 from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
@@ -10,15 +11,16 @@ from pprint import pprint
 import networkx as nx
 
 class ClingoApp(object):
-    def __init__(self, name):
+    def __init__(self, name, no_show=False):
         self.program_name = name
         self.sub_doms = {}
+        self.no_show = no_show
 
     def main(self, ctl, files):
         # read subdomains in #program insts.
         self._readSubDoms(ctl,files)
 
-        term_transformer = TermTransformer(self.sub_doms)
+        term_transformer = TermTransformer(self.sub_doms, self.no_show)
         parse_files(files, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
@@ -47,10 +49,11 @@ class ClingoApp(object):
                 for t in transformer.terms:
                     print (f"dom({t}).")
 
-                if not term_transformer.show:
-                    for f in transformer.shows.keys():
-                        for l in transformer.shows[f]:
-                            print (f"#show {f}/{l}.")
+                if not self.no_show:
+                    if not term_transformer.show:
+                        for f in transformer.shows.keys():
+                            for l in transformer.shows[f]:
+                                print (f"#show {f}/{l}.")
 
     def _readSubDoms(self, ctl_insts, files):
         #ctl_insts = Control()
@@ -100,7 +103,10 @@ class NglpDlpTransformer(Transformer):
             if str(node.head) == "#false": # catch constraints and print manually since clingo uses #false
                 print(f":- {', '.join(str(n) for n in node.body)}.")
             else:
-                print(node)
+                if len(node.body) > 0:
+                    print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
+                else:
+                    print(f"{str(node.head).replace(';', ',')}.")
             return node
         # check if AST is non-ground
         self.visit_children(node)
@@ -119,13 +125,13 @@ class NglpDlpTransformer(Transformer):
                 disjunction = ""
                 if v in self.sub_doms:
                     for t in self.sub_doms[v]: # domain
-                        disjunction += f"r{self.counter}_{v}({t}), "
+                        disjunction += f"r{self.counter}_{v}({t}) | "
                 else:
                     for t in self.terms: # domain
-                        disjunction += f"r{self.counter}_{v}({t}), "
-
-                disjunction = disjunction[:-2] + "."
-                print (disjunction)
+                        disjunction += f"r{self.counter}_{v}({t}) | "
+                if len(disjunction) > 0:
+                    disjunction = disjunction[:-3] + "."
+                    print (disjunction)
 
                 if v in self.sub_doms:
                     for t in self.sub_doms[v]: # domain
@@ -197,7 +203,7 @@ class NglpDlpTransformer(Transformer):
                         else:
                             f_args = f"{f.name}"
 
-                        print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not'} {f_args}.")
+                        print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not '}{f_args}.")
 
             # reduce duplicates; track combinations
             sat_per_f = {}
@@ -547,7 +553,7 @@ class NglpDlpTransformer(Transformer):
                 self.f[pred][arity][c][rule].add(indices)
 
 class TermTransformer(Transformer):
-    def __init__(self, sub_doms):
+    def __init__(self, sub_doms, no_show=False):
         self.terms = []
         self.sub_doms = sub_doms
         self.facts = {}
@@ -556,6 +562,7 @@ class TermTransformer(Transformer):
         self.show = False
         self.shows = {}
         self.current_f = None
+        self.no_show = no_show
 
     def visit_Rule(self, node):
         self.visit_children(node)
@@ -612,7 +619,8 @@ class TermTransformer(Transformer):
 
     def visit_ShowSignature(self, node):
         self.show = True
-        print (node)
+        if not self.no_show:
+            print (node)
         return node
 
 def _addToSubdom(sub_doms, var, value):
@@ -628,6 +636,14 @@ def _addToSubdom(sub_doms, var, value):
         sub_doms[var].append(value)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
+    parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
+    parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
+    args = parser.parse_args()
     # no output from clingo itself
     sys.argv.append("--outf=3")
-    clingo.clingo_main(ClingoApp(sys.argv[0]), sys.argv[1:])
+    if args.no_show:
+        sys.argv.remove('--no-show')
+        clingo.clingo_main(ClingoApp(sys.argv[0], True), sys.argv[1:])
+    else:
+        clingo.clingo_main(ClingoApp(sys.argv[0]), sys.argv[1:])
