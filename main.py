@@ -7,25 +7,33 @@ import clingo
 from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
 from clingo.control import Control
 from pprint import pprint
+from clingox.program import Program, ProgramObserver, Remapping
 
 import networkx as nx
 
 class ClingoApp(object):
-    def __init__(self, name, no_show=False, ground_guess=False):
+    def __init__(self, name, no_show=False, ground_guess=False, ground=False):
         self.program_name = name
         self.sub_doms = {}
         self.no_show = no_show
         self.ground_guess = ground_guess
+        self.ground = ground
+
+        self.prg = Program()
 
     def main(self, ctl, files):
+        ctl_insts = Control()
+        ctl_insts.register_observer(ProgramObserver(self.prg))
         # read subdomains in #program insts.
-        self._readSubDoms(ctl,files)
+        self._readSubDoms(ctl_insts,files)
+        if self.ground:
+            print(self.prg)
 
         term_transformer = TermTransformer(self.sub_doms, self.no_show)
         parse_files(files, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
-            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess)
+            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground)
             parse_files(files, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
@@ -61,7 +69,7 @@ class ClingoApp(object):
         #ctl_insts = Control()
         for f in files:
             ctl_insts.load(f)
-        ctl_insts.ground([("insts", [])])
+        ctl_insts.ground([("base", []), ("insts", [])])
         for k in ctl_insts.symbolic_atoms:
             if(str(k.symbol).startswith('_dom_')):
                 var = str(k.symbol).split("(", 1)[0]
@@ -70,7 +78,7 @@ class ClingoApp(object):
 
 
 class NglpDlpTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess):
+    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess, ground):
         self.rules = False
         self.ng = False
         self.bld = bld
@@ -79,6 +87,7 @@ class NglpDlpTransformer(Transformer):
         self.ng_heads = ng_heads
         self.sub_doms = sub_doms
         self.ground_guess = ground_guess
+        self.ground = ground
 
         self.cur_anon = 0
         self.cur_var = []
@@ -103,20 +112,10 @@ class NglpDlpTransformer(Transformer):
     def visit_Rule(self, node):
         if not self.rules:
             self._reset_after_rule()
-            if str(node.head) == "#false": # catch constraints and print manually since clingo uses #false
-                print(f":- {', '.join(str(n) for n in node.body)}.")
-            else:
-                if len(node.body) > 0:
-                    if (str(node.head).startswith('{')):
-                        print(f"{str(node.head)} :- {', '.join([str(b) for b in node.body])}.")
-                    else:
-                        print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
-                else:
-                    if (str(node.head).startswith('{')):
-                        print(f"{str(node.head)}.")
-                    else:
-                        print(f"{str(node.head).replace(';', ',')}.")
+            if not self.ground:
+                self._outputNodeFormatConform(node)
             return node
+
         # check if AST is non-ground
         self.visit_children(node)
 
@@ -280,11 +279,10 @@ class NglpDlpTransformer(Transformer):
                             head_interpretation = f"{head.name}" + (
                                 f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
                             rem_interpretation = ','.join([c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
-                            rem_interpretations = ';'.join([f"r{self.counter}f_{r}({v},{rem_interpretation})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
+                            rem_interpretations = ';'.join([f"r{self.counter}f_{r}({v}{','+rem_interpretation if h_args_len>0 else ''})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
                             mis_vars  = [v for v in h_vars if v not in g_r[r]]
                             if len(h_vars) == len(g_r[r]):  # removed none
-                                print(
-                                    f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
+                                print(f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
                             elif len(g_r[r]) == 0:  # removed all
                                 print(f"1{{{rem_interpretations}}}1.")
                             else:  # removed some
@@ -418,7 +416,7 @@ class NglpDlpTransformer(Transformer):
                 self._addToFoundednessCheck(pred, arity, [arguments.split(',')], self.g_counter, range(0,arity))
                 self.g_counter = chr(ord(self.g_counter) + 1)
             # print rule as it is
-            print(node)
+            self._outputNodeFormatConform(node)
 
         self._reset_after_rule()
         return node
@@ -585,6 +583,21 @@ class NglpDlpTransformer(Transformer):
             else:
                 self.f[pred][arity][c][rule].add(indices)
 
+    def _outputNodeFormatConform(self, node):
+        if str(node.head) == "#false":  # catch constraints and print manually since clingo uses #false
+            print(f":- {', '.join(str(n) for n in node.body)}.")
+        else:
+            if len(node.body) > 0:
+                if (str(node.head).startswith('{')):
+                    print(f"{str(node.head)} :- {', '.join([str(b) for b in node.body])}.")
+                else:
+                    print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
+            else:
+                if (str(node.head).startswith('{')):
+                    print(f"{str(node.head)}.")
+                else:
+                    print(f"{str(node.head).replace(';', ',')}.")
+
 class TermTransformer(Transformer):
     def __init__(self, sub_doms, no_show=False):
         self.terms = []
@@ -673,17 +686,24 @@ if __name__ == "__main__":
     parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
     parser.add_argument('--ground-guess', action='store_true',
                         help='Additionally ground guesses which results in (fully) grounded output. ')
+    parser.add_argument('--ground', action='store_true',
+                        help='Output program fully grounded. ')
     parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
     # no output from clingo itself
     sys.argv.append("--outf=3")
     no_show = False
     ground_guess = False
+    ground = False
     if args.no_show:
         sys.argv.remove('--no-show')
         no_show = True
     if args.ground_guess:
         sys.argv.remove('--ground-guess')
         ground_guess = True
+    if args.ground:
+        sys.argv.remove('--ground')
+        ground_guess = True
+        ground = True
 
-    clingo.clingo_main(ClingoApp(sys.argv[0], no_show, ground_guess), sys.argv[1:])
+    clingo.clingo_main(ClingoApp(sys.argv[0], no_show, ground_guess, ground), sys.argv[1:])
