@@ -104,9 +104,15 @@ class NglpDlpTransformer(Transformer):
                 print(f":- {', '.join(str(n) for n in node.body)}.")
             else:
                 if len(node.body) > 0:
-                    print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
+                    if (str(node.head).startswith('{')):
+                        print(f"{str(node.head)} :- {', '.join([str(b) for b in node.body])}.")
+                    else:
+                        print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
                 else:
-                    print(f"{str(node.head).replace(';', ',')}.")
+                    if (str(node.head).startswith('{')):
+                        print(f"{str(node.head)}.")
+                    else:
+                        print(f"{str(node.head).replace(';', ',')}.")
             return node
         # check if AST is non-ground
         self.visit_children(node)
