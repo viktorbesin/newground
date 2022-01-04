@@ -4,6 +4,11 @@ Reduction of **non-ground** logic programs to **disjunctive** logic programs usi
 ## Requirements
 * clingo 
 * clingo's Python module > *v5.5*
+* clingox
+* future-fstrings (for compatibility with older versions)
+```
+pip install -r requirements.txt
+```
 
 ## Input Format
 The input format is equivalent to clingos input format. Currently the reduction of normal logic programs (including comparison operators) is implemented. 

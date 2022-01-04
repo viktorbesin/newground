@@ -1,0 +1,3 @@
+future-fstrings
+clingo>=5.5.0
+clingox
