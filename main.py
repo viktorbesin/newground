@@ -11,10 +11,11 @@ from pprint import pprint
 import networkx as nx
 
 class ClingoApp(object):
-    def __init__(self, name, no_show=False):
+    def __init__(self, name, no_show=False, ground_guess=False):
         self.program_name = name
         self.sub_doms = {}
         self.no_show = no_show
+        self.ground_guess = ground_guess
 
     def main(self, ctl, files):
         # read subdomains in #program insts.
@@ -24,7 +25,7 @@ class ClingoApp(object):
         parse_files(files, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
-            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms)
+            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess)
             parse_files(files, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
@@ -46,8 +47,9 @@ class ClingoApp(object):
                             head = ','.join(c)
                             print(f":- {', '.join([f'{p}' +(f'({head})' if len(head)>0 else '')] + rule_sets)}.")
 
-                for t in transformer.terms:
-                    print (f"dom({t}).")
+                if not self.ground_guess:
+                    for t in transformer.terms:
+                        print (f"dom({t}).")
 
                 if not self.no_show:
                     if not term_transformer.show:
@@ -68,7 +70,7 @@ class ClingoApp(object):
 
 
 class NglpDlpTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms):
+    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess):
         self.rules = False
         self.ng = False
         self.bld = bld
@@ -76,6 +78,7 @@ class NglpDlpTransformer(Transformer):
         self.facts = facts
         self.ng_heads = ng_heads
         self.sub_doms = sub_doms
+        self.ground_guess = ground_guess
 
         self.cur_anon = 0
         self.cur_var = []
@@ -229,7 +232,13 @@ class NglpDlpTransformer(Transformer):
                        v not in h_vars]  # remaining variables not included in head atom (without facts)
 
                 # GUESS head
-                print(f"{{{head}" + (f" : {','.join(f'_dom_{v}({v})' if v in self.sub_doms else f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
+                if not self.ground_guess:
+                    print(f"{{{head}" + (f" : {','.join(f'_dom_{v}({v})' if v in self.sub_doms else f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
+                else:
+                    dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in h_vars]
+                    combinations = [p for p in itertools.product(*dom_list)]
+                    h_interpretations = [f"{head.name}({','.join(c[h_vars.index(a)] if a in h_vars else a for a in h_args)})" for c in combinations]
+                    print(f"{{{';'.join(h_interpretations)}}}." if h_args_len > 0 else f"{{{head.name}}}.")
 
                 g_r = {}
 
@@ -256,16 +265,34 @@ class NglpDlpTransformer(Transformer):
                     dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in g_r[r]]
                     needed_combs = [p for p in itertools.product(*dom_list)]
                     for c in needed_combs:
-                        head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
-                        rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
-                        doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
-                        if len(h_vars) == len(g_r[r]):  # removed none
-                            print(f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}.")
-                        elif len(g_r[r]) == 0: # removed all
-                            print(f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1.")
-                        else: # removed some
-                            print(
-                                f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}, {doms}.")
+                        if not self.ground_guess:
+                            head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
+                            rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
+                            doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
+                            if len(h_vars) == len(g_r[r]):  # removed none
+                                print(f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}.")
+                            elif len(g_r[r]) == 0: # removed all
+                                print(f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1.")
+                            else: # removed some
+                                print(
+                                    f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}, {doms}.")
+                        else:
+                            head_interpretation = f"{head.name}" + (
+                                f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
+                            rem_interpretation = ','.join([c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
+                            rem_interpretations = ';'.join([f"r{self.counter}f_{r}({v},{rem_interpretation})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
+                            mis_vars  = [v for v in h_vars if v not in g_r[r]]
+                            if len(h_vars) == len(g_r[r]):  # removed none
+                                print(
+                                    f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
+                            elif len(g_r[r]) == 0:  # removed all
+                                print(f"1{{{rem_interpretations}}}1.")
+                            else:  # removed some
+                                dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in mis_vars]
+                                combinations = [p for p in itertools.product(*dom_list)]
+                                h_interpretations = [f"{head.name}({','.join(c2[mis_vars.index(a)] if a in mis_vars else c[g_r[r].index(a)] for a in h_args)})" for c2 in combinations]
+                                for hi in h_interpretations:
+                                    print(f"1{{{rem_interpretations}}}1 :- {hi}.")
 
                 covered_cmp = {}
                 # for every cmp operator
@@ -644,12 +671,19 @@ def _addToSubdom(sub_doms, var, value):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
     parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
+    parser.add_argument('--ground-guess', action='store_true',
+                        help='Additionally ground guesses which results in (fully) grounded output. ')
     parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
     # no output from clingo itself
     sys.argv.append("--outf=3")
+    no_show = False
+    ground_guess = False
     if args.no_show:
         sys.argv.remove('--no-show')
-        clingo.clingo_main(ClingoApp(sys.argv[0], True), sys.argv[1:])
-    else:
-        clingo.clingo_main(ClingoApp(sys.argv[0]), sys.argv[1:])
+        no_show = True
+    if args.ground_guess:
+        sys.argv.remove('--ground-guess')
+        ground_guess = True
+
+    clingo.clingo_main(ClingoApp(sys.argv[0], no_show, ground_guess), sys.argv[1:])
