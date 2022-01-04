@@ -21,6 +21,8 @@ positional arguments:
   file
 
 optional arguments:
-  -h, --help  show this help message and exit
-  --no-show   Do not print #show-statements to avoid compatibility issues.
+  -h, --help      show this help message and exit
+  --no-show       Do not print #show-statements to avoid compatibility issues.
+  --ground-guess  Additionally ground guesses which results in (fully) grounded output.
+  --ground        Output program fully grounded.
 ```
