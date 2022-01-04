@@ -269,12 +269,12 @@ class NglpDlpTransformer(Transformer):
                             rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
                             doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
                             if len(h_vars) == len(g_r[r]):  # removed none
-                                print(f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}.")
+                                print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}.")
                             elif len(g_r[r]) == 0: # removed all
-                                print(f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1.")
+                                print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1.")
                             else: # removed some
                                 print(
-                                    f"1{{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}1 :- {head_interpretation}, {doms}.")
+                                    f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}, {doms}.")
                         else:
                             head_interpretation = f"{head.name}" + (
                                 f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
