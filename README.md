@@ -5,6 +5,7 @@ Reduction of **non-ground** logic programs to **disjunctive** logic programs usi
 * clingo 
 * clingo's Python module > *v5.5*
 * clingox
+* networkx
 * future-fstrings (for compatibility with older versions)
 ```
 pip install -r requirements.txt
@@ -30,4 +31,8 @@ optional arguments:
   --no-show       Do not print #show-statements to avoid compatibility issues.
   --ground-guess  Additionally ground guesses which results in (fully) grounded output.
   --ground        Output program fully grounded.
+```
+e.g. clingo can then be used to compute the answer-sets
+```
+python3 main.py [instance] | clingo -n 0 --project
 ```
