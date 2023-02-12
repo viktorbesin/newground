@@ -11,13 +11,24 @@ from clingox.program import Program, ProgramObserver, Remapping
 
 import networkx as nx
 
+class DefaultOutputPrinter:
+
+    def custom_print(self, string):
+        print(string)
+
+
 class ClingoApp(object):
-    def __init__(self, name, no_show=False, ground_guess=False, ground=False):
+    def __init__(self, name, no_show=False, ground_guess=False, ground=False, output_printer = None):
         self.program_name = name
         self.sub_doms = {}
         self.no_show = no_show
         self.ground_guess = ground_guess
         self.ground = ground
+
+        if not output_printer:
+            self.printer = DefaultOutputPrinter()
+        else:
+            self.printer = output_printer
 
         self.prg = Program()
 
@@ -27,19 +38,19 @@ class ClingoApp(object):
         # read subdomains in #program insts.
         self._readSubDoms(ctl_insts,files)
         if self.ground:
-            print(self.prg)
+            self.printer.custom_print(self.prg)
 
-        term_transformer = TermTransformer(self.sub_doms, self.no_show)
+        term_transformer = TermTransformer(self.sub_doms, self.printer, self.no_show)
         parse_files(files, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
-            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground)
+            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer)
             parse_files(files, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
-                print (":- not sat.")
+                self.printer.custom_print(":- not sat.")
                 #parse_string(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.", lambda stm: self.bld.add(stm))
-                print(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.")
+                self.printer.custom_print(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.")
 
                 for p in transformer.f:
                     for arity in transformer.f[p]:
@@ -48,22 +59,22 @@ class ClingoApp(object):
                             for r in transformer.f[p][arity][c]:
                                 sum_sets = []
                                 for subset in transformer.f[p][arity][c][r]:
-                                    # print ([c[int(i)] for i in subset])
+                                    # self.printer.custom_print([c[int(i)] for i in subset])
                                     sum_sets.append(f"1:r{r}_unfound{'_'+''.join(subset) if len(subset) < arity else ''}" + (f"({','.join([c[int(i)] for i in subset])})" if len(subset)>0 else ""))
                                 sum_atom = f"#sum {{{'; '.join(sum_sets)}}} >= 1"
                                 rule_sets.append(sum_atom)
                             head = ','.join(c)
-                            print(f":- {', '.join([f'{p}' +(f'({head})' if len(head)>0 else '')] + rule_sets)}.")
+                            self.printer.custom_print(f":- {', '.join([f'{p}' +(f'({head})' if len(head)>0 else '')] + rule_sets)}.")
 
                 if not self.ground_guess:
                     for t in transformer.terms:
-                        print (f"dom({t}).")
+                        self.printer.custom_print(f"dom({t}).")
 
                 if not self.no_show:
                     if not term_transformer.show:
                         for f in transformer.shows.keys():
                             for l in transformer.shows[f]:
-                                print (f"#show {f}/{l}.")
+                                self.printer.custom_print(f"#show {f}/{l}.")
 
     def _readSubDoms(self, ctl_insts, files):
         #ctl_insts = Control()
@@ -78,7 +89,7 @@ class ClingoApp(object):
 
 
 class NglpDlpTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess, ground):
+    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess, ground, printer):
         self.rules = False
         self.ng = False
         self.bld = bld
@@ -88,6 +99,7 @@ class NglpDlpTransformer(Transformer):
         self.sub_doms = sub_doms
         self.ground_guess = ground_guess
         self.ground = ground
+        self.printer = printer
 
         self.cur_anon = 0
         self.cur_var = []
@@ -139,16 +151,16 @@ class NglpDlpTransformer(Transformer):
                         disjunction += f"r{self.counter}_{v}({t}) | "
                 if len(disjunction) > 0:
                     disjunction = disjunction[:-3] + "."
-                    print (disjunction)
+                    self.printer.custom_print(disjunction)
 
                 if v in self.sub_doms:
                     for t in self.sub_doms[v]: # domain
                         # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                        print(f"r{self.counter}_{v}({t}) :- sat.")
+                        self.printer.custom_print(f"r{self.counter}_{v}({t}) :- sat.")
                 else:
                     for t in self.terms: # domain
                         # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                        print(f"r{self.counter}_{v}({t}) :- sat.")
+                        self.printer.custom_print(f"r{self.counter}_{v}({t}) :- sat.")
 
 
             # SAT
@@ -179,12 +191,12 @@ class NglpDlpTransformer(Transformer):
                         c2 = int(c[vars.index(var[1])] if var[1] in vars else var[1])
                         if not self._compareTerms(f.comparison, c1, c2):
                             covered_cmp[vars_set].add(c_varset)
-                            print (f"sat_r{self.counter} :- {interpretation[:-2]}.")
+                            self.printer.custom_print(f"sat_r{self.counter} :- {interpretation[:-2]}.")
 
             for f in self.cur_func:
                 args_len = len(f.arguments)
                 if (args_len == 0):
-                    print(
+                    self.printer.custom_print(
                         f"sat_r{self.counter} :-{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else ' not'} {f}.")
                     continue
                 arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
@@ -211,7 +223,7 @@ class NglpDlpTransformer(Transformer):
                         else:
                             f_args = f"{f.name}"
 
-                        print (f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not '}{f_args}.")
+                        self.printer.custom_print(f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not '}{f_args}.")
 
             # reduce duplicates; track combinations
             sat_per_f = {}
@@ -232,12 +244,12 @@ class NglpDlpTransformer(Transformer):
 
                 # GUESS head
                 if not self.ground_guess:
-                    print(f"{{{head}" + (f" : {','.join(f'_dom_{v}({v})' if v in self.sub_doms else f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
+                    self.printer.custom_print(f"{{{head}" + (f" : {','.join(f'_dom_{v}({v})' if v in self.sub_doms else f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
                 else:
                     dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in h_vars]
                     combinations = [p for p in itertools.product(*dom_list)]
                     h_interpretations = [f"{head.name}({','.join(c[h_vars.index(a)] if a in h_vars else a for a in h_args)})" for c in combinations]
-                    print(f"{{{';'.join(h_interpretations)}}}." if h_args_len > 0 else f"{{{head.name}}}.")
+                    self.printer.custom_print(f"{{{';'.join(h_interpretations)}}}." if h_args_len > 0 else f"{{{head.name}}}.")
 
                 g_r = {}
 
@@ -269,11 +281,11 @@ class NglpDlpTransformer(Transformer):
                             rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
                             doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
                             if len(h_vars) == len(g_r[r]):  # removed none
-                                print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}.")
+                                self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}.")
                             elif len(g_r[r]) == 0: # removed all
-                                print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1.")
+                                self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1.")
                             else: # removed some
-                                print(
+                                self.printer.custom_print(
                                     f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}, {doms}.")
                         else:
                             head_interpretation = f"{head.name}" + (
@@ -282,15 +294,15 @@ class NglpDlpTransformer(Transformer):
                             rem_interpretations = ';'.join([f"r{self.counter}f_{r}({v}{','+rem_interpretation if h_args_len>0 else ''})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
                             mis_vars  = [v for v in h_vars if v not in g_r[r]]
                             if len(h_vars) == len(g_r[r]):  # removed none
-                                print(f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
+                                self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
                             elif len(g_r[r]) == 0:  # removed all
-                                print(f"1{{{rem_interpretations}}}1.")
+                                self.printer.custom_print(f"1{{{rem_interpretations}}}1.")
                             else:  # removed some
                                 dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in mis_vars]
                                 combinations = [p for p in itertools.product(*dom_list)]
                                 h_interpretations = [f"{head.name}({','.join(c2[mis_vars.index(a)] if a in mis_vars else c[g_r[r].index(a)] for a in h_args)})" for c2 in combinations]
                                 for hi in h_interpretations:
-                                    print(f"1{{{rem_interpretations}}}1 :- {hi}.")
+                                    self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {hi}.")
 
                 covered_cmp = {}
                 # for every cmp operator
@@ -340,9 +352,9 @@ class NglpDlpTransformer(Transformer):
                                     f"_{''.join(index_vars)}" if len(f_vars_needed) < len(h_vars) else "") + (
                                                    f"({','.join(interpretation_incomplete)})" if len(
                                                        interpretation_incomplete) > 0 else "")
-                                print(unfound_atom + (
+                                self.printer.custom_print(unfound_atom + (
                                     f" :- {', '.join(f_rem_atoms)}" if len(f_rem_atoms) > 0 else "") + ".")
-                                #print (f"{h_args_len} | {combs_covered} | {index_vars}")
+                                #self.printer.custom_print(f"{h_args_len} | {combs_covered} | {index_vars}")
                                 self._addToFoundednessCheck(head.name, h_args_len, combs_covered, self.counter,
                                                             index_vars)
 
@@ -390,7 +402,7 @@ class NglpDlpTransformer(Transformer):
                                 f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
                                 # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
                                 unfound_atom = f"r{self.counter}_unfound" + (f"_{''.join(index_vars)}" if len(f_vars_needed)<len(h_vars) else "") + (f"({','.join(interpretation_incomplete)})" if len(interpretation_incomplete)>0 else "")
-                                print(unfound_atom  + f" :- "
+                                self.printer.custom_print(unfound_atom  + f" :- "
                                       f"{', '.join([f_interpretation] + f_rem_atoms)}.")
 
                                 # predicate arity combinations rule indices
@@ -411,7 +423,7 @@ class NglpDlpTransformer(Transformer):
                         neg = ""
                     else:
                         neg = "not "
-                    print(f"r{self.g_counter}_unfound({arguments}) :- "
+                    self.printer.custom_print(f"r{self.g_counter}_unfound({arguments}) :- "
                           f"{ neg + str(body_atom)}.")
                 self._addToFoundednessCheck(pred, arity, [arguments.split(',')], self.g_counter, range(0,arity))
                 self.g_counter = chr(ord(self.g_counter) + 1)
@@ -585,21 +597,21 @@ class NglpDlpTransformer(Transformer):
 
     def _outputNodeFormatConform(self, node):
         if str(node.head) == "#false":  # catch constraints and print manually since clingo uses #false
-            print(f":- {', '.join(str(n) for n in node.body)}.")
+            self.printer.custom_print(f":- {', '.join(str(n) for n in node.body)}.")
         else:
             if len(node.body) > 0:
                 if (str(node.head).startswith('{')):
-                    print(f"{str(node.head)} :- {', '.join([str(b) for b in node.body])}.")
+                    self.printer.custom_print(f"{str(node.head)} :- {', '.join([str(b) for b in node.body])}.")
                 else:
-                    print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
+                    self.printer.custom_print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
             else:
                 if (str(node.head).startswith('{')):
-                    print(f"{str(node.head)}.")
+                    self.printer.custom_print(f"{str(node.head)}.")
                 else:
-                    print(f"{str(node.head).replace(';', ',')}.")
+                    self.printer.custom_print(f"{str(node.head).replace(';', ',')}.")
 
 class TermTransformer(Transformer):
-    def __init__(self, sub_doms, no_show=False):
+    def __init__(self, sub_doms, printer, no_show=False):
         self.terms = []
         self.sub_doms = sub_doms
         self.facts = {}
@@ -609,6 +621,7 @@ class TermTransformer(Transformer):
         self.shows = {}
         self.current_f = None
         self.no_show = no_show
+        self.printer = printer
 
     def visit_Rule(self, node):
         self.visit_children(node)
@@ -666,7 +679,7 @@ class TermTransformer(Transformer):
     def visit_ShowSignature(self, node):
         self.show = True
         if not self.no_show:
-            print (node)
+            self.printer.custom_print(node)
         return node
 
 def _addToSubdom(sub_doms, var, value):
