@@ -52,19 +52,20 @@ class ClingoApp(object):
                 #parse_string(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.", lambda stm: self.bld.add(stm))
                 self.printer.custom_print(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.")
 
-                for p in transformer.f:
-                    for arity in transformer.f[p]:
-                        for c in transformer.f[p][arity]:
-                            rule_sets = []
-                            for r in transformer.f[p][arity][c]:
-                                sum_sets = []
-                                for subset in transformer.f[p][arity][c][r]:
-                                    # self.printer.custom_print([c[int(i)] for i in subset])
-                                    sum_sets.append(f"1:r{r}_unfound{'_'+''.join(subset) if len(subset) < arity else ''}" + (f"({','.join([c[int(i)] for i in subset])})" if len(subset)>0 else ""))
-                                sum_atom = f"#sum {{{'; '.join(sum_sets)}}} >= 1"
-                                rule_sets.append(sum_atom)
-                            head = ','.join(c)
-                            self.printer.custom_print(f":- {', '.join([f'{p}' +(f'({head})' if len(head)>0 else '')] + rule_sets)}.")
+                #print(transformer.unfounded_rules)
+
+                for key in transformer.unfounded_rules.keys():
+                    unfounded_rules_list = transformer.unfounded_rules[key]
+
+                    sum_list = []
+                    for index in range(len(unfounded_rules_list)):
+                        unfounded_rule = unfounded_rules_list[index]
+
+                        sum_list.append(f"1,{index} : {unfounded_rule}")
+
+
+                    self.printer.custom_print(f":- {key}, #sum{{{'; '.join(sum_list)}}} >=1.")
+                
 
                 if not self.ground_guess:
                     for t in transformer.terms:
@@ -111,6 +112,8 @@ class NglpDlpTransformer(Transformer):
         self.f = {}
         self.counter = 0
         self.g_counter = 'A'
+
+        self.unfounded_rules = {}
 
     def _reset_after_rule(self):
         self.cur_var = []
@@ -267,6 +270,9 @@ class NglpDlpTransformer(Transformer):
                 for comp in self.cur_comp:
                     g.add_edge(str(comp.left), str(comp.left))
 
+                # ---------------------------------------------
+                # REM -> is for the ''remaining'' variables that do not occur in the head
+                # The next part is about the introduction of the ''remaining'' variables
                 for r in rem:
                     g_r[r] = []
                     for n in nx.dfs_postorder_nodes(g, source=r):
@@ -274,19 +280,46 @@ class NglpDlpTransformer(Transformer):
                             g_r[r].append(n)
 
                     dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in g_r[r]]
-                    needed_combs = [p for p in itertools.product(*dom_list)]
-                    for c in needed_combs:
+                    #needed_combs = [p for p in itertools.product(*dom_list)]
+
+                    iter_list = []
+                    for i in range(len(h_vars)):
+                        iter_list.append(self.terms)
+
+
+                    combs = [p for p in itertools.product(*iter_list)]
+
+
+                    for c in combs:
                         if not self.ground_guess:
-                            head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
-                            rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
-                            doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
-                            if len(h_vars) == len(g_r[r]):  # removed none
-                                self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}.")
-                            elif len(g_r[r]) == 0: # removed all
-                                self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1.")
-                            else: # removed some
-                                self.printer.custom_print(
-                                    f"1<={{r{self.counter}f_{r}({rem_interpretation}): dom({r})}}<=1 :- {head_interpretation}, {doms}.")
+                            #head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
+
+                            head_tuple_list = []
+        
+                            comb_counter = 0
+                            for h_arg in h_args:
+                                if h_arg in h_vars:
+                                    head_tuple_list.append(c[comb_counter])
+                                    comb_counter += 1
+                                else:
+                                    head_tuple_list.append(h_arg)
+
+
+                            head_interpretation = f"{head.name}"
+                            #head_tuple_list = [c[index] for index in range(len(c))]
+                            head_tuple_interpretation = ','.join(head_tuple_list)
+
+                            if len(c) > 0:
+                                head_interpretation += f"({head_tuple_interpretation})"
+
+                            #rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
+                            #doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
+
+                            rem_tuple_list = [r] + head_tuple_list
+                            rem_tuple_interpretation = ','.join(rem_tuple_list)
+
+                            self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_tuple_interpretation}):dom({r})}}<=1 :- {head_interpretation}.")
+
                         else:
                             head_interpretation = f"{head.name}" + (
                                 f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
@@ -304,6 +337,8 @@ class NglpDlpTransformer(Transformer):
                                 for hi in h_interpretations:
                                     self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {hi}.")
 
+                # ---------------------------------------------
+                # The next section is about the handling of the comparison operators
                 covered_cmp = {}
                 # for every cmp operator
                 for f in self.cur_comp:
@@ -313,54 +348,105 @@ class NglpDlpTransformer(Transformer):
                         [a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
 
                     f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
-                    f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+                    #f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+
+           
+                    #f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+                    f_vars_needed = h_vars
 
                     vars_set = frozenset(f_vars_needed + f_rem)
-                    if vars_set not in covered_cmp:
-                        covered_cmp[vars_set] = set()
 
-                    combs = [p for p in itertools.product(self.terms, repeat=len(f_vars_needed) + len(f_rem))]
+                    dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in f_vars_needed+f_rem]
+                    combs = [p for p in itertools.product(*dom_list)]
+
+
+
                     for c in combs:
-                        c_varset = tuple(
-                            [c[f_vars_needed.index(v)] if v in f_vars_needed else c[len(f_vars_needed) + f_rem.index(v)]
-                             for v in vars_set])
+                        head_combination_list = list(c[:len(h_vars)])
 
-                        if not self._checkForCoveredSubsets(covered_cmp, list(vars_set), c_varset): # smaller sets are also possible
-                        #if c_varset not in covered_cmp[vars_set]:  # smaller sets are also possible
-                            interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(
-                                h_args, f_vars_needed, c, head)
-                            if combs_covered is None or combs_covered == []:
-                                continue
-                            # generate body for unfound-rule
-                            f_args_unf_left = f"{c[f_vars_needed.index(f_args[0])]}" if f_args[
-                                                                                            0] in f_vars_needed else (
-                                f"{f_args[0]}" if f_args[
-                                                      0] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[0])]}")
-                            f_args_unf_right = f"{c[f_vars_needed.index(f_args[1])]}" if f_args[
-                                                                                             1] in f_vars_needed else (
-                                f"{f_args[1]}" if f_args[
-                                                      1] in self.terms else f"{c[len(f_vars_needed) + f_rem.index(f_args[1])]}")
+                        head_combination = {}
 
-                            if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
-                                f_rem_atoms = [
-                                    f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})"
-                                    for v in f_args_nd if v in rem]
+                        head_counter = 0
+                        for h_arg in h_args:
+                            if h_arg in h_vars:
+                                head_combination[h_arg] = c[head_counter]
+                                head_counter += 1
+                            else:
+                                head_combination[h_arg] = h_arg
 
-                                covered_cmp[vars_set].add(c_varset)
+                        head_combination_list_2 = []
+                        for h_arg in h_args:
+                            head_combination_list_2.append(head_combination[h_arg])
 
-                                unfound_atom = f"r{self.counter}_unfound" + (
-                                    f"_{''.join(index_vars)}" if len(f_vars_needed) < len(h_vars) else "") + (
-                                                   f"({','.join(interpretation_incomplete)})" if len(
-                                                       interpretation_incomplete) > 0 else "")
-                                self.printer.custom_print(unfound_atom + (
-                                    f" :- {', '.join(f_rem_atoms)}" if len(f_rem_atoms) > 0 else "") + ".")
-                                #self.printer.custom_print(f"{h_args_len} | {combs_covered} | {index_vars}")
-                                self._addToFoundednessCheck(head.name, h_args_len, combs_covered, self.counter,
-                                                            index_vars)
+                        unfound_atom = f"r{self.counter}_unfound({','.join(head_combination_list_2)})"
 
+                        body_combination = {}
+
+                        not_head_counter = len(h_vars)
+                        for f_arg in f_args:
+                            if f_arg in h_vars: # Variables in head
+                                index_head = h_vars.index(f_arg)
+                                body_combination[f_arg] = (c[index_head])
+                            elif f_arg in f_vars: # Not in head variables
+                                body_combination[f_arg] = (c[not_head_counter])
+                                not_head_counter += 1
+                            else: # Static
+                                body_combination[f_arg] = f_arg 
+
+                        body_combination_list_2 = []
+
+                        for f_arg in f_args:
+                            body_combination_list_2.append(body_combination[f_arg])
+
+                        # TODO -> Extend for arbitrary nesting depth -> Now only depth 1 (e.g. X=Y) works!
+                        left = body_combination_list_2[0]
+                        right = body_combination_list_2[1]
+
+                        if not self._compareTerms(f.comparison, left, right):
+
+                            unfound_body_list = []
+                            for v in f_args_nd:
+                                if v in rem:
+
+                                    #if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
+                                    
+                                    body_combination_tmp = [body_combination[v]] + head_combination_list_2
+                                    body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
+                                    unfound_body_list.append(body_predicate)
+
+
+                            if len(unfound_body_list) > 0:
+                                unfound_body = f" {','.join(unfound_body_list)}"
+                            else:
+                                unfound_body = ""
+
+                            unfound_rule = f"{unfound_atom} :-{unfound_body}."
+                            self.printer.custom_print(unfound_rule)
+
+                            if len(head_combination_list_2) > 0:
+                                head_string = f"{head.name}({','.join(head_combination_list_2)})"
+                            else:
+                                head_string = f"{head.name}"
+
+
+                            if head_string not in self.unfounded_rules:
+                                self.unfounded_rules[head_string] = []
+
+                            self.unfounded_rules[head_string].append(unfound_atom)
+     
+                              
+
+                            
+                        else:
+                            pass
+
+                # -------------------------------------------
                 # over every body-atom
                 for f in self.cur_func:
                     if f != head:
+
+                        
+
                         f_args_len = len(f.arguments)
                         f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
                         f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
@@ -368,7 +454,8 @@ class NglpDlpTransformer(Transformer):
 
                         f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
 
-                        f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+                        #f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
+                        f_vars_needed = h_vars
 
                         vars_set = frozenset(f_vars_needed + f_rem)
 
@@ -376,38 +463,79 @@ class NglpDlpTransformer(Transformer):
                         combs = [p for p in itertools.product(*dom_list)]
 
                         for c in combs:
-                            c_varset = tuple(
-                                [c[f_vars_needed.index(v)] if v in f_vars_needed else c[
-                                    len(f_vars_needed) + f_rem.index(v)]
-                                 for v in vars_set])
-                            if not self._checkForCoveredSubsets(covered_cmp, list(vars_set),c_varset):  # smaller sets are also possible
-                            #if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
-                                interpretation, interpretation_incomplete, combs_covered, index_vars = self._generateCombinationInformation(h_args, f_vars_needed, c, head)
-                                if combs_covered is None or combs_covered == []:
-                                    continue
+                            head_combination_list = list(c[:len(h_vars)])
 
-                                # generate body for unfound-rule
-                                if f_args_len > 0:
-                                    f_args_unf = ""
-                                    for v in f_args:
-                                        f_args_unf += f"{c[f_vars_needed.index(v)]}," if v in f_vars_needed else \
-                                            (
-                                                f"{v}," if v in self.terms else f"{c[len(f_vars_needed) + f_rem.index(v)]},")
-                                    f_interpretation = f"{f.name}({f_args_unf[:-1]})"
+                            head_combination = {}
+
+                            head_counter = 0
+                            for h_arg in h_args:
+                                if h_arg in h_vars:
+                                    head_combination[h_arg] = c[head_counter]
+                                    head_counter += 1
                                 else:
-                                    f_interpretation = f"{f.name}"
+                                    head_combination[h_arg] = h_arg
 
-                                f_rem_atoms = [f"r{self.counter}f_{v}({','.join([c[len(f_vars_needed) + f_rem.index(v)]] + [i for id, i in enumerate(interpretation) if h_args[id] in g_r[v]])})" for v in f_args_nd if v in rem]
+                            head_combination_list_2 = []
+                            for h_arg in h_args:
+                                head_combination_list_2.append(head_combination[h_arg])
 
-                                f_interpretation = ('' if self.cur_func_sign[self.cur_func.index(f)] else 'not ') + f_interpretation
-                                # r1_unfound(V1,V2) :- p(V1,V2), not f(Z), r1_Z(Z,V1,V2).
-                                unfound_atom = f"r{self.counter}_unfound" + (f"_{''.join(index_vars)}" if len(f_vars_needed)<len(h_vars) else "") + (f"({','.join(interpretation_incomplete)})" if len(interpretation_incomplete)>0 else "")
-                                self.printer.custom_print(unfound_atom  + f" :- "
-                                      f"{', '.join([f_interpretation] + f_rem_atoms)}.")
+                            unfound_atom = f"r{self.counter}_unfound({','.join(head_combination_list_2)})"
 
-                                # predicate arity combinations rule indices
-                                self._addToFoundednessCheck(head.name, h_args_len, combs_covered, self.counter, index_vars)
 
+                            # ---------
+                            body_combination = {}
+
+                            not_head_counter = len(h_vars)
+                            for f_arg in f_args:
+                                if f_arg in h_vars: # Variables in head
+                                    index_head = h_vars.index(f_arg)
+                                    body_combination[f_arg] = (c[index_head])
+                                elif f_arg in f_vars: # Not in head variables
+                                    body_combination[f_arg] = (c[not_head_counter])
+                                    not_head_counter += 1
+                                else: # Static
+                                    body_combination[f_arg] = f_arg 
+    
+
+                            unfound_body_list = []
+                            for v in f_args_nd:
+                                if v in rem:
+                                    body_combination_tmp = [body_combination[v]] + head_combination_list_2
+                                    body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
+                                    unfound_body_list.append(body_predicate)
+
+                            unfound_predicate = f"{f.name}"
+                            if len(f_args) > 0:
+                                unfound_predicate += f"("
+
+                                unfound_predicate_args = []
+                                for f_arg in f_args:
+                                    if f_arg in body_combination:
+                                        unfound_predicate_args.append(body_combination[f_arg])
+                                    else:
+                                        unfound_predicate_args.append(f_arg)
+
+                                unfound_predicate += f"{','.join(unfound_predicate_args)})"
+
+                            if len(unfound_body_list) > 0:
+                                unfound_body = f" {','.join(unfound_body_list)},"
+                            else:
+                                unfound_body = ""
+
+                            unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_predicate}."
+                            self.printer.custom_print(unfound_rule)
+
+
+                            if len(head_combination_list_2) > 0:
+                                head_string = f"{head.name}({','.join(head_combination_list_2)})"
+                            else:
+                                head_string = f"{head.name}"
+
+
+                            if head_string not in self.unfounded_rules:
+                                self.unfounded_rules[head_string] = []
+
+                            self.unfounded_rules[head_string].append(unfound_atom)
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
             pred = str(node.head).split('(', 1)[0]
@@ -497,7 +625,7 @@ class NglpDlpTransformer(Transformer):
             assert(False) # not implemented
 
     def _compareTerms(self, comp, c1, c2):
-        if comp is int(clingo.ast.ComparisonOperator.Equal):
+        if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
             return c1 == c2
         elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
             return c1 != c2
@@ -518,6 +646,7 @@ class NglpDlpTransformer(Transformer):
                 c = tuple([c_varset[current.index(p)] for p in list(key)])
                 if c in base[key]:
                     return True
+
         return False
 
     def _getVarsNeeded(self, h_vars, f_vars, f_rem, g):
@@ -529,6 +658,7 @@ class NglpDlpTransformer(Transformer):
         return f_vars_needed
 
     def _generateCombinationInformation(self, h_args, f_vars_needed, c, head):
+
         interpretation = []  # interpretation-list
         interpretation_incomplete = []  # uncomplete; without removed vars
         nnv = []  # not needed vars
