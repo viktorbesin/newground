@@ -402,43 +402,38 @@ class NglpDlpTransformer(Transformer):
                         left = body_combination_list_2[0]
                         right = body_combination_list_2[1]
 
-                        if not self._compareTerms(f.comparison, left, right):
+                        unfound_comparison = self._comparison_handlings(f.comparison, left, right)
 
-                            unfound_body_list = []
-                            for v in f_args_nd:
-                                if v in rem:
+                        unfound_body_list = []
+                        for v in f_args_nd:
+                            if v in rem:
 
-                                    #if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
-                                    
-                                    body_combination_tmp = [body_combination[v]] + head_combination_list_2
-                                    body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
-                                    unfound_body_list.append(body_predicate)
-
-
-                            if len(unfound_body_list) > 0:
-                                unfound_body = f" {','.join(unfound_body_list)}"
-                            else:
-                                unfound_body = ""
-
-                            unfound_rule = f"{unfound_atom} :-{unfound_body}."
-                            self.printer.custom_print(unfound_rule)
-
-                            if len(head_combination_list_2) > 0:
-                                head_string = f"{head.name}({','.join(head_combination_list_2)})"
-                            else:
-                                head_string = f"{head.name}"
+                                #if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
+                                
+                                body_combination_tmp = [body_combination[v]] + head_combination_list_2
+                                body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
+                                unfound_body_list.append(body_predicate)
 
 
-                            if head_string not in self.unfounded_rules:
-                                self.unfounded_rules[head_string] = []
-
-                            self.unfounded_rules[head_string].append(unfound_atom)
-     
-                              
-
-                            
+                        if len(unfound_body_list) > 0:
+                            unfound_body = f" {','.join(unfound_body_list)},"
                         else:
-                            pass
+                            unfound_body = ""
+
+                        unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
+                        self.printer.custom_print(unfound_rule)
+
+                        if len(head_combination_list_2) > 0:
+                            head_string = f"{head.name}({','.join(head_combination_list_2)})"
+                        else:
+                            head_string = f"{head.name}"
+
+
+                        if head_string not in self.unfounded_rules:
+                            self.unfounded_rules[head_string] = []
+
+                        self.unfounded_rules[head_string].append(unfound_atom)
+
 
                 # -------------------------------------------
                 # over every body-atom
@@ -601,8 +596,10 @@ class NglpDlpTransformer(Transformer):
 
     def visit_Comparison(self, node):
         # currently implements only terms/variables
-        assert(node.left.ast_type is clingo.ast.ASTType.Variable or node.left.ast_type is clingo.ast.ASTType.SymbolicTerm)
-        assert (node.right.ast_type is clingo.ast.ASTType.Variable or node.right.ast_type is clingo.ast.ASTType.SymbolicTerm)
+        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm]
+
+        assert(node.left.ast_type in supported_types)
+        assert (node.right.ast_type in supported_types)
 
         self.cur_comp.append(node)
         self.visit_children(node)
@@ -623,6 +620,23 @@ class NglpDlpTransformer(Transformer):
             return "<"
         else:
             assert(False) # not implemented
+
+    def _comparison_handlings(self, comp, c1, c2):
+        if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
+            return f"{c1} = {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
+            return f"{c1} != {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
+            return f"{c1} >= {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
+            return f"{c1} > {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
+            return f"{c1} <= {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
+            return f"{c1} < {c2}"
+        else:
+            assert(False) # not implemented
+
 
     def _compareTerms(self, comp, c1, c2):
         if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
