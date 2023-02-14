@@ -166,10 +166,19 @@ class NglpDlpTransformer(Transformer):
                         self.printer.custom_print(f"r{self.counter}_{v}({t}) :- sat.")
 
 
+            # ----------------------------
             # SAT
+            # SAT for comparison operators
+
             covered_cmp = {} # reduce SAT rules when compare-operators are pre-checked
             for f in self.cur_comp:
-                arguments = [str(f.left), str(f.right)] # all arguments (incl. duplicates / terms)
+                                
+                symbolic_arguments = self._get_arguments_from_operation(f.left) + self._get_arguments_from_operation(f.right)
+
+                arguments = []
+                for symbolic_argument in symbolic_arguments:
+                    arguments.append(str(symbolic_argument))
+
                 var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
                 vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
 
@@ -181,6 +190,29 @@ class NglpDlpTransformer(Transformer):
                     covered_cmp[vars_set] = set()
 
                 for c in combinations:
+    
+                    variable_assignments = {}
+                    
+                    for variable_index in range(len(vars)):
+                        variable = vars[variable_index]
+                        value = c[variable_index]
+
+                        variable_assignments[variable] = value
+
+                    interpretation = ""
+                    for variable in var:
+                        if variable in vars:
+                            interpretation += f"r{self.counter}_{variable}({variable_assignments[variable]}),"
+
+                    left = self._instantiate_operation(f.left, variable_assignments)
+                    right = self._instantiate_operation(f.right, variable_assignments)
+                    comparison = self._comparison_handlings(f.comparison, left, right)
+
+                    interpretation += f" not {comparison}"
+
+                    self.printer.custom_print(f"sat_r{self.counter} :- {interpretation}.")
+
+                    """
                     c_varset = tuple([c[vars.index(v)] for v in vars_set])
                     if not self._checkForCoveredSubsets(covered_cmp, list(vars_set),c_varset):  # smaller sets are also possible
                     #if c_varset not in covered_cmp[vars_set]:
@@ -190,11 +222,13 @@ class NglpDlpTransformer(Transformer):
                         for v in var:
                             interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
                             f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
+
                         c1 = int(c[vars.index(var[0])] if var[0] in vars else var[0])
                         c2 = int(c[vars.index(var[1])] if var[1] in vars else var[1])
                         if not self._compareTerms(f.comparison, c1, c2):
                             covered_cmp[vars_set].add(c_varset)
                             self.printer.custom_print(f"sat_r{self.counter} :- {interpretation[:-2]}.")
+                    """
 
             for f in self.cur_func:
                 args_len = len(f.arguments)
@@ -596,8 +630,10 @@ class NglpDlpTransformer(Transformer):
 
     def visit_Comparison(self, node):
         # currently implements only terms/variables
-        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm]
+        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm, clingo.ast.ASTType.BinaryOperation]
 
+        print(node.left.ast_type)
+        print(node.right.ast_type)
         assert(node.left.ast_type in supported_types)
         assert (node.right.ast_type in supported_types)
 
@@ -653,6 +689,57 @@ class NglpDlpTransformer(Transformer):
             return c1 < c2
         else:
             assert(False) # not implemented
+
+
+    def _get_arguments_from_operation(self, root):
+        """
+            Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lasylt ''Y'' -> then combines together)
+        """
+
+        if root.ast_type is clingo.ast.ASTType.BinaryOperation:
+            return self._get_arguments_from_operation(root.left) + self._get_arguments_from_operation(root.right)
+
+        elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
+            return self._get_arguments_from_operation(root.argument)
+
+        elif root.ast_type is clingo.ast.ASTType.Variable or root.ast_type is clingo.ast.ASTType.SymbolicTerm:
+            return [root]
+        else:
+            assert(False) # not implemented
+
+    def _instantiate_operation(self, root, variable_assignments):
+        """
+            Instantiates a operation and returns a string
+        """
+
+        if root.ast_type is clingo.ast.ASTType.BinaryOperation:
+            string_rep = self._get_operator_type_as_string(root.operator_type)
+    
+            return self._instantiate_operation(root.left, variable_assignments) + string_rep + self._instantiate_operation(root.right, variable_assignments)
+
+        elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
+            string_rep = self._get_operator_type_as_string(root.operator_type, variable_assignments)
+
+            return string_rep + self._instantiate_operation(root.argument)
+
+        elif root.ast_type is clingo.ast.ASTType.Variable:
+            variable_string = str(root)
+            return variable_assignments[variable_string]
+
+        elif root.ast_type is clingo.ast.ASTType.SymbolicTerm:
+            return str(root)
+
+        else:
+            assert(False) # not implemented
+
+    def _get_operator_type_as_string(self, operator_type):
+        if operator_type == 3:
+            return "+"
+        else:
+            print(operator_type)
+            assert(False) # not implemented
+
+
 
     def _checkForCoveredSubsets(self, base, current, c_varset):
         for key in base:
