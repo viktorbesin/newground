@@ -52,9 +52,7 @@ class EquivChecker:
 
         hashes[(hash(tuple(output[cur_pos])))] = cur_pos
 
-    def start(self):
-
-
+    def parse(self):
         parser = argparse.ArgumentParser(prog='Answerset Equivalence Checker', description='Checks equivalence of answersets produced by newground and clingo.')
 
         parser.add_argument('instance')
@@ -73,6 +71,12 @@ class EquivChecker:
 
         instance_file_contents = open(instance_filename, 'r').read()
         encoding_file_contents = open(encoding_filename, 'r').read()
+
+        return (instance_file_contents, encoding_file_contents)
+
+
+
+    def start(self, instance_file_contents, encoding_file_contents, verbose = True):
 
     
         ctl = clingo.Control()
@@ -115,25 +119,31 @@ class EquivChecker:
         for clingo_key in self.clingo_hashes.keys():
             if clingo_key not in self.newground_hashes:
                 works = False
-                print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
-                print(f"This corresponds to the answer set: ")
-                print(self.clingo_output[self.clingo_hashes[clingo_key]])
+                if verbose:
+                    print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
+                    print(f"This corresponds to the answer set: ")
+                    print(self.clingo_output[self.clingo_hashes[clingo_key]])
 
         if not works:
-            print("----------------------")
-            print("----------------------")
-            print("----------------------")
-            print("The answersets DIFFER!")
-            print(f"Clingo produced a total of {len(self.clingo_output)}")
-            print(f"Newground produced a total of {len(self.newground_output)}")
+            if verbose:
+                print("----------------------")
+                print("----------------------")
+                print("----------------------")
+                print("The answersets DIFFER!")
+                print(f"Clingo produced a total of {len(self.clingo_output)}")
+                print(f"Newground produced a total of {len(self.newground_output)}")
+
+            return (False, len(self.clingo_output), len(self.newground_output))
         else:
-            print("The answersets are the SAME!")
+            if verbose:
+                print("The answersets are the SAME!")
+
+            return (True, len(self.clingo_output), len(self.newground_output))
 
 
+if __name__ == "__main__":
+    checker = EquivChecker()
+    (instance, encoding) = checker.parse()
+    checker.start(instance, encoding)
 
 
-
-
-
-checker = EquivChecker()
-checker.start()
