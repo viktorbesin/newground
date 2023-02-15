@@ -630,10 +630,8 @@ class NglpDlpTransformer(Transformer):
 
     def visit_Comparison(self, node):
         # currently implements only terms/variables
-        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm, clingo.ast.ASTType.BinaryOperation]
+        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm, clingo.ast.ASTType.BinaryOperation, clingo.ast.ASTType.UnaryOperation]
 
-        print(node.left.ast_type)
-        print(node.right.ast_type)
         assert(node.left.ast_type in supported_types)
         assert (node.right.ast_type in supported_types)
 
@@ -713,14 +711,17 @@ class NglpDlpTransformer(Transformer):
         """
 
         if root.ast_type is clingo.ast.ASTType.BinaryOperation:
-            string_rep = self._get_operator_type_as_string(root.operator_type)
+            string_rep = self._get_binary_operator_type_as_string(root.operator_type)
     
-            return self._instantiate_operation(root.left, variable_assignments) + string_rep + self._instantiate_operation(root.right, variable_assignments)
+            return "(" + self._instantiate_operation(root.left, variable_assignments) + string_rep + self._instantiate_operation(root.right, variable_assignments) + ")"
 
         elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
-            string_rep = self._get_operator_type_as_string(root.operator_type, variable_assignments)
+            string_rep = self._get_unary_operator_type_as_string(root.operator_type)
 
-            return string_rep + self._instantiate_operation(root.argument)
+            if string_rep != "ABSOLUTE":
+                return "(" + string_rep + self._instantiate_operation(root.argument, variable_assignments) + ")"
+            elif string_rep == "ABSOLUTE":
+                return "(|" + self._instantiate_operation(root.argument, variable_assignments) + "|)"
 
         elif root.ast_type is clingo.ast.ASTType.Variable:
             variable_string = str(root)
@@ -732,13 +733,39 @@ class NglpDlpTransformer(Transformer):
         else:
             assert(False) # not implemented
 
-    def _get_operator_type_as_string(self, operator_type):
-        if operator_type == 3:
-            return "+"
+    def _get_unary_operator_type_as_string(self, operator_type):
+        if operator_type == 0:
+            return "-"
+        elif operator_type == 1:
+            return "~"
+        elif operator_type == 2: # Absolute, i.e. |X| needs special handling
+            return "ABSOLUTE"
         else:
-            print(operator_type)
+            print(f"[NOT-IMPLEMENTED] - Unary operator type '{operator_type}' is not implemented!")
             assert(False) # not implemented
 
+    def _get_binary_operator_type_as_string(self, operator_type):
+        if operator_type == 0:
+            return "^"
+        elif operator_type == 1:
+            return "?"
+        elif operator_type == 2:
+            return "&"
+        elif operator_type == 3:
+            return "+"
+        elif operator_type == 4:
+            return "-"
+        elif operator_type == 5:
+            return "*"
+        elif operator_type == 6:
+            return "/"
+        elif operator_type == 7:
+            return "\\"
+        elif operator_type == 8:
+            return "**"
+        else:
+            print(f"[NOT-IMPLEMENTED] - Binary operator type '{operator_type}' is not implemented!")
+            assert(False) # not implemented
 
 
     def _checkForCoveredSubsets(self, base, current, c_varset):
