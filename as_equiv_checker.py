@@ -115,13 +115,17 @@ class EquivChecker:
             ctl2.solve(on_model=lambda m: self.on_model(m, self.newground_output, self.newground_hashes))
 
             works = True
-            for clingo_key in self.clingo_hashes.keys():
-                if clingo_key not in self.newground_hashes:
-                    works = False
-                    if verbose:
-                        print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
-                        print(f"This corresponds to the answer set: ")
-                        print(self.clingo_output[self.clingo_hashes[clingo_key]])
+
+            if len(self.clingo_output) != len(self.newground_output):
+                works = False
+            else:
+                for clingo_key in self.clingo_hashes.keys():
+                    if clingo_key not in self.newground_hashes:
+                        works = False
+                        if verbose:
+                            print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
+                            print(f"This corresponds to the answer set: ")
+                            print(self.clingo_output[self.clingo_hashes[clingo_key]])
 
             if not works:
                 if verbose:

@@ -212,23 +212,6 @@ class NglpDlpTransformer(Transformer):
 
                     self.printer.custom_print(f"sat_r{self.counter} :- {interpretation}.")
 
-                    """
-                    c_varset = tuple([c[vars.index(v)] for v in vars_set])
-                    if not self._checkForCoveredSubsets(covered_cmp, list(vars_set),c_varset):  # smaller sets are also possible
-                    #if c_varset not in covered_cmp[vars_set]:
-                        f_args = ""
-                        # vars in atom
-                        interpretation = ""
-                        for v in var:
-                            interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
-                            f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
-
-                        c1 = int(c[vars.index(var[0])] if var[0] in vars else var[0])
-                        c2 = int(c[vars.index(var[1])] if var[1] in vars else var[1])
-                        if not self._compareTerms(f.comparison, c1, c2):
-                            covered_cmp[vars_set].add(c_varset)
-                            self.printer.custom_print(f"sat_r{self.counter} :- {interpretation[:-2]}.")
-                    """
 
             for f in self.cur_func:
                 args_len = len(f.arguments)
@@ -376,35 +359,51 @@ class NglpDlpTransformer(Transformer):
                 covered_cmp = {}
                 # for every cmp operator
                 for f in self.cur_comp:
-                    f_args = [str(f.left), str(f.right)]  # all arguments (incl. duplicates / terms)
-                    f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
-                    f_vars = list(dict.fromkeys(
-                        [a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
+
+                    symbolic_arguments = self._get_arguments_from_operation(f.left) + self._get_arguments_from_operation(f.right)
+
+                    arguments = []
+                    for symbolic_argument in symbolic_arguments:
+                        arguments.append(str(symbolic_argument))
+
+                    f_arguments_nd = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
+                    f_vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
 
                     f_rem = [v for v in f_vars if v in rem]  # remaining vars for current function (not in head)
-                    #f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
 
-           
-                    #f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
                     f_vars_needed = h_vars
 
                     vars_set = frozenset(f_vars_needed + f_rem)
 
-                    dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in f_vars_needed+f_rem]
+                    dom_list = []
+
+                    for v in f_vars_needed + f_rem:
+                        if v in self.sub_doms:
+                            dom_list.append(self.sub_doms[v])
+                        else:
+                            dom_list.append(self.terms)
+                        
+
+                    #dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in f_vars_needed+f_rem]
                     combs = [p for p in itertools.product(*dom_list)]
 
-
-
                     for c in combs:
+     
+                        variable_assignments = {}
+
+                        for variable_index in range(len(f_vars)):
+                            variable = f_vars[variable_index]
+                            value = c[variable_index]
+
+                            variable_assignments[variable] = value
+
                         head_combination_list = list(c[:len(h_vars)])
 
                         head_combination = {}
 
-                        head_counter = 0
                         for h_arg in h_args:
                             if h_arg in h_vars:
-                                head_combination[h_arg] = c[head_counter]
-                                head_counter += 1
+                                head_combination[h_arg] = variable_assignments[h_arg]
                             else:
                                 head_combination[h_arg] = h_arg
 
@@ -416,30 +415,19 @@ class NglpDlpTransformer(Transformer):
 
                         body_combination = {}
 
-                        not_head_counter = len(h_vars)
-                        for f_arg in f_args:
-                            if f_arg in h_vars: # Variables in head
-                                index_head = h_vars.index(f_arg)
-                                body_combination[f_arg] = (c[index_head])
-                            elif f_arg in f_vars: # Not in head variables
-                                body_combination[f_arg] = (c[not_head_counter])
-                                not_head_counter += 1
+                        for f_arg in arguments:
+                            if f_arg in f_vars: # Is a variable
+                                body_combination[f_arg] = variable_assignments[f_arg]
                             else: # Static
                                 body_combination[f_arg] = f_arg 
 
-                        body_combination_list_2 = []
-
-                        for f_arg in f_args:
-                            body_combination_list_2.append(body_combination[f_arg])
-
-                        # TODO -> Extend for arbitrary nesting depth -> Now only depth 1 (e.g. X=Y) works!
-                        left = body_combination_list_2[0]
-                        right = body_combination_list_2[1]
+                        left = self._instantiate_operation(f.left, variable_assignments)
+                        right = self._instantiate_operation(f.right, variable_assignments)
 
                         unfound_comparison = self._comparison_handlings(f.comparison, left, right)
 
                         unfound_body_list = []
-                        for v in f_args_nd:
+                        for v in f_arguments_nd:
                             if v in rem:
 
                                 #if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
