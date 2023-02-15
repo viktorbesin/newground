@@ -539,7 +539,14 @@ class NglpDlpTransformer(Transformer):
                             else:
                                 unfound_body = ""
 
-                            unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_predicate}."
+                            sign_adjusted_predicate = "" 
+                            if not self.cur_func_sign[self.cur_func.index(f)]: # i.e. a ''positive'' occurence (e.g. q(X) :- p(X) -> p(X) is positive)
+                                sign_adjusted_predicate = f"not {unfound_predicate}"
+                            else: # i.e. a ''negative'' occurence (e.g. q(X) :- p(X), not p(1). -> p(1) is negative)
+                                sign_adjusted_predicate = f"{unfound_predicate}"
+
+                            
+                            unfound_rule = f"{unfound_atom} :-{unfound_body} {sign_adjusted_predicate}."
                             self.printer.custom_print(unfound_rule)
 
 

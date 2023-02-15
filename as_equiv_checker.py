@@ -76,7 +76,10 @@ class EquivChecker:
 
 
 
-    def start(self, instance_file_contents, encoding_file_contents, verbose = True):
+    def start(self, instance_file_contents, encoding_file_contents, verbose = True, one_directional_equivalence = True):
+        """ 
+            one_directional_equivalence: If True, then only the direction clingo -> newground is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the newground result as well (but therefore it could be, that newground has more answersets)
+        """
 
     
         ctl = clingo.Control()
@@ -116,7 +119,7 @@ class EquivChecker:
 
             works = True
 
-            if len(self.clingo_output) != len(self.newground_output):
+            if not one_directional_equivalence and len(self.clingo_output) != len(self.newground_output):
                 works = False
             else:
                 for clingo_key in self.clingo_hashes.keys():
