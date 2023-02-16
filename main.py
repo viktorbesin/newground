@@ -32,20 +32,25 @@ class ClingoApp(object):
 
         self.prg = Program()
 
-    def main(self, ctl, files):
+    def main(self, ctl, inputs):
+
+        combined_inputs = '\n'.join(inputs)
+
         ctl_insts = Control()
         ctl_insts.register_observer(ProgramObserver(self.prg))
         # read subdomains in #program insts.
-        self._readSubDoms(ctl_insts,files)
+        self._readSubDoms(ctl_insts,combined_inputs)
         if self.ground:
             self.printer.custom_print(self.prg)
 
         term_transformer = TermTransformer(self.sub_doms, self.printer, self.no_show)
-        parse_files(files, lambda stm: term_transformer(stm))
+        #parse_files(inputs, lambda stm: term_transformer(stm))
+        parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
         with ProgramBuilder(ctl) as bld:
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer)
-            parse_files(files, lambda stm: bld.add(transformer(stm)))
+            #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
+            parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
                 self.printer.custom_print(":- not sat.")
@@ -77,16 +82,26 @@ class ClingoApp(object):
                             for l in transformer.shows[f]:
                                 self.printer.custom_print(f"#show {f}/{l}.")
 
-    def _readSubDoms(self, ctl_insts, files):
+    def _readSubDoms(self, ctl_insts, combined_inputs):
         #ctl_insts = Control()
+      
+        """ 
         for f in files:
             ctl_insts.load(f)
+        """
+        
+        """ 
+        ctl_insts.add("base", [], combined_inputs)
+            
         ctl_insts.ground([("base", []), ("insts", [])])
         for k in ctl_insts.symbolic_atoms:
             if(str(k.symbol).startswith('_dom_')):
                 var = str(k.symbol).split("(", 1)[0]
                 atom = re.sub(r'^.*?\(', '', str(k.symbol))[:-1]
                 _addToSubdom(self.sub_doms, var, atom)
+
+        """
+        pass
 
 
 class NglpDlpTransformer(Transformer):  
@@ -125,6 +140,7 @@ class NglpDlpTransformer(Transformer):
         #self.head = None
 
     def visit_Rule(self, node):
+
         if not self.rules:
             self._reset_after_rule()
             if not self.ground:
@@ -617,10 +633,12 @@ class NglpDlpTransformer(Transformer):
         return node
 
     def visit_Program(self, node):
+
         if node.name == 'rules':
             self.rules = True
         else:
             self.rules = False
+
         return node
 
     def visit_Comparison(self, node):
@@ -957,7 +975,7 @@ if __name__ == "__main__":
     parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
     # no output from clingo itself
-    sys.argv.append("--outf=3")
+    #sys.argv.append("--outf=3")
     no_show = False
     ground_guess = False
     ground = False
@@ -972,4 +990,13 @@ if __name__ == "__main__":
         ground_guess = True
         ground = True
 
-    clingo.clingo_main(ClingoApp(sys.argv[0], no_show, ground_guess, ground), sys.argv[1:])
+
+    contents = ""
+    for f in sys.argv[1:]:
+        contents += open(f, "r").read()
+
+    #clingo.clingo_main(ClingoApp(sys.argv[0], no_show, ground_guess, ground), sys.argv[1:])
+    newground = ClingoApp(sys.argv[0], no_show, ground_guess, ground)
+    newground.main(clingo.Control(), [contents])
+
+

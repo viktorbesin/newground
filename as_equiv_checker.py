@@ -4,6 +4,7 @@ import argparse
 
 import clingo
 
+from aggregate_transformer import AggregateHandler
 from newground import ClingoApp, DefaultOutputPrinter
 
 def block_print():
@@ -20,7 +21,7 @@ class CustomOutputPrinter(DefaultOutputPrinter):
         self.string = ""
 
     def custom_print(self, string):
-        self.string = self.string + string + '\n'
+        self.string = self.string + str(string) + '\n'
 
     def get_string(self):
         return self.string
@@ -92,66 +93,52 @@ class EquivChecker:
         ground_guess = False
         ground = False
 
-        new_instance_file_contents = '#program facts.\n' + instance_file_contents
-        new_encoding_file_contents = '#program rules.\n' + encoding_file_contents
-
-        total_content = new_instance_file_contents + new_encoding_file_contents
-
-        temp_file_name = 'temp_as_equiv_checker.py'
-        open(temp_file_name, 'w').write(total_content)
-
-        # no output from clingo itself
-        #sys.argv.append("--outf=3")
+        total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
 
         custom_printer = CustomOutputPrinter()
+        
+        newground_aggregates = AggregateHandler(no_show, ground_guess, ground, output_printer = custom_printer)
+        newground_aggregates.start(total_content)
 
-        block_print()
+        ctl2 = clingo.Control()
+        ctl2.configuration.solve.models = 0
+        ctl2.add('base',[], custom_printer.get_string())
+        ctl2.ground([('base',[])], context=Context())
+        ctl2.solve(on_model=lambda m: self.on_model(m, self.newground_output, self.newground_hashes))
 
-        ret_val =clingo.clingo_main(ClingoApp('newground', no_show, ground_guess, ground, custom_printer), [temp_file_name])
+        works = True
 
-        enable_print()
-        if ret_val == 0:
-            ctl2 = clingo.Control()
-            ctl2.configuration.solve.models = 0
-            ctl2.add('base',[], custom_printer.get_string())
-            ctl2.ground([('base',[])], context=Context())
-            ctl2.solve(on_model=lambda m: self.on_model(m, self.newground_output, self.newground_hashes))
+        if not one_directional_equivalence and len(self.clingo_output) != len(self.newground_output):
+            works = False
+        else:
+            for clingo_key in self.clingo_hashes.keys():
+                if clingo_key not in self.newground_hashes:
+                    works = False
+                    if verbose:
+                        print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
+                        print(f"This corresponds to the answer set: ")
+                        print(self.clingo_output[self.clingo_hashes[clingo_key]])
 
-            works = True
+        if not works:
+            if verbose:
+                print("----------------------")
+                print("----------------------")
+                print("----------------------")
+                print("The answersets DIFFER!")
+                print(f"Clingo produced a total of {len(self.clingo_output)}")
+                print(f"Newground produced a total of {len(self.newground_output)}")
 
-            if not one_directional_equivalence and len(self.clingo_output) != len(self.newground_output):
-                works = False
-            else:
-                for clingo_key in self.clingo_hashes.keys():
-                    if clingo_key not in self.newground_hashes:
-                        works = False
-                        if verbose:
-                            print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
-                            print(f"This corresponds to the answer set: ")
-                            print(self.clingo_output[self.clingo_hashes[clingo_key]])
+            return (False, len(self.clingo_output), len(self.newground_output))
+        else: # works
+            if verbose:
+                print("The answersets are the SAME!")
 
-            if not works:
-                if verbose:
-                    print("----------------------")
-                    print("----------------------")
-                    print("----------------------")
-                    print("The answersets DIFFER!")
-                    print(f"Clingo produced a total of {len(self.clingo_output)}")
-                    print(f"Newground produced a total of {len(self.newground_output)}")
-
-                return (False, len(self.clingo_output), len(self.newground_output))
-            else: # works
-                if verbose:
-                    print("The answersets are the SAME!")
-
-                return (True, len(self.clingo_output), len(self.newground_output))
-        else: #ret_val != 0
-            return (False, len(self.clingo_output), -1)
+            return (True, len(self.clingo_output), len(self.newground_output))
 
 
 if __name__ == "__main__":
     checker = EquivChecker()
     (instance, encoding) = checker.parse()
-    checker.start(instance, encoding)
+    checker.start(instance, encoding, verbose = True)
 
 

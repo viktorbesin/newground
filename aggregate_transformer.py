@@ -6,6 +6,7 @@ import argparse
 import clingo
 
 from clingo.ast import Transformer, Variable, parse_string
+from newground import ClingoApp
 
 def do_nothing(stuff):
     pass
@@ -35,15 +36,21 @@ class AggregateHandler:
         self.ground_guess = ground_guess
         self.ground = ground
         self.output_printer = output_printer
+        
+        self.rules = False
 
     def start(self, contents):
 
         vrt = AggregateTransformer()
-        #parse_string(contents, lambda stm: print(str(vrt(stm))))
         parse_string(contents, lambda stm: do_nothing(vrt(stm)))
 
+        shown_predicates = list(set(vrt.shown_predicates))
 
-        print('\n'.join(vrt.new_prg))
+        program_string = '\n'.join(shown_predicates + vrt.new_prg)
+
+        newground = ClingoApp("newground", self.no_show, self.ground_guess, self.ground, self.output_printer)
+
+        newground.main(clingo.Control(), [program_string])
 
 
 
@@ -53,6 +60,8 @@ class AggregateTransformer(Transformer):
         self.new_prg = []
         self.aggregate_count = 0
 
+        self.shown_predicates = []
+
         self.cur_has_aggregate = False
         self.cur_aggregates = []
 
@@ -61,6 +70,22 @@ class AggregateTransformer(Transformer):
         self.cur_has_aggregate = False
         self.cur_aggregates = []
 
+    def visit_Program(self, node):
+
+        if node.name == 'rules':
+            self.rules = True
+            self.new_prg.append(str(node))
+        else:
+            self.rules = False
+
+        return node
+
+
+    def visit_Function(self, node):
+
+        self.shown_predicates.append(f"#show {node.name}/{len(node.arguments)}.")
+
+        return node
 
     def _add_aggregate_helper_rules(self, aggregate_index):
         aggregate = self.cur_aggregates[aggregate_index]
@@ -187,8 +212,19 @@ class AggregateTransformer(Transformer):
 
         self.visit_children(node)
 
-        if not self.cur_has_aggregate:
-            self.new_prg.append(str(node))
+        if not self.cur_has_aggregate or not self.rules:
+            body_rep = ""
+            for body_element_index in range(len(node.body)):
+                body_elem = node.body[body_element_index]
+                if body_element_index < len(node.body) - 1:
+                    body_rep += f"{str(body_elem)},"
+                else:
+                    body_rep += f"{str(body_elem)}"
+
+            if len(node.body) > 0:
+                self.new_prg.append(f"{str(node.head)} :- {body_rep}.")
+            else:    
+                self.new_prg.append(f"{str(node.head)}.")
 
         else:
 
@@ -208,9 +244,6 @@ class AggregateTransformer(Transformer):
             remaining_body_string = ','.join(remaining_body)
             new_rule = f"{head} :- {remaining_body_string}."
             self.new_prg.append(new_rule)
-
-
-        
 
         self.reset_temporary_variables() # MUST BE LAST
         return node
