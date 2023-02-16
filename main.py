@@ -338,6 +338,7 @@ class NglpDlpTransformer(Transformer):
                                     head_tuple_list.append(h_arg)
 
 
+                            #print(head)
                             head_interpretation = f"{head.name}"
                             #head_tuple_list = [c[index] for index in range(len(c))]
                             head_tuple_interpretation = ','.join(head_tuple_list)
@@ -351,7 +352,7 @@ class NglpDlpTransformer(Transformer):
                             rem_tuple_list = [r] + head_tuple_list
                             rem_tuple_interpretation = ','.join(rem_tuple_list)
 
-                            self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_tuple_interpretation}):dom({r})}}<=1 :- {head_interpretation}.")
+                            self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_tuple_interpretation}):dom({r})}}<=1 :- {head}.")
 
                         else:
                             head_interpretation = f"{head.name}" + (
@@ -954,7 +955,7 @@ class TermTransformer(Transformer):
         return node
 
 def _addToSubdom(sub_doms, var, value):
-    if var.startswith('_dom_'):
+    if var and hasattr(var, "startswith") and var.startswith('_dom_'):
         var = var[5:]
     else:
         return

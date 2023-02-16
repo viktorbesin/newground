@@ -48,6 +48,8 @@ class AggregateHandler:
 
         program_string = '\n'.join(shown_predicates + vrt.new_prg)
 
+        #print(program_string)
+   
         newground = ClingoApp("newground", self.no_show, self.ground_guess, self.ground, self.output_printer)
 
         newground.main(clingo.Control(), [program_string])
@@ -94,99 +96,202 @@ class AggregateTransformer(Transformer):
         str_id = aggregate["id"] 
 
         if str_type == "sum":
-            rule_string = f"{str_type}_ag{str_id}(S) :- "
-           
-            element_strings = []
-            element_variables = [] 
+            self._add_sum_aggregate_rules(aggregate_index)
+        elif str_type == "count":
 
-            for element_id in range(len(aggregate["elements"])):
-                element = aggregate["elements"][element_id]
+            if len(aggregate["elements"]) > 1:  
+                print("Not implemented")
+                assert(False) # Not implemented
+            
+            element = aggregate["elements"][0]
 
-                element_strings.append(f"{str_type}_ag{str_id}_elem{element_id}(S{element_id})")
-                element_variables.append(f"S{element_id}")
+            body_string = f"body_{str_type}_ag{str_id}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
+            self.new_prg.append(body_string)
 
-            rule_string += ','.join(element_strings)
+            new_atoms = []
+            if aggregate["left_guard"]:
+                left_guard = aggregate["left_guard"]
 
-            rule_string += f", S = {'+'.join(element_variables)}."
+                left_name = f"{str_type}_ag{str_id}_left(1)"
 
-            self.new_prg.append(rule_string)
+                count = int(str(left_guard.term)) # Assuming constant
 
-            for element_id in range(len(aggregate["elements"])):
-
-                element = aggregate["elements"][element_id]
-                # Partial Sum Last
-
-                rule_string = f"{str_type}_ag{str_id}_elem{element_id}(S) :- last_ag{str_id}_elem{element_id}(O,X2), partial_{str_type}_ag{str_id}_elem{element_id}(O,S)."
-                self.new_prg.append(rule_string)
-
-                # Partial Sum Middle
-
-                rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}(O2,S2) :- next_ag{str_id}_elem{element_id}(O1,O2,X2), partial_{str_type}_ag{str_id}_elem{element_id}(O1,S1), S2 = S1 + X2."
-                self.new_prg.append(rule_string)
-
-                # Partial Sum First
-
-                rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}(O,X1) :- first_ag{str_id}_elem{element_id}(O,X1)."
-                self.new_prg.append(rule_string)
-
-                # Body
-                body_head_def = f"body_ag{str_id}_elem{element_id}({','.join(element['terms'])})"
-                body_head_def_first = element['terms'][0]
-    
-                # DRY VIOLATION START: DRY (Do Not Repeat) justification: Because it is only used here and writing a subroutine creates more overload than simply duplicating the code
-                term_strings_temp = []
-                for term_string in element['terms']:
-                    term_strings_temp.append(term_string + "1")
-                body_head_1 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
-                body_head_1_first = term_strings_temp[0]
-                 
-                term_strings_temp = []
-                for term_string in element['terms']:
-                    term_strings_temp.append(term_string + "2")
-                body_head_2 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
-                body_head_2_first = term_strings_temp[0]
-
-                term_strings_temp = []
-                for term_string in element['terms']:
-                    term_strings_temp.append(term_string + "3")
-                body_head_3 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
-                body_head_3_first = term_strings_temp[0]
-                # DRY VIOLATION END
-
-                if len(element['condition']) > 0:
-                    rule_string = f"{body_head_def} :- {','.join(element['condition'])}."
+                operator = getCompOperator(left_guard.comparison)
+                if operator == "<":
+                    count += 1
+                elif operator == "<=":
+                    count = count
                 else:
-                    rule_string = f"{body_head_def}."
+                    assert(False) # Not implemented
+
+                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, element, str_type, str_id)
+
+                rule_string = f"{left_name} :- {','.join(bodies + helper_bodies)}."
+
+                self.new_prg.append(rule_string)
+            
+            if aggregate["right_guard"]:
+                right_guard = aggregate["right_guard"]
+
+                right_name = f"{str_type}_ag{str_id}_right(1)"
+
+                count = int(str(right_guard.term)) # Assuming constant
+
+                operator = getCompOperator(left_guard.comparison)
+                if operator == "<":
+                    count = count
+                elif operator == "<=":
+                    count += 1
+                else:
+                    assert(False) # Not implemented
+
+                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, element, str_type, str_id)
+
+                rule_string = f"{right_name} :- {','.join(bodies + helper_bodies)}."
 
                 self.new_prg.append(rule_string)
 
-
-                # not_last
-                rule_string = f"not_last_ag{str_id}_elem{element_id}({body_head_1}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
-                self.new_prg.append(rule_string)
-
-                # Last
-                rule_string = f"last_ag{str_id}_elem{element_id}({body_head_def},{body_head_def_first}) :- {body_head_def}, not not_last_ag{str_id}_elem{element_id}({body_head_def})."
-                self.new_prg.append(rule_string)
-
-                # not_next
-                rule_string = f"not_next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2}) :- {body_head_1}, {body_head_2}, {body_head_3}, {body_head_1} < {body_head_3}, {body_head_3} < {body_head_2}."
-                self.new_prg.append(rule_string)
-
-                # next
-                rule_string = f"next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2}, {body_head_2_first}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}, not not_next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2})."
-                self.new_prg.append(rule_string)
-
-                # not_first
-                rule_string = f"not_first_ag{str_id}_elem{element_id}({body_head_2}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
-                self.new_prg.append(rule_string)
-
-                # first
-                rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1}, {body_head_1_first}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1})."
-                self.new_prg.append(rule_string)
 
         else: 
             assert(False) # Not Implemented
+
+    def _count_generate_bodies_and_helper_bodies(self, count, element, str_type, str_id):
+
+        terms = []
+        bodies = []
+        for index in range(count):
+            new_terms = []
+            for term in element["terms"]:
+                new_terms.append(term + str(index))
+
+            terms.append(new_terms)
+
+            bodies.append(f"body_{str_type}_ag{str_id}({','.join(new_terms)})") 
+
+        term_length = len(terms[0])
+        helper_bodies = []
+        for index_1 in range(count):
+            for index_2 in range(index_1 + 1, count):
+
+                helper_body = "0 != "
+
+                term_combinations = [] 
+                for term_index in range(term_length):
+                    first_term = terms[index_1][term_index]
+                    second_term = terms[index_2][term_index]
+
+                    term_combinations.append(f"({first_term} ^ {second_term})")
+
+                helper_body = f"0 != {'?'.join(term_combinations)}"
+                helper_bodies.append(helper_body)
+
+        return (bodies, helper_bodies)
+
+
+
+    def _add_sum_aggregate_rules(self, aggregate_index):
+        """
+            Adds the necessary rules for the recursive sum aggregate.
+        """
+
+        aggregate = self.cur_aggregates[aggregate_index]
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+
+        rule_string = f"{str_type}_ag{str_id}(S) :- "
+       
+        element_strings = []
+        element_variables = [] 
+
+        for element_id in range(len(aggregate["elements"])):
+            element = aggregate["elements"][element_id]
+
+            element_strings.append(f"{str_type}_ag{str_id}_elem{element_id}(S{element_id})")
+            element_variables.append(f"S{element_id}")
+
+        rule_string += ','.join(element_strings)
+
+        rule_string += f", S = {'+'.join(element_variables)}."
+
+        self.new_prg.append(rule_string)
+
+        for element_id in range(len(aggregate["elements"])):
+
+            element = aggregate["elements"][element_id]
+            # Partial Sum Last
+
+            rule_string = f"{str_type}_ag{str_id}_elem{element_id}(S) :- last_ag{str_id}_elem{element_id}(O,X2), partial_{str_type}_ag{str_id}_elem{element_id}(O,S)."
+            self.new_prg.append(rule_string)
+
+            # Partial Sum Middle
+
+            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}(O2,S2) :- next_ag{str_id}_elem{element_id}(O1,O2,X2), partial_{str_type}_ag{str_id}_elem{element_id}(O1,S1), S2 = S1 + X2."
+            self.new_prg.append(rule_string)
+
+            # Partial Sum First
+
+            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}(O,X1) :- first_ag{str_id}_elem{element_id}(O,X1)."
+            self.new_prg.append(rule_string)
+
+            # Body
+            body_head_def = f"body_ag{str_id}_elem{element_id}({','.join(element['terms'])})"
+            body_head_def_first = element['terms'][0]
+
+            # DRY VIOLATION START: DRY (Do Not Repeat) justification: Because it is only used here and writing a subroutine creates more overload than simply duplicating the code
+            term_strings_temp = []
+            for term_string in element['terms']:
+                term_strings_temp.append(term_string + "1")
+            body_head_1 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
+            body_head_1_first = term_strings_temp[0]
+             
+            term_strings_temp = []
+            for term_string in element['terms']:
+                term_strings_temp.append(term_string + "2")
+            body_head_2 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
+            body_head_2_first = term_strings_temp[0]
+
+            term_strings_temp = []
+            for term_string in element['terms']:
+                term_strings_temp.append(term_string + "3")
+            body_head_3 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
+            body_head_3_first = term_strings_temp[0]
+            # DRY VIOLATION END
+
+            if len(element['condition']) > 0:
+                rule_string = f"{body_head_def} :- {','.join(element['condition'])}."
+            else:
+                rule_string = f"{body_head_def}."
+
+            self.new_prg.append(rule_string)
+
+
+            # not_last
+            rule_string = f"not_last_ag{str_id}_elem{element_id}({body_head_1}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
+            self.new_prg.append(rule_string)
+
+            # Last
+            rule_string = f"last_ag{str_id}_elem{element_id}({body_head_def},{body_head_def_first}) :- {body_head_def}, not not_last_ag{str_id}_elem{element_id}({body_head_def})."
+            self.new_prg.append(rule_string)
+
+            # not_next
+            rule_string = f"not_next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2}) :- {body_head_1}, {body_head_2}, {body_head_3}, {body_head_1} < {body_head_3}, {body_head_3} < {body_head_2}."
+            self.new_prg.append(rule_string)
+
+            # next
+            rule_string = f"next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2}, {body_head_2_first}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}, not not_next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2})."
+            self.new_prg.append(rule_string)
+
+            # not_first
+            rule_string = f"not_first_ag{str_id}_elem{element_id}({body_head_2}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
+            self.new_prg.append(rule_string)
+
+            # first
+            rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1}, {body_head_1_first}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1})."
+            self.new_prg.append(rule_string)
+
+
 
     def _new_aggregate_rule(self, aggregate_index):
 
@@ -197,14 +302,28 @@ class AggregateTransformer(Transformer):
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
 
-        remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
+        if str_type == "sum":
+            remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
 
-        if aggregate["left_guard"]:
-            guard = aggregate["left_guard"]
-            remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
-        if aggregate["right_guard"]:
-            guard = aggregate["right_guard"]
-            remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
+
+        elif str_type == "count":
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                left_name = f"{str_type}_ag{str_id}_left(1)"
+                remaining_body.append(left_name)
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                right_name = f"not {str_type}_ag{str_id}_right(1)"
+                remaining_body.append(right_name)
+
+        else:
+            assert(False) # Not Implemented
 
         return remaining_body
 
