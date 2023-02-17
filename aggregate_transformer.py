@@ -54,8 +54,6 @@ class AggregateHandler:
 
         newground.main(clingo.Control(), [program_string])
 
-
-
 class AggregateTransformer(Transformer):
     
     def __init__(self):
@@ -99,14 +97,11 @@ class AggregateTransformer(Transformer):
             self._add_sum_aggregate_rules(aggregate_index)
         elif str_type == "count":
 
-            if len(aggregate["elements"]) > 1:  
-                print("Not implemented")
-                assert(False) # Not implemented
-            
-            element = aggregate["elements"][0]
+            for element_index in range(len(aggregate["elements"])):
+                element = aggregate["elements"][element_index]
+                body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
+                self.new_prg.append(body_string)
 
-            body_string = f"body_{str_type}_ag{str_id}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
-            self.new_prg.append(body_string)
 
             new_atoms = []
             if aggregate["left_guard"]:
@@ -124,7 +119,7 @@ class AggregateTransformer(Transformer):
                 else:
                     assert(False) # Not implemented
 
-                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, element, str_type, str_id)
+                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, aggregate["elements"], str_type, str_id)
 
                 rule_string = f"{left_name} :- {','.join(bodies + helper_bodies)}."
 
@@ -145,7 +140,7 @@ class AggregateTransformer(Transformer):
                 else:
                     assert(False) # Not implemented
 
-                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, element, str_type, str_id)
+                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count,  aggregate["elements"], str_type, str_id)
 
                 rule_string = f"{right_name} :- {','.join(bodies + helper_bodies)}."
 
@@ -155,25 +150,30 @@ class AggregateTransformer(Transformer):
         else: 
             assert(False) # Not Implemented
 
-    def _count_generate_bodies_and_helper_bodies(self, count, element, str_type, str_id):
+
+    def _count_generate_bodies_and_helper_bodies(self, count, elements, str_type, str_id):
 
         terms = []
         bodies = []
-        for index in range(count):
-            new_terms = []
-            for term in element["terms"]:
-                new_terms.append(term + str(index))
+        for element_index in range(len(elements)):
+            element = elements[element_index]
 
-            terms.append(new_terms)
+            for index in range(count):
+                new_terms = []
+                for term in element["terms"]:
+                    new_terms.append(f"{str(term)}_{str(element_index)}_{str(index)}")
 
-            bodies.append(f"body_{str_type}_ag{str_id}({','.join(new_terms)})") 
+                terms.append(new_terms)
 
-        term_length = len(terms[0])
+                bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({','.join(new_terms)})") 
+
         helper_bodies = []
-        for index_1 in range(count):
-            for index_2 in range(index_1 + 1, count):
+        for index_1 in range(len(terms)):
+            for index_2 in range(index_1 + 1, len(terms)):
 
                 helper_body = "0 != "
+
+                term_length = min(len(terms[index_1]), len(terms[index_2])) 
 
                 term_combinations = [] 
                 for term_index in range(term_length):
