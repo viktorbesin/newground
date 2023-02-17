@@ -92,7 +92,7 @@ if __name__ == "__main__":
         for key in failed_tests.keys():
             print(f"- {key} - Clingo Answersets: {failed_tests[key]['clingo_answersets']}, Newground Answersets: {failed_tests[key]['newground_answersets']}")
     else:
-        print(f"All executed tests were SUCCESSFUL (In total {total_tests} were conducted).")
+        print(f"All executed tests were SUCCESSFUL (In total {total_tests} were conducted and {total_tests - len(skipped_tests.keys())} were executed).")
 
     if len(skipped_tests.keys()) > 0:
         print("############")

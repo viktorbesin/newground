@@ -38,8 +38,6 @@ class ClingoApp(object):
 
         ctl_insts = Control()
         ctl_insts.register_observer(ProgramObserver(self.prg))
-        # read subdomains in #program insts.
-        self._readSubDoms(ctl_insts,combined_inputs)
         if self.ground:
             self.printer.custom_print(self.prg)
 
@@ -47,8 +45,28 @@ class ClingoApp(object):
         #parse_files(inputs, lambda stm: term_transformer(stm))
         parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
+        safe_variables = term_transformer.safe_variable_rules
+        domain = term_transformer.domain
+        new_domain_hash = hash(str(domain))
+        old_domain_hash = None
+
+        while new_domain_hash != old_domain_hash:
+
+            old_domain_hash = new_domain_hash
+
+            domain_transformer = DomainTransformer(safe_variables, domain)
+            parse_string(combined_inputs, lambda stm: domain_transformer(stm))       
+
+            safe_variables = domain_transformer.safe_variables_rules
+            domain = domain_transformer.domain
+
+
+            new_domain_hash = hash(str(domain))
+
+
+
         with ProgramBuilder(ctl) as bld:
-            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer)
+            transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
             #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
             parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
             if transformer.counter > 0:
@@ -61,6 +79,8 @@ class ClingoApp(object):
 
                 for key in transformer.unfounded_rules.keys():
                     unfounded_rules_list = transformer.unfounded_rules[key]
+
+                    unfounded_rules_list = list(set(unfounded_rules_list)) # Remove duplicates
 
                     sum_list = []
                     for index in range(len(unfounded_rules_list)):
@@ -82,30 +102,8 @@ class ClingoApp(object):
                             for l in transformer.shows[f]:
                                 self.printer.custom_print(f"#show {f}/{l}.")
 
-    def _readSubDoms(self, ctl_insts, combined_inputs):
-        #ctl_insts = Control()
-      
-        """ 
-        for f in files:
-            ctl_insts.load(f)
-        """
-        
-        """ 
-        ctl_insts.add("base", [], combined_inputs)
-            
-        ctl_insts.ground([("base", []), ("insts", [])])
-        for k in ctl_insts.symbolic_atoms:
-            if(str(k.symbol).startswith('_dom_')):
-                var = str(k.symbol).split("(", 1)[0]
-                atom = re.sub(r'^.*?\(', '', str(k.symbol))[:-1]
-                _addToSubdom(self.sub_doms, var, atom)
-
-        """
-        pass
-
-
 class NglpDlpTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess, ground, printer):
+    def __init__(self, bld, terms, facts, ng_heads, shows, sub_doms, ground_guess, ground, printer, domain, safe_variables_rules):
         self.rules = False
         self.ng = False
         self.bld = bld
@@ -116,6 +114,9 @@ class NglpDlpTransformer(Transformer):
         self.ground_guess = ground_guess
         self.ground = ground
         self.printer = printer
+
+        self.domain = domain
+        self.safe_variables_rules = safe_variables_rules
 
         self.cur_anon = 0
         self.cur_var = []
@@ -129,6 +130,7 @@ class NglpDlpTransformer(Transformer):
         self.g_counter = 'A'
 
         self.unfounded_rules = {}
+        self.current_rule_position = 0
 
     def _reset_after_rule(self):
         self.cur_var = []
@@ -139,12 +141,39 @@ class NglpDlpTransformer(Transformer):
         self.ng = False
         #self.head = None
 
+    def _get_domain_values_from_rule_variable(self, rule, variable):
+
+        if str(rule) not in self.safe_variables_rules:
+            return self.domain["0_terms"]
+
+        if str(variable) not in self.safe_variables_rules[str(rule)]:
+            return self.domain["0_terms"]
+
+        total_domain = []
+
+        for domain_type in self.safe_variables_rules[str(rule)][str(variable)]:
+       
+            if domain_type["type"] == "function":
+                domain_name = domain_type["name"]
+                domain_position = domain_type["position"]
+
+                if domain_name not in self.domain:
+                    return self.domain["0_terms"]
+
+                if domain_position not in self.domain[domain_name]:
+                    return self.domain["0_terms"]
+
+                total_domain += self.domain[domain_name][domain_position]
+
+        return list(set(total_domain))
+
     def visit_Rule(self, node):
 
         if not self.rules:
             self._reset_after_rule()
             if not self.ground:
                 self._outputNodeFormatConform(node)
+            self.current_rule_position += 1
             return node
 
         # check if AST is non-ground
@@ -160,27 +189,21 @@ class NglpDlpTransformer(Transformer):
 
             # MOD
             # domaining per rule variable
-            for v in self.cur_var: # variables
+            for variable in self.cur_var: # variables
+
+                values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
+
                 disjunction = ""
-                if v in self.sub_doms:
-                    for t in self.sub_doms[v]: # domain
-                        disjunction += f"r{self.counter}_{v}({t}) | "
-                else:
-                    for t in self.terms: # domain
-                        disjunction += f"r{self.counter}_{v}({t}) | "
+
+                for value in values:
+                    disjunction += f"r{self.counter}_{variable}({value}) | "
+
                 if len(disjunction) > 0:
                     disjunction = disjunction[:-3] + "."
                     self.printer.custom_print(disjunction)
 
-                if v in self.sub_doms:
-                    for t in self.sub_doms[v]: # domain
-                        # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                        self.printer.custom_print(f"r{self.counter}_{v}({t}) :- sat.")
-                else:
-                    for t in self.terms: # domain
-                        # r1_x(1) :- sat. r1_x(2) :- sat. ...
-                        self.printer.custom_print(f"r{self.counter}_{v}({t}) :- sat.")
-
+                for value in values:
+                    self.printer.custom_print(f"r{self.counter}_{variable}({value}) :- sat.")
 
             # ----------------------------
             # SAT
@@ -198,7 +221,11 @@ class NglpDlpTransformer(Transformer):
                 var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
                 vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
 
-                dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in vars]
+
+                dom_list = []
+                for variable in vars:
+                    dom_list.append(self.domain["0_terms"])
+
                 combinations = [p for p in itertools.product(*dom_list)]
 
                 vars_set = frozenset(vars)
@@ -228,7 +255,7 @@ class NglpDlpTransformer(Transformer):
 
                     self.printer.custom_print(f"sat_r{self.counter} :- {interpretation}.")
 
-
+            # SAT - Functions
             for f in self.cur_func:
                 args_len = len(f.arguments)
                 if (args_len == 0):
@@ -239,7 +266,11 @@ class NglpDlpTransformer(Transformer):
                 var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
                 vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) if args_len > 0 else [] # which have to be grounded per combination
 
-                dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in vars]
+                dom_list = []
+                for variable in vars:
+                    values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
+                    dom_list.append(values)
+
                 combinations = [p for p in itertools.product(*dom_list)]
                 vars_set = frozenset(vars)
 
@@ -280,9 +311,19 @@ class NglpDlpTransformer(Transformer):
 
                 # GUESS head
                 if not self.ground_guess:
-                    self.printer.custom_print(f"{{{head}" + (f" : {','.join(f'_dom_{v}({v})' if v in self.sub_doms else f'dom({v})' for v in h_vars)}}}." if h_args_len > 0 else "}."))
+
+                    domains = []
+                    for variable in h_vars:
+                        domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
+                        values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
+                        for value in values:
+                            self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{variable}({value}).")
+
+                    self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+
                 else:
-                    dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in h_vars]
+                    
+                    dom_list = [self._get_domain_values_from_rule_variable(self.current_rule_position, variable) for variable in h_vars]
                     combinations = [p for p in itertools.product(*dom_list)]
                     h_interpretations = [f"{head.name}({','.join(c[h_vars.index(a)] if a in h_vars else a for a in h_args)})" for c in combinations]
                     self.printer.custom_print(f"{{{';'.join(h_interpretations)}}}." if h_args_len > 0 else f"{{{head.name}}}.")
@@ -312,18 +353,18 @@ class NglpDlpTransformer(Transformer):
                         if n in h_vars:
                             g_r[r].append(n)
 
-                    dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in g_r[r]]
-                    #needed_combs = [p for p in itertools.product(*dom_list)]
-
-                    iter_list = []
-                    for i in range(len(h_vars)):
-                        iter_list.append(self.terms)
 
 
-                    combs = [p for p in itertools.product(*iter_list)]
+                    dom_list = []
+                    for variable in vars:
+                        values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
+                        dom_list.append(values)
 
 
-                    for c in combs:
+                    combinations = [p for p in itertools.product(*dom_list)]
+
+                   
+                    for combination in combinations:
                         if not self.ground_guess:
                             #head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
 
@@ -332,7 +373,7 @@ class NglpDlpTransformer(Transformer):
                             comb_counter = 0
                             for h_arg in h_args:
                                 if h_arg in h_vars:
-                                    head_tuple_list.append(c[comb_counter])
+                                    head_tuple_list.append(combination[comb_counter])
                                     comb_counter += 1
                                 else:
                                     head_tuple_list.append(h_arg)
@@ -343,7 +384,7 @@ class NglpDlpTransformer(Transformer):
                             #head_tuple_list = [c[index] for index in range(len(c))]
                             head_tuple_interpretation = ','.join(head_tuple_list)
 
-                            if len(c) > 0:
+                            if len(combination) > 0:
                                 head_interpretation += f"({head_tuple_interpretation})"
 
                             #rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
@@ -356,8 +397,8 @@ class NglpDlpTransformer(Transformer):
 
                         else:
                             head_interpretation = f"{head.name}" + (
-                                f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
-                            rem_interpretation = ','.join([c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
+                                f"({','.join([combination[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
+                            rem_interpretation = ','.join([combination[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
                             rem_interpretations = ';'.join([f"r{self.counter}f_{r}({v}{','+rem_interpretation if h_args_len>0 else ''})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
                             mis_vars  = [v for v in h_vars if v not in g_r[r]]
                             if len(h_vars) == len(g_r[r]):  # removed none
@@ -366,13 +407,13 @@ class NglpDlpTransformer(Transformer):
                                 self.printer.custom_print(f"1{{{rem_interpretations}}}1.")
                             else:  # removed some
                                 dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in mis_vars]
-                                combinations = [p for p in itertools.product(*dom_list)]
-                                h_interpretations = [f"{head.name}({','.join(c2[mis_vars.index(a)] if a in mis_vars else c[g_r[r].index(a)] for a in h_args)})" for c2 in combinations]
+                                combinations_2 = [p for p in itertools.product(*dom_list)]
+                                h_interpretations = [f"{head.name}({','.join(c2[mis_vars.index(a)] if a in mis_vars else combination[g_r[r].index(a)] for a in h_args)})" for c2 in combinations_2]
                                 for hi in h_interpretations:
                                     self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {hi}.")
 
                 # ---------------------------------------------
-                # The next section is about the handling of the comparison operators
+                # The next section is about the handling of the comparison operators (foundedness)
                 covered_cmp = {}
                 # for every cmp operator
                 for f in self.cur_comp:
@@ -393,18 +434,13 @@ class NglpDlpTransformer(Transformer):
                     vars_set = frozenset(f_vars_needed + f_rem)
 
                     dom_list = []
+                    for variable in f_vars_needed + f_rem:
+                        dom_list.append(self.domain["0_terms"])
 
-                    for v in f_vars_needed + f_rem:
-                        if v in self.sub_doms:
-                            dom_list.append(self.sub_doms[v])
-                        else:
-                            dom_list.append(self.terms)
-                        
 
-                    #dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in f_vars_needed+f_rem]
-                    combs = [p for p in itertools.product(*dom_list)]
+                    combinations = [p for p in itertools.product(*dom_list)]
 
-                    for c in combs:
+                    for c in combinations:
      
                         variable_assignments = {}
 
@@ -493,10 +529,14 @@ class NglpDlpTransformer(Transformer):
 
                         vars_set = frozenset(f_vars_needed + f_rem)
 
-                        dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in f_vars_needed+f_rem]
-                        combs = [p for p in itertools.product(*dom_list)]
+                        dom_list = []
+                        for variable in f_vars_needed + f_rem:
+                            values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
+                            dom_list.append(values)
 
-                        for c in combs:
+                        combinations = [p for p in itertools.product(*dom_list)]
+
+                        for c in combinations:
                             head_combination_list = list(c[:len(h_vars)])
 
                             head_combination = {}
@@ -599,6 +639,7 @@ class NglpDlpTransformer(Transformer):
             # print rule as it is
             self._outputNodeFormatConform(node)
 
+        self.current_rule_position += 1
         self._reset_after_rule()
         return node
 
@@ -891,15 +932,28 @@ class TermTransformer(Transformer):
         self.ng = False
         self.show = False
         self.shows = {}
-        self.current_f = None
         self.no_show = no_show
         self.printer = printer
 
+        self.current_head = None
+        self.safe_variable_rules = {}
+
+        self.domain = {}
+        self.current_function = None
+        self.current_function_position = 0
+
+        self.current_rule_position = 0
+
     def visit_Rule(self, node):
+        self.current_head = node.head
+
         self.visit_children(node)
+
+
         pred = str(node.head).split('(', 1)[0]
         arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
         arity = len(arguments)
+
 
         if self.ng:
             self.ng = False
@@ -918,10 +972,69 @@ class TermTransformer(Transformer):
                 self.facts[pred][arity] = {arguments}
             else:
                 self.facts[pred][arity].add(arguments)
+
+
+        self.current_rule_position += 1
+        self._reset_temporary_rule_variables()
         return node
 
+    def _reset_temporary_rule_variables(self):
+        self.current_head = None
+
+    def _reset_temporary_function_variables(self):
+        self.current_function = None
+        self.current_function_position = 0
+
+    def _add_symbolic_term_to_domain(self, identifier, position, value):
+        """
+            e.g. consider p(1,2).
+            then one has to call this method twice:
+            First Call:
+                - p is the identifier
+                - 0 is the position
+                - 1 is the value
+            Second Call:
+                - p is the identifier
+                - 1 is the position
+                - 2 is the value
+        """
+        if str(identifier) not in self.domain:
+            self.domain[str(identifier)] = {}
+
+        if str(position) not in self.domain[str(identifier)]:
+            self.domain[str(identifier)][str(position)] = []
+
+        if str(value) not in self.domain[str(identifier)][str(position)]:
+            self.domain[str(identifier)][str(position)].append(str(value))
+
+        if "0_terms" not in self.domain:
+            self.domain["0_terms"] = []
+
+        if str(value) not in self.domain["0_terms"]:
+            self.domain["0_terms"].append(str(value))
+
+    def _add_safe_variable(self, identifier, position, value, safe_type):
+
+
+        rule = str(self.current_rule_position)
+        if rule not in self.safe_variable_rules:
+            self.safe_variable_rules[rule] = {}
+
+        if str(value) not in self.safe_variable_rules[rule]:
+            self.safe_variable_rules[rule][str(value)] = []
+
+        to_add_dict = {}
+        to_add_dict["type"] = str(safe_type)
+        to_add_dict["name"] = str(identifier)
+        to_add_dict["position"] = str(position)
+
+        self.safe_variable_rules[rule][str(value)].append(to_add_dict)
+
+
     def visit_Function(self, node):
-        self.current_f = str(node).split("(", 1)[0] if len(node.arguments) > 0 else node
+
+        self.current_function = node
+
         # shows
         #if not str(node.name).startswith('_dom_'):
         if node.name in self.shows:
@@ -929,23 +1042,43 @@ class TermTransformer(Transformer):
         else:
             self.shows[node.name] = {len(node.arguments)}
         self.visit_children(node)
+
+        self._reset_temporary_function_variables()
+
         return node
 
     def visit_Variable(self, node):
+
+        if self.current_function and str(self.current_function) != str(self.current_head):
+            self._add_safe_variable(self.current_function.name, self.current_function_position, str(node), "function")
+            self.current_function_position += 1
+
         self.ng = True
         return node
 
     def visit_Interval(self, node):
+
+        if self.current_function: 
+            for value in range(int(str(node.left)), int(str(node.right)) + 1):
+                self._add_symbolic_term_to_domain(self.current_function.name, self.current_function_position, str(value))
+
+            self.current_function_position += 1
+
         for i in range(int(str(node.left)), int(str(node.right))+1):
             if (str(i) not in self.terms):
                 self.terms.append(str(i))
-            _addToSubdom(self.sub_doms, self.current_f, str(i))
+
         return node
 
     def visit_SymbolicTerm(self, node):
+       
+        if self.current_function: 
+            self._add_symbolic_term_to_domain(self.current_function.name, self.current_function_position, str(node))
+            self.current_function_position += 1
+
         if (str(node) not in self.terms):
             self.terms.append(str(node))
-        _addToSubdom(self.sub_doms, self.current_f, str(node))
+
         return node
 
     def visit_ShowSignature(self, node):
@@ -954,17 +1087,125 @@ class TermTransformer(Transformer):
             self.printer.custom_print(node)
         return node
 
-def _addToSubdom(sub_doms, var, value):
-    if var and hasattr(var, "startswith") and var.startswith('_dom_'):
-        var = var[5:]
-    else:
-        return
 
-    if var not in sub_doms:
-        sub_doms[var] = []
-        sub_doms[var].append(value)
-    elif value not in sub_doms[var]:
-        sub_doms[var].append(value)
+class DomainTransformer(Transformer):
+
+    def __init__(self, safe_variables_rules, domain):
+        self.safe_variables_rules = safe_variables_rules
+        self.domain = domain
+
+        self.current_head = None
+
+        self.current_function = None
+        self.current_function_position = 0
+        self.current_head_function = None
+
+        self.current_rule_position = 0
+
+    def visit_Rule(self, node):
+
+        self.current_head = node.head
+
+        self.visit_children(node)
+
+        self.current_rule_position += 1
+        self._reset_temporary_rule_variables()
+        return node
+
+    def visit_Function(self, node):
+
+        self.current_function = node
+
+        if str(self.current_function) == str(self.current_head):
+            self.current_head_function = node
+
+        self.visit_children(node)
+
+        self._reset_temporary_function_variables()
+        return node
+
+    def visit_Variable(self, node):
+        
+        variable_is_in_head = self.current_function and str(self.current_function) == str(self.current_head)
+        rule_is_in_safe_variables = str(self.current_rule_position) in self.safe_variables_rules
+
+        if variable_is_in_head and rule_is_in_safe_variables:
+
+            if str(node) in self.safe_variables_rules[str(self.current_rule_position)]:
+                safe_positions = self.safe_variables_rules[str(self.current_rule_position)][str(node)]
+
+                if len(safe_positions) == 1:
+                    safe_position = safe_positions[0]
+                    if safe_position['type'] == 'function':
+                        safe_pos_name = safe_position['name']
+                        safe_pos_position = safe_position['position']
+
+                        if safe_pos_name in self.domain and safe_pos_position in self.domain[safe_pos_name]:
+                            new_domain = self.domain[safe_pos_name][safe_pos_position]
+
+                            new_name = self.current_head_function.name
+                            new_position = self.current_function_position
+
+                            for new_value in new_domain:
+                                self._add_symbolic_term_to_domain(new_name, new_position, new_value)
+
+        if self.current_function:
+            self.current_function_position += 1
+
+        return node
+
+
+    def _add_symbolic_term_to_domain(self, identifier, position, value):
+        """
+            e.g. consider p(1,2).
+            then one has to call this method twice:
+            First Call:
+                - p is the identifier
+                - 0 is the position
+                - 1 is the value
+            Second Call:
+                - p is the identifier
+                - 1 is the position
+                - 2 is the value
+        """
+        if str(identifier) not in self.domain:
+            self.domain[str(identifier)] = {}
+
+        if str(position) not in self.domain[str(identifier)]:
+            self.domain[str(identifier)][str(position)] = []
+
+        if str(value) not in self.domain[str(identifier)][str(position)]:
+            self.domain[str(identifier)][str(position)].append(str(value))
+
+        if "0_terms" not in self.domain:
+            self.domain["0_terms"] = []
+
+        if str(value) not in self.domain["0_terms"]:
+            self.domain["0_terms"].append(str(value))
+
+
+
+    def visit_SymbolicTerm(self, node):
+       
+        if self.current_function: 
+            self.current_function_position += 1
+
+        return node
+
+
+    def _reset_temporary_rule_variables(self):
+        self.current_head = None
+
+    def _reset_temporary_function_variables(self):
+        self.current_function = None
+        self.current_function_position = 0
+        self.current_head_function = None
+
+
+
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
