@@ -63,6 +63,13 @@ class ClingoApp(object):
 
             new_domain_hash = hash(str(domain))
 
+        """
+        print(domain)
+        print(''.join(inputs))
+        quit()
+        """
+
+
 
         with ProgramBuilder(ctl) as bld:
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
@@ -392,13 +399,28 @@ class NglpDlpTransformer(Transformer):
                             if len(combination) > 0:
                                 head_interpretation += f"({head_tuple_interpretation})"
 
-                            #rem_interpretation = ','.join([r] + [c[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
-                            #doms  = ','.join(f'dom({v})' for v in h_vars if v not in g_r[r])
+                            if str(self.current_rule_position) in self.safe_variables_rules and str(r) in self.safe_variables_rules[str(self.current_rule_position)]:
+
+                                values = self._get_domain_values_from_rule_variable(self.current_rule_position, r) 
+                                for value in values:
+                                    self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{r}({value}).")
+
+                                domain_string = f"domain_rule_{self.current_rule_position}_variable_{r}({r})"
+                            else:
+                                domain_string = f"dom({r})"
+
+
+                            domains = []
+                            for variable in h_vars:
+                                domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
+                            self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+
+
 
                             rem_tuple_list = [r] + head_tuple_list
                             rem_tuple_interpretation = ','.join(rem_tuple_list)
 
-                            self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_tuple_interpretation}):dom({r})}}<=1 :- {head}.")
+                            self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head}.")
 
                         else:
                             head_interpretation = f"{head.name}" + (
