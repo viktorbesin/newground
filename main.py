@@ -64,7 +64,6 @@ class ClingoApp(object):
             new_domain_hash = hash(str(domain))
 
 
-
         with ProgramBuilder(ctl) as bld:
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
             #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
@@ -220,11 +219,16 @@ class NglpDlpTransformer(Transformer):
 
                 var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
                 vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
-
-
                 dom_list = []
                 for variable in vars:
-                    dom_list.append(self.domain["0_terms"])
+                    if str(self.current_rule_position) in self.safe_variables_rules and variable in self.safe_variables_rules[str(self.current_rule_position)]:
+                        element = self.safe_variables_rules[str(self.current_rule_position)][variable][0]
+
+                        domain = self.domain[element["name"]][element["position"]]
+                            
+                        dom_list.append(domain)
+                    else:
+                        dom_list.append(self.domain["0_terms"])
 
                 combinations = [p for p in itertools.product(*dom_list)]
 
@@ -355,8 +359,9 @@ class NglpDlpTransformer(Transformer):
 
 
 
+
                     dom_list = []
-                    for variable in vars:
+                    for variable in h_vars + [r]:
                         values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
                         dom_list.append(values)
 
@@ -936,6 +941,7 @@ class TermTransformer(Transformer):
         self.printer = printer
 
         self.current_head = None
+        self.current_head_functions = []
         self.safe_variable_rules = {}
 
         self.domain = {}
@@ -946,14 +952,13 @@ class TermTransformer(Transformer):
 
     def visit_Rule(self, node):
         self.current_head = node.head
+        self.current_head_functions.append(str(node.head))
 
         self.visit_children(node)
-
 
         pred = str(node.head).split('(', 1)[0]
         arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
         arity = len(arguments)
-
 
         if self.ng:
             self.ng = False
@@ -978,8 +983,20 @@ class TermTransformer(Transformer):
         self._reset_temporary_rule_variables()
         return node
 
+    def visit_Aggregate(self, node):
+
+        if str(node) == str(self.current_head):
+            for elem in node.elements:
+                self.current_head_functions.append(str(elem.literal))
+
+        self.visit_children(node)
+
+        return node
+
+
     def _reset_temporary_rule_variables(self):
         self.current_head = None
+        self.current_head_functions = []
 
     def _reset_temporary_function_variables(self):
         self.current_function = None
@@ -1041,6 +1058,7 @@ class TermTransformer(Transformer):
             self.shows[node.name].add(len(node.arguments))
         else:
             self.shows[node.name] = {len(node.arguments)}
+
         self.visit_children(node)
 
         self._reset_temporary_function_variables()
@@ -1049,7 +1067,7 @@ class TermTransformer(Transformer):
 
     def visit_Variable(self, node):
 
-        if self.current_function and str(self.current_function) != str(self.current_head):
+        if self.current_function and str(self.current_function) not in self.current_head_functions:
             self._add_safe_variable(self.current_function.name, self.current_function_position, str(node), "function")
             self.current_function_position += 1
 
@@ -1099,12 +1117,18 @@ class DomainTransformer(Transformer):
         self.current_function = None
         self.current_function_position = 0
         self.current_head_function = None
+        self.current_head_functions = {}
 
         self.current_rule_position = 0
 
     def visit_Rule(self, node):
 
         self.current_head = node.head
+
+        head = node.head
+        if hasattr(node.head, "atom") and hasattr(node.head.atom,"symbol"):
+            head = node.head.atom.symbol
+        self.current_head_functions[str(node.head)] = head
 
         self.visit_children(node)
 
@@ -1124,12 +1148,23 @@ class DomainTransformer(Transformer):
         self._reset_temporary_function_variables()
         return node
 
+    def visit_Aggregate(self, node):
+
+        if str(node) == str(self.current_head):
+            for elem in node.elements:
+                self.current_head_functions[str(elem.literal)] = elem.literal.atom.symbol # is the function
+                
+        self.visit_children(node)
+
+        return node
+
+
     def visit_Variable(self, node):
         
-        variable_is_in_head = self.current_function and str(self.current_function) == str(self.current_head)
+        variable_is_in_head = self.current_function and str(self.current_function) in self.current_head_functions
         rule_is_in_safe_variables = str(self.current_rule_position) in self.safe_variables_rules
-
         if variable_is_in_head and rule_is_in_safe_variables:
+
 
             if str(node) in self.safe_variables_rules[str(self.current_rule_position)]:
                 safe_positions = self.safe_variables_rules[str(self.current_rule_position)][str(node)]
@@ -1143,7 +1178,9 @@ class DomainTransformer(Transformer):
                         if safe_pos_name in self.domain and safe_pos_position in self.domain[safe_pos_name]:
                             new_domain = self.domain[safe_pos_name][safe_pos_position]
 
-                            new_name = self.current_head_function.name
+                            head = self.current_head_functions[str(self.current_function)]
+
+                            new_name = head.name
                             new_position = self.current_function_position
 
                             for new_value in new_domain:
@@ -1195,6 +1232,7 @@ class DomainTransformer(Transformer):
 
     def _reset_temporary_rule_variables(self):
         self.current_head = None
+        self.current_head_functions = {}
 
     def _reset_temporary_function_variables(self):
         self.current_function = None
