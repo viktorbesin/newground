@@ -253,7 +253,12 @@ class NglpDlpTransformer(Transformer):
                                 g.add_edge(v1,v2)
 
                 for comp in self.cur_comp:
-                    g.add_edge(str(comp.left), str(comp.left))
+                    f_args = [str(comp.left), str(comp.right)]  # all arguments (incl. duplicates / terms)
+                    f_vars = list(dict.fromkeys(
+                        [a for a in f_args if a in self.cur_var]))  # which have to be grounded per combination
+                    for v1 in f_vars:
+                        for v2 in f_vars:
+                            g.add_edge(v1, v2)
 
                 for r in rem:
                     g_r[r] = []
