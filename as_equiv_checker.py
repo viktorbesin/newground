@@ -119,6 +119,16 @@ class EquivChecker:
                         print(f"This corresponds to the answer set: ")
                         print(self.clingo_output[self.clingo_hashes[clingo_key]])
 
+            for newground_key in self.newground_hashes.keys():
+                if newground_key not in self.clingo_hashes:
+                    works = False
+                    if verbose:
+                        print(f"Could not find corresponding stable model in clingo for hash {newground_key}")
+                        print(f"This corresponds to the answer set: ")
+                        print(self.newground_output[self.newground_hashes[newground_key]])
+
+
+
         if not works:
             if verbose:
                 print("----------------------")
