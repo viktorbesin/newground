@@ -50,8 +50,10 @@ class ClingoApp(object):
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
 
+        """
         print(domain)
         print(safe_variables)
+        """
 
 
         while new_domain_hash != old_domain_hash:
@@ -67,9 +69,11 @@ class ClingoApp(object):
 
             new_domain_hash = hash(str(domain))
 
+        """
         print(domain)
         print(safe_variables)
         quit()
+        """
 
 
 
@@ -154,6 +158,10 @@ class NglpDlpTransformer(Transformer):
             Provided a rule number and a variable in that rule, one gets the domain of this variable.
             If applicable it automatically calculates the intersection of different domains.
         """
+
+        possible_domain_value_name = f"term_rule_{str(rule)}_variable_{str(variable)}"
+        if possible_domain_value_name in self.domain:
+            return self.domain[possible_domain_value_name]['0']
 
         if str(rule) not in self.safe_variables_rules:
             return self.domain["0_terms"]
@@ -1146,6 +1154,7 @@ class DomainTransformer(Transformer):
         self.domain = domain
 
         self.current_head = None
+        self.variables_visited = {}
 
         self.current_function = None
         self.current_function_position = 0
@@ -1194,9 +1203,9 @@ class DomainTransformer(Transformer):
 
     def visit_Variable(self, node):
         
-        variable_is_in_head = self.current_function and str(self.current_function) in self.current_head_functions
         rule_is_in_safe_variables = str(self.current_rule_position) in self.safe_variables_rules
-        if variable_is_in_head and rule_is_in_safe_variables:
+        if rule_is_in_safe_variables and str(node) not in self.variables_visited:
+            self.variables_visited[str(node)] = 0
 
 
             if str(node) in self.safe_variables_rules[str(self.current_rule_position)]:
@@ -1242,13 +1251,23 @@ class DomainTransformer(Transformer):
                         assert(False)
 
                 if all_variables_present:
-                    head = self.current_head_functions[str(self.current_function)]
-                    new_name = head.name
+                    variable_is_in_head = self.current_function and str(self.current_function) in self.current_head_functions
+
                     new_position = self.current_function_position
 
+                    if variable_is_in_head:
+                        head = self.current_head_functions[str(self.current_function)]
+                        new_name = head.name
+
+                    rule_name = str(self.current_rule_position)
+                    variable_name = str(node)
+                    new_domain_variable_name = f"term_rule_{rule_name}_variable_{variable_name}"
 
                     for new_value in new_domain:
-                        self._add_symbolic_term_to_domain(new_name, new_position, new_value)
+                        if variable_is_in_head:
+                            self._add_symbolic_term_to_domain(new_name, new_position, new_value)
+                       
+                        self._add_symbolic_term_to_domain(new_domain_variable_name, '0', new_value)
 
         if self.current_function:
             self.current_function_position += 1
@@ -1307,14 +1326,12 @@ class DomainTransformer(Transformer):
     def _reset_temporary_rule_variables(self):
         self.current_head = None
         self.current_head_functions = {}
+        self.variables_visited = {}
 
     def _reset_temporary_function_variables(self):
         self.current_function = None
         self.current_function_position = 0
         self.current_head_function = None
-
-
-
 
 
 
