@@ -220,24 +220,11 @@ class AggregateTransformer(Transformer):
         for element_id in range(len(aggregate["elements"])):
 
             element = aggregate["elements"][element_id]
-            # Partial Sum Last
-
-            rule_string = f"{str_type}_ag{str_id}_elem{element_id}(S) :- last_ag{str_id}_elem{element_id}(O,X2), partial_{str_type}_ag{str_id}_elem{element_id}(O,S)."
-            self.new_prg.append(rule_string)
-
-            # Partial Sum Middle
-
-            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}(O2,S2) :- next_ag{str_id}_elem{element_id}(O1,O2,X2), partial_{str_type}_ag{str_id}_elem{element_id}(O1,S1), S2 = S1 + X2."
-            self.new_prg.append(rule_string)
-
-            # Partial Sum First
-
-            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}(O,X1) :- first_ag{str_id}_elem{element_id}(O,X1)."
-            self.new_prg.append(rule_string)
-
+            guard = aggregate["right_guard"]
             # Body
             body_head_def = f"body_ag{str_id}_elem{element_id}({','.join(element['terms'])})"
             body_head_def_first = element['terms'][0]
+            body_head_def_terms = ','.join(element['terms'])
 
             # DRY VIOLATION START: DRY (Do Not Repeat) justification: Because it is only used here and writing a subroutine creates more overload than simply duplicating the code
             term_strings_temp = []
@@ -245,18 +232,21 @@ class AggregateTransformer(Transformer):
                 term_strings_temp.append(term_string + "1")
             body_head_1 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
             body_head_1_first = term_strings_temp[0]
+            body_head_1_def_terms = ','.join(term_strings_temp)
              
             term_strings_temp = []
             for term_string in element['terms']:
                 term_strings_temp.append(term_string + "2")
             body_head_2 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
             body_head_2_first = term_strings_temp[0]
+            body_head_2_def_terms = ','.join(term_strings_temp)
 
             term_strings_temp = []
             for term_string in element['terms']:
                 term_strings_temp.append(term_string + "3")
             body_head_3 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
             body_head_3_first = term_strings_temp[0]
+            body_head_3_def_terms = ','.join(term_strings_temp)
             # DRY VIOLATION END
 
             if len(element['condition']) > 0:
@@ -266,29 +256,43 @@ class AggregateTransformer(Transformer):
 
             self.new_prg.append(rule_string)
 
+            # Partial Sum Last
+
+            rule_string = f"{str_type}_ag{str_id}_elem{element_id}(S) :- last_ag{str_id}_elem{element_id}({body_head_def_terms}), partial_{str_type}_ag{str_id}_elem{element_id}({body_head_def_terms},S)."
+            self.new_prg.append(rule_string)
+
+            # Partial Sum Middle
+
+            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}({body_head_2_def_terms},S2) :- next_ag{str_id}_elem{element_id}({body_head_1_def_terms},{body_head_2_def_terms}), partial_{str_type}_ag{str_id}_elem{element_id}({body_head_1_def_terms},S1), S2 = S1 + {body_head_2_first}, S2 <= {guard.term}."
+            self.new_prg.append(rule_string)
+
+            # Partial Sum First
+
+            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}({body_head_def_terms},S) :- first_ag{str_id}_elem{element_id}({body_head_def_terms}), S = {body_head_def_terms}."
+            self.new_prg.append(rule_string)
 
             # not_last
-            rule_string = f"not_last_ag{str_id}_elem{element_id}({body_head_1}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
+            rule_string = f"not_last_ag{str_id}_elem{element_id}({body_head_1_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
             self.new_prg.append(rule_string)
 
             # Last
-            rule_string = f"last_ag{str_id}_elem{element_id}({body_head_def},{body_head_def_first}) :- {body_head_def}, not not_last_ag{str_id}_elem{element_id}({body_head_def})."
+            rule_string = f"last_ag{str_id}_elem{element_id}({body_head_def_terms}) :- {body_head_def}, not not_last_ag{str_id}_elem{element_id}({body_head_def_terms})."
             self.new_prg.append(rule_string)
 
             # not_next
-            rule_string = f"not_next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2}) :- {body_head_1}, {body_head_2}, {body_head_3}, {body_head_1} < {body_head_3}, {body_head_3} < {body_head_2}."
+            rule_string = f"not_next_ag{str_id}_elem{element_id}({body_head_1_def_terms}, {body_head_2_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_3}, {body_head_1} < {body_head_3}, {body_head_3} < {body_head_2}."
             self.new_prg.append(rule_string)
 
             # next
-            rule_string = f"next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2}, {body_head_2_first}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}, not not_next_ag{str_id}_elem{element_id}({body_head_1}, {body_head_2})."
+            rule_string = f"next_ag{str_id}_elem{element_id}({body_head_1_def_terms}, {body_head_2_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}, not not_next_ag{str_id}_elem{element_id}({body_head_1_def_terms}, {body_head_2_def_terms})."
             self.new_prg.append(rule_string)
 
             # not_first
-            rule_string = f"not_first_ag{str_id}_elem{element_id}({body_head_2}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
+            rule_string = f"not_first_ag{str_id}_elem{element_id}({body_head_2_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
             self.new_prg.append(rule_string)
 
             # first
-            rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1}, {body_head_1_first}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1})."
+            rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1_def_terms}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1_def_terms})."
             self.new_prg.append(rule_string)
 
 

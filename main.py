@@ -47,6 +47,9 @@ class ClingoApp(object):
 
         safe_variables = term_transformer.safe_variable_rules
         domain = term_transformer.domain
+
+        comparisons = term_transformer.comparison_operators_variables
+
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
 
@@ -58,10 +61,10 @@ class ClingoApp(object):
 
 
         while new_domain_hash != old_domain_hash:
-
+        
             old_domain_hash = new_domain_hash
 
-            domain_transformer = DomainTransformer(safe_variables, domain)
+            domain_transformer = DomainTransformer(safe_variables, domain, comparisons)
             parse_string(combined_inputs, lambda stm: domain_transformer(stm))       
 
             safe_variables = domain_transformer.safe_variables_rules
@@ -69,11 +72,6 @@ class ClingoApp(object):
 
 
             new_domain_hash = hash(str(domain))
-
-        print(domain)
-        print(safe_variables)
-
-
 
         with ProgramBuilder(ctl) as bld:
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
@@ -139,6 +137,8 @@ class NglpDlpTransformer(Transformer):
         self.counter = 0
         self.g_counter = 'A'
 
+        self.current_comparison = None
+
         self.unfounded_rules = {}
         self.current_rule_position = 0
 
@@ -187,9 +187,6 @@ class NglpDlpTransformer(Transformer):
                     total_domain = total_domain.intersection(set(cur_domain))
                 else:
                     total_domain = set(cur_domain)
-
-        print(rule)
-        print(variable)
 
         return list(total_domain)
 
@@ -479,8 +476,10 @@ class NglpDlpTransformer(Transformer):
 
                     vars_set = frozenset(f_vars_needed + f_rem)
 
+                    combination_variables = f_vars_needed + f_rem
+
                     dom_list = []
-                    for variable in f_vars_needed + f_rem:
+                    for variable in combination_variables:
                         dom_list.append(self.domain["0_terms"])
 
 
@@ -490,8 +489,8 @@ class NglpDlpTransformer(Transformer):
      
                         variable_assignments = {}
 
-                        for variable_index in range(len(f_vars)):
-                            variable = f_vars[variable_index]
+                        for variable_index in range(len(combination_variables)):
+                            variable = combination_variables[variable_index]
                             value = c[variable_index]
 
                             variable_assignments[variable] = value
@@ -697,14 +696,16 @@ class NglpDlpTransformer(Transformer):
         return node
 
     def visit_Function(self, node):
-        # shows
-        if node.name in self.shows:
-            self.shows[node.name].add(len(node.arguments))
-        else:
-            self.shows[node.name] = {len(node.arguments)}
 
-        node = node.update(**self.visit_children(node))
-        self.cur_func.append(node)
+        if not self.current_comparison:
+            # shows
+            if node.name in self.shows:
+                self.shows[node.name].add(len(node.arguments))
+            else:
+                self.shows[node.name] = {len(node.arguments)}
+
+            node = node.update(**self.visit_children(node))
+            self.cur_func.append(node)
 
         return node
 
@@ -731,13 +732,19 @@ class NglpDlpTransformer(Transformer):
 
     def visit_Comparison(self, node):
         # currently implements only terms/variables
-        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm, clingo.ast.ASTType.BinaryOperation, clingo.ast.ASTType.UnaryOperation]
+        supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm, clingo.ast.ASTType.BinaryOperation, clingo.ast.ASTType.UnaryOperation, clingo.ast.ASTType.Function]
 
         assert(node.left.ast_type in supported_types)
         assert (node.right.ast_type in supported_types)
 
         self.cur_comp.append(node)
+
+        self.current_comparison = node
+
         self.visit_children(node)
+
+        self.current_comparison = None
+
         return node
 
     def _checkForCoveredSubsets(self, base, current, c_varset):
@@ -857,6 +864,9 @@ class TermTransformer(Transformer):
         self.safe_variable_rules = {}
 
         self.domain = {}
+        self.comparison_operators_variables = {}
+
+        self.current_comparison = None
         self.current_function = None
         self.current_function_position = 0
 
@@ -913,6 +923,9 @@ class TermTransformer(Transformer):
     def _reset_temporary_function_variables(self):
         self.current_function = None
         self.current_function_position = 0
+
+    def _reset_temporary_comparison_variables(self):
+        self.current_comparison = None
 
     def _add_symbolic_term_to_domain(self, identifier, position, value):
         """
@@ -1001,22 +1014,40 @@ class TermTransformer(Transformer):
 
     def visit_Comparison(self, node):
 
+        self.current_comparison = node
+
         if node.comparison == int(clingo.ast.ComparisonOperator.Equal):
             if node.left.ast_type == clingo.ast.ASTType.Variable:
                 self._add_comparison_to_safe_variables(str(node.left), node.right)
 
             if node.right.ast_type == clingo.ast.ASTType.Variable: 
                 self._add_comparison_to_safe_variables(str(node.right), node.left)
-                
+   
+        self.visit_children(node)
+
+        self._reset_temporary_comparison_variables()
+
         return node
 
+    def _add_comparison(self, rule_name, variable, comparison):
+        
+        if rule_name not in self.comparison_operators_variables:
+            self.comparison_operators_variables[rule_name] = {}
 
+        if variable not in self.comparison_operators_variables[rule_name]:
+            self.comparison_operators_variables[rule_name][variable] = []
+
+        self.comparison_operators_variables[rule_name][variable].append(comparison)
 
     def visit_Variable(self, node):
 
         if self.current_function and str(self.current_function) not in self.current_head_functions:
             self._add_safe_variable(self.current_function.name, self.current_function_position, str(node), "function")
             self.current_function_position += 1
+
+        if self.current_comparison:
+
+            self._add_comparison(str(self.current_rule_position), str(node), self.current_comparison)
 
         self.ng = True
         return node
@@ -1055,9 +1086,10 @@ class TermTransformer(Transformer):
 
 class DomainTransformer(Transformer):
 
-    def __init__(self, safe_variables_rules, domain):
+    def __init__(self, safe_variables_rules, domain, comparisons):
         self.safe_variables_rules = safe_variables_rules
         self.domain = domain
+        self.comparisons = comparisons
 
         self.current_head = None
         self.variables_visited = {}
@@ -1110,7 +1142,7 @@ class DomainTransformer(Transformer):
     def visit_Variable(self, node):
         
         rule_is_in_safe_variables = str(self.current_rule_position) in self.safe_variables_rules
-        if rule_is_in_safe_variables and str(node) not in self.variables_visited:
+        if rule_is_in_safe_variables: #and str(node) not in self.variables_visited:
             self.variables_visited[str(node)] = 0
 
 
@@ -1158,6 +1190,7 @@ class DomainTransformer(Transformer):
             
                         all_variables_present = True
 
+
                         for variable in safe_position["variables"]:
                             new_domain_variable_name = f"term_rule_{rule_name}_variable_{variable}"
                             if new_domain_variable_name in self.domain:
@@ -1171,6 +1204,41 @@ class DomainTransformer(Transformer):
                     else:
                         # not implemented
                         assert(False)
+
+                # If there is a comparison like X < 5 one can make the domain smaller...
+                if all_variables_present and str(self.current_rule_position) in self.comparisons and str(node) in self.comparisons[str(self.current_rule_position)]:
+                    comparisons = self.comparisons[str(self.current_rule_position)][str(node)]
+
+                    for comparison in comparisons:
+                        if str(node) == str(comparison.left) and str(comparison.right).isdigit() and (comparison.comparison == int(clingo.ast.ComparisonOperator.LessThan) or comparison.comparison == int(clingo.ast.ComparisonOperator.LessEqual)):
+                            new_domain = list(new_domain)
+
+
+                            new_domain_index = 0
+
+                            while new_domain_index < len(new_domain):
+
+                                domain_element = new_domain[new_domain_index]
+   
+                                violates = False
+ 
+                                if comparison.comparison == int(clingo.ast.ComparisonOperator.LessEqual):
+                                    if int(domain_element) > int(str(comparison.right)):
+                                        violates = True
+  
+                                if comparison.comparison == int(clingo.ast.ComparisonOperator.LessThan):
+                                    if int(domain_element) >= int(str(comparison.right)):
+                                        violates = True          
+
+                                if violates:
+                                    del new_domain[new_domain_index]
+
+                                    new_domain_index -= 1
+
+                                new_domain_index += 1
+                            
+
+                            new_domain = set(new_domain)
 
                 if all_variables_present:
                     variable_is_in_head = self.current_function and str(self.current_function) in self.current_head_functions
@@ -1312,6 +1380,15 @@ class ComparisonOperations:
 
         elif root.ast_type is clingo.ast.ASTType.Variable or root.ast_type is clingo.ast.ASTType.SymbolicTerm:
             return [root]
+        elif root.ast_type is clingo.ast.ASTType.Function:
+
+            argument_list = []
+
+            for argument in root.arguments:
+                argument_list += cls.get_arguments_from_operation(argument)
+
+            return argument_list
+
         else:
             assert(False) # not implemented
 
@@ -1340,6 +1417,14 @@ class ComparisonOperations:
 
         elif root.ast_type is clingo.ast.ASTType.SymbolicTerm:
             return str(root)
+
+        elif root.ast_type is clingo.ast.ASTType.Function:
+
+            instantiations = []
+            for argument in root.arguments:
+                instantiations.append(cls.instantiate_operation(argument, variable_assignments))
+
+            return f"{root.name}({','.join(instantiations)})"
 
         else:
             assert(False) # not implemented
@@ -1387,7 +1472,6 @@ class ComparisonOperations:
         if operation.ast_type == clingo.ast.ASTType.SymbolicAtom: 
             return [str(operation.symbol)]
         elif operation.ast_type == clingo.ast.ASTType.SymbolicTerm:
-            print(operation.symbol) 
             return [str(operation.symbol)]
         elif operation.ast_type == clingo.ast.ASTType.Variable:
             return variable_assignments[str(operation.name)]
