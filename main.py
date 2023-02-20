@@ -50,6 +50,7 @@ class ClingoApp(object):
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
 
+        print(''.join(inputs))
         """
         print(domain)
         print(safe_variables)
@@ -69,11 +70,8 @@ class ClingoApp(object):
 
             new_domain_hash = hash(str(domain))
 
-        """
         print(domain)
         print(safe_variables)
-        quit()
-        """
 
 
 
@@ -190,6 +188,9 @@ class NglpDlpTransformer(Transformer):
                 else:
                     total_domain = set(cur_domain)
 
+        print(rule)
+        print(variable)
+
         return list(total_domain)
 
     def visit_Rule(self, node):
@@ -237,7 +238,7 @@ class NglpDlpTransformer(Transformer):
             covered_cmp = {} # reduce SAT rules when compare-operators are pre-checked
             for f in self.cur_comp:
                                 
-                symbolic_arguments = self._get_arguments_from_operation(f.left) + self._get_arguments_from_operation(f.right)
+                symbolic_arguments = ComparisonOperations.get_arguments_from_operation(f.left) + ComparisonOperations.get_arguments_from_operation(f.right)
 
                 arguments = []
                 for symbolic_argument in symbolic_arguments:
@@ -248,9 +249,8 @@ class NglpDlpTransformer(Transformer):
                 dom_list = []
                 for variable in vars:
                     if str(self.current_rule_position) in self.safe_variables_rules and variable in self.safe_variables_rules[str(self.current_rule_position)]:
-                        element = self.safe_variables_rules[str(self.current_rule_position)][variable][0]
 
-                        domain = self.domain[element["name"]][element["position"]]
+                        domain = self._get_domain_values_from_rule_variable(str(self.current_rule_position), variable)
                             
                         dom_list.append(domain)
                     else:
@@ -277,9 +277,9 @@ class NglpDlpTransformer(Transformer):
                         if variable in vars:
                             interpretation += f"r{self.counter}_{variable}({variable_assignments[variable]}),"
 
-                    left = self._instantiate_operation(f.left, variable_assignments)
-                    right = self._instantiate_operation(f.right, variable_assignments)
-                    comparison = self._comparison_handlings(f.comparison, left, right)
+                    left = ComparisonOperations.instantiate_operation(f.left, variable_assignments)
+                    right = ComparisonOperations.instantiate_operation(f.right, variable_assignments)
+                    comparison = ComparisonOperations.comparison_handlings(f.comparison, left, right)
 
                     interpretation += f" not {comparison}"
 
@@ -464,7 +464,7 @@ class NglpDlpTransformer(Transformer):
                 # for every cmp operator
                 for f in self.cur_comp:
 
-                    symbolic_arguments = self._get_arguments_from_operation(f.left) + self._get_arguments_from_operation(f.right)
+                    symbolic_arguments = ComparisonOperations.get_arguments_from_operation(f.left) + ComparisonOperations.get_arguments_from_operation(f.right)
 
                     arguments = []
                     for symbolic_argument in symbolic_arguments:
@@ -520,16 +520,16 @@ class NglpDlpTransformer(Transformer):
                             else: # Static
                                 body_combination[f_arg] = f_arg 
 
-                        left = self._instantiate_operation(f.left, variable_assignments)
-                        right = self._instantiate_operation(f.right, variable_assignments)
+                        left = ComparisonOperations.instantiate_operation(f.left, variable_assignments)
+                        right = ComparisonOperations.instantiate_operation(f.right, variable_assignments)
 
-                        unfound_comparison = self._comparison_handlings(f.comparison, left, right)
+                        unfound_comparison = ComparisonOperations.comparison_handlings(f.comparison, left, right)
 
                         unfound_body_list = []
                         for v in f_arguments_nd:
                             if v in rem:
 
-                                #if not self._compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
+                                #if not ComparisonOperations.compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
                                 
                                 body_combination_tmp = [body_combination[v]] + head_combination_list_2
                                 body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
@@ -739,135 +739,6 @@ class NglpDlpTransformer(Transformer):
         self.cur_comp.append(node)
         self.visit_children(node)
         return node
-
-    def _getCompOperator(self, comp):
-        if comp is int(clingo.ast.ComparisonOperator.Equal):
-            return "="
-        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
-            return "!="
-        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
-            return ">="
-        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
-            return ">"
-        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
-            return "<="
-        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
-            return "<"
-        else:
-            assert(False) # not implemented
-
-    def _comparison_handlings(self, comp, c1, c2):
-        if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
-            return f"{c1} = {c2}"
-        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
-            return f"{c1} != {c2}"
-        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
-            return f"{c1} >= {c2}"
-        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
-            return f"{c1} > {c2}"
-        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
-            return f"{c1} <= {c2}"
-        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
-            return f"{c1} < {c2}"
-        else:
-            assert(False) # not implemented
-
-
-    def _compareTerms(self, comp, c1, c2):
-        if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
-            return c1 == c2
-        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
-            return c1 != c2
-        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
-            return c1 >= c2
-        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
-            return c1 > c2
-        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
-            return c1 <= c2
-        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
-            return c1 < c2
-        else:
-            assert(False) # not implemented
-
-
-    def _get_arguments_from_operation(self, root):
-        """
-            Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lasylt ''Y'' -> then combines together)
-        """
-
-        if root.ast_type is clingo.ast.ASTType.BinaryOperation:
-            return self._get_arguments_from_operation(root.left) + self._get_arguments_from_operation(root.right)
-
-        elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
-            return self._get_arguments_from_operation(root.argument)
-
-        elif root.ast_type is clingo.ast.ASTType.Variable or root.ast_type is clingo.ast.ASTType.SymbolicTerm:
-            return [root]
-        else:
-            assert(False) # not implemented
-
-    def _instantiate_operation(self, root, variable_assignments):
-        """
-            Instantiates a operation and returns a string
-        """
-
-        if root.ast_type is clingo.ast.ASTType.BinaryOperation:
-            string_rep = self._get_binary_operator_type_as_string(root.operator_type)
-    
-            return "(" + self._instantiate_operation(root.left, variable_assignments) + string_rep + self._instantiate_operation(root.right, variable_assignments) + ")"
-
-        elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
-            string_rep = self._get_unary_operator_type_as_string(root.operator_type)
-
-            if string_rep != "ABSOLUTE":
-                return "(" + string_rep + self._instantiate_operation(root.argument, variable_assignments) + ")"
-            elif string_rep == "ABSOLUTE":
-                return "(|" + self._instantiate_operation(root.argument, variable_assignments) + "|)"
-
-        elif root.ast_type is clingo.ast.ASTType.Variable:
-            variable_string = str(root)
-            return variable_assignments[variable_string]
-
-        elif root.ast_type is clingo.ast.ASTType.SymbolicTerm:
-            return str(root)
-
-        else:
-            assert(False) # not implemented
-
-    def _get_unary_operator_type_as_string(self, operator_type):
-        if operator_type == 0:
-            return "-"
-        elif operator_type == 1:
-            return "~"
-        elif operator_type == 2: # Absolute, i.e. |X| needs special handling
-            return "ABSOLUTE"
-        else:
-            print(f"[NOT-IMPLEMENTED] - Unary operator type '{operator_type}' is not implemented!")
-            assert(False) # not implemented
-
-    def _get_binary_operator_type_as_string(self, operator_type):
-        if operator_type == 0:
-            return "^"
-        elif operator_type == 1:
-            return "?"
-        elif operator_type == 2:
-            return "&"
-        elif operator_type == 3:
-            return "+"
-        elif operator_type == 4:
-            return "-"
-        elif operator_type == 5:
-            return "*"
-        elif operator_type == 6:
-            return "/"
-        elif operator_type == 7:
-            return "\\"
-        elif operator_type == 8:
-            return "**"
-        else:
-            print(f"[NOT-IMPLEMENTED] - Binary operator type '{operator_type}' is not implemented!")
-            assert(False) # not implemented
-
 
     def _checkForCoveredSubsets(self, base, current, c_varset):
         for key in base:
@@ -1088,6 +959,28 @@ class TermTransformer(Transformer):
 
         self.safe_variable_rules[rule][str(value)].append(to_add_dict)
 
+    def _add_comparison_to_safe_variables(self, value, operation):
+
+        arguments = ComparisonOperations.get_arguments_from_operation(operation)
+        variables = []
+        for argument in arguments:
+            if argument.ast_type == clingo.ast.ASTType.Variable:
+                variables.append(str(argument))
+
+        rule = str(self.current_rule_position)
+        if rule not in self.safe_variable_rules:
+            self.safe_variable_rules[rule] = {}
+
+        if str(value) not in self.safe_variable_rules[rule]:
+            self.safe_variable_rules[rule][str(value)] = []
+
+        to_add_dict = {}
+        to_add_dict["type"] = "term"
+        to_add_dict["variables"] = variables
+        to_add_dict["operation"] = operation
+
+        self.safe_variable_rules[rule][str(value)].append(to_add_dict)
+
 
     def visit_Function(self, node):
 
@@ -1105,6 +998,19 @@ class TermTransformer(Transformer):
         self._reset_temporary_function_variables()
 
         return node
+
+    def visit_Comparison(self, node):
+
+        if node.comparison == int(clingo.ast.ComparisonOperator.Equal):
+            if node.left.ast_type == clingo.ast.ASTType.Variable:
+                self._add_comparison_to_safe_variables(str(node.left), node.right)
+
+            if node.right.ast_type == clingo.ast.ASTType.Variable: 
+                self._add_comparison_to_safe_variables(str(node.right), node.left)
+                
+        return node
+
+
 
     def visit_Variable(self, node):
 
@@ -1244,8 +1150,24 @@ class DomainTransformer(Transformer):
                             all_variables_present = False
                             break
                     elif safe_position["type"] == "term":
-                        print("NOT YET IMPLEMENTED")
-                        assert(False)
+
+                        rule_name = str(self.current_rule_position)
+                        variable_name = str(node)
+
+                        variable_assignments = {}
+            
+                        all_variables_present = True
+
+                        for variable in safe_position["variables"]:
+                            new_domain_variable_name = f"term_rule_{rule_name}_variable_{variable}"
+                            if new_domain_variable_name in self.domain:
+                                variable_assignments[variable] = self.domain[new_domain_variable_name]['0']
+                            else:
+                                all_variables_present = False
+                                break
+
+                        if all_variables_present:
+                            new_domain = ComparisonOperations.generate_domain(variable_assignments, safe_position["operation"])                       
                     else:
                         # not implemented
                         assert(False)
@@ -1303,18 +1225,6 @@ class DomainTransformer(Transformer):
         if str(value) not in self.domain["0_terms"]:
             self.domain["0_terms"].append(str(value))
 
-    def visit_Comparison(self, node):
-
-        print(node)
-        print(node.ast_type)
-        print(node.left)
-        print(node.left.ast_type)
-        print(node.right)
-        print(node.right.ast_type)
-
-        return node
-
-
     def visit_SymbolicTerm(self, node):
        
         if self.current_function: 
@@ -1334,6 +1244,230 @@ class DomainTransformer(Transformer):
         self.current_head_function = None
 
 
+class ComparisonOperations:
+
+    @classmethod
+    def getCompOperator(cls, comp):
+        if comp is int(clingo.ast.ComparisonOperator.Equal):
+            return "="
+        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
+            return "!="
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
+            return ">="
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
+            return ">"
+        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
+            return "<="
+        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
+            return "<"
+        else:
+            assert(False) # not implemented
+
+    @classmethod
+    def comparison_handlings(cls, comp, c1, c2):
+        if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
+            return f"{c1} = {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
+            return f"{c1} != {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
+            return f"{c1} >= {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
+            return f"{c1} > {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
+            return f"{c1} <= {c2}"
+        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
+            return f"{c1} < {c2}"
+        else:
+            assert(False) # not implemented
+
+
+    @classmethod
+    def compareTerms(cls, comp, c1, c2):
+        if comp is int(clingo.ast.ComparisonOperator.Equal): # == 5
+            return c1 == c2
+        elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
+            return c1 != c2
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
+            return c1 >= c2
+        elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
+            return c1 > c2
+        elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
+            return c1 <= c2
+        elif comp is int(clingo.ast.ComparisonOperator.LessThan):
+            return c1 < c2
+        else:
+            assert(False) # not implemented
+
+    @classmethod
+    def get_arguments_from_operation(cls, root):
+        """
+            Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lasylt ''Y'' -> then combines together)
+        """
+
+        if root.ast_type is clingo.ast.ASTType.BinaryOperation:
+            return ComparisonOperations.get_arguments_from_operation(root.left) + ComparisonOperations.get_arguments_from_operation(root.right)
+
+        elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
+            return ComparisonOperations.get_arguments_from_operation(root.argument)
+
+        elif root.ast_type is clingo.ast.ASTType.Variable or root.ast_type is clingo.ast.ASTType.SymbolicTerm:
+            return [root]
+        else:
+            assert(False) # not implemented
+
+    @classmethod
+    def instantiate_operation(cls, root, variable_assignments):
+        """
+            Instantiates a operation and returns a string
+        """
+
+        if root.ast_type is clingo.ast.ASTType.BinaryOperation:
+            string_rep = ComparisonOperations._get_binary_operator_type_as_string(root.operator_type)
+    
+            return "(" + ComparisonOperations.instantiate_operation(root.left, variable_assignments) + string_rep + ComparisonOperations.instantiate_operation(root.right, variable_assignments) + ")"
+
+        elif root.ast_type is clingo.ast.ASTType.UnaryOperation:
+            string_rep = ComparisonOperations._get_unary_operator_type_as_string(root.operator_type)
+
+            if string_rep != "ABSOLUTE":
+                return "(" + string_rep + ComparisonOperations.instantiate_operation(root.argument, variable_assignments) + ")"
+            elif string_rep == "ABSOLUTE":
+                return "(|" + ComparisonOperations.instantiate_operation(root.argument, variable_assignments) + "|)"
+
+        elif root.ast_type is clingo.ast.ASTType.Variable:
+            variable_string = str(root)
+            return variable_assignments[variable_string]
+
+        elif root.ast_type is clingo.ast.ASTType.SymbolicTerm:
+            return str(root)
+
+        else:
+            assert(False) # not implemented
+
+    @classmethod
+    def _get_unary_operator_type_as_string(cls, operator_type):
+        if operator_type == int(clingo.ast.UnaryOperator.Minus):
+            return "-"
+        elif operator_type == int(clingo.ast.UnaryOperator.Negation):
+            return "~"
+        elif operator_type == int(clingo.ast.UnaryOperator.Absolute): # Absolute, i.e. |X| needs special handling
+            return "ABSOLUTE"
+        else:
+            print(f"[NOT-IMPLEMENTED] - Unary operator type '{operator_type}' is not implemented!")
+            assert(False) # not implemented
+
+    @classmethod
+    def _get_binary_operator_type_as_string(cls, operator_type):
+        if operator_type == int(clingo.ast.BinaryOperator.XOr):
+            return "^"
+        elif operator_type == int(clingo.ast.BinaryOperator.Or):
+            return "?"
+        elif operator_type == int(clingo.ast.BinaryOperator.And):
+            return "&"
+        elif operator_type == int(clingo.ast.BinaryOperator.Plus):
+            return "+"
+        elif operator_type == int(clingo.ast.BinaryOperator.Minus):
+            return "-"
+        elif operator_type == int(clingo.ast.BinaryOperator.Multiplication):
+            return "*"
+        elif operator_type == int(clingo.ast.BinaryOperator.Division):
+            return "/"
+        elif operator_type == int(clingo.ast.BinaryOperator.Modulo):
+            return "\\"
+        elif operator_type == int(clingo.ast.BinaryOperator.Power):
+            return "**"
+        else:
+            print(f"[NOT-IMPLEMENTED] - Binary operator type '{operator_type}' is not implemented!")
+            assert(False) # not implemented
+
+       
+    @classmethod                     
+    def generate_domain(cls, variable_assignments, operation):
+
+        if operation.ast_type == clingo.ast.ASTType.SymbolicAtom: 
+            return [str(operation.symbol)]
+        elif operation.ast_type == clingo.ast.ASTType.SymbolicTerm:
+            print(operation.symbol) 
+            return [str(operation.symbol)]
+        elif operation.ast_type == clingo.ast.ASTType.Variable:
+            return variable_assignments[str(operation.name)]
+        elif operation.ast_type == clingo.ast.ASTType.UnaryOperation:
+            return cls.generate_unary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.argument))
+        elif operation.ast_type == clingo.ast.ASTType.BinaryOperation:
+            return cls.generate_binary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.left), cls.generate_domain(variable_assignments, operation.right))
+        else:
+            print(operation)
+            print(operation.ast_type)
+            assert(False)
+
+    @classmethod 
+    def generate_unary_operator_domain(cls, operator_type, domain):
+
+        if operator_type == int(clingo.ast.UnaryOperator.Minus):
+            return cls.apply_unary_operation(domain, lambda d: -d)
+        elif operator_type == int(clingo.ast.UnaryOperator.Negation):
+            return cls.apply_unary_operation(domain, lambda d: ~d)
+        elif operator_type == int(clingo.ast.UnaryOperator.Absolute): 
+            return cls.apply_unary_operation(domain, lambda d: abs(d))
+        else:
+            print(f"[NOT-IMPLEMENTED] - Unary operator type '{operator_type}' is not implemented!")
+            assert(False) # not implemented
+
+
+    @classmethod
+    def generate_binary_operator_domain(cls, operator_type, left_domain, right_domain):
+
+        if operator_type == int(clingo.ast.BinaryOperator.XOr):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l ^ r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Or):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l | r)
+        elif operator_type == int(clingo.ast.BinaryOperator.And):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l & r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Plus):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l + r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Minus):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l - r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Multiplication):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l * r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Division):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l / r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Modulo):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l % r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Power):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: pow(l,r))
+        else:
+            print(f"[NOT-IMPLEMENTED] - Binary operator type '{operator_type}' is not implemented!")
+            assert(False) # not implemented
+
+        assert(False) # not implemented
+
+       
+    @classmethod     
+    def apply_unary_operation(domain, unary_operation):
+
+        new_domain = {}
+
+        for element in domain:
+            res = unary_operation(element)
+
+            if res not in new_domain:
+                new_domain[res] = res
+
+        return list(new_domain.keys())
+
+    @classmethod
+    def apply_binary_operation(cls, left_domain, right_domain, binary_operation):
+    
+        new_domain = {}
+
+        for left in left_domain:
+            for right in right_domain:
+                res = binary_operation(int(left), int(right))
+
+                if res not in new_domain:
+                    new_domain[res] = res
+
+        return list(new_domain.keys())
 
 
 if __name__ == "__main__":
