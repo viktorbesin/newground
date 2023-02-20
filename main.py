@@ -50,6 +50,10 @@ class ClingoApp(object):
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
 
+        print(domain)
+        print(safe_variables)
+
+
         while new_domain_hash != old_domain_hash:
 
             old_domain_hash = new_domain_hash
@@ -63,11 +67,9 @@ class ClingoApp(object):
 
             new_domain_hash = hash(str(domain))
 
-        """
         print(domain)
-        print(''.join(inputs))
+        print(safe_variables)
         quit()
-        """
 
 
 
@@ -148,6 +150,10 @@ class NglpDlpTransformer(Transformer):
         #self.head = None
 
     def _get_domain_values_from_rule_variable(self, rule, variable):
+        """ 
+            Provided a rule number and a variable in that rule, one gets the domain of this variable.
+            If applicable it automatically calculates the intersection of different domains.
+        """
 
         if str(rule) not in self.safe_variables_rules:
             return self.domain["0_terms"]
@@ -155,7 +161,7 @@ class NglpDlpTransformer(Transformer):
         if str(variable) not in self.safe_variables_rules[str(rule)]:
             return self.domain["0_terms"]
 
-        total_domain = []
+        total_domain = None
 
         for domain_type in self.safe_variables_rules[str(rule)][str(variable)]:
        
@@ -169,9 +175,14 @@ class NglpDlpTransformer(Transformer):
                 if domain_position not in self.domain[domain_name]:
                     return self.domain["0_terms"]
 
-                total_domain += self.domain[domain_name][domain_position]
+                cur_domain = self.domain[domain_name][domain_position]
 
-        return list(set(total_domain))
+                if total_domain:
+                    total_domain = total_domain.intersection(set(cur_domain))
+                else:
+                    total_domain = set(cur_domain)
+
+        return list(total_domain)
 
     def visit_Rule(self, node):
 
@@ -1191,22 +1202,53 @@ class DomainTransformer(Transformer):
             if str(node) in self.safe_variables_rules[str(self.current_rule_position)]:
                 safe_positions = self.safe_variables_rules[str(self.current_rule_position)][str(node)]
 
-                if len(safe_positions) == 1:
-                    safe_position = safe_positions[0]
-                    if safe_position['type'] == 'function':
+                if len(safe_positions) > 1: 
+                    
+                    for safe_position_index in range(len(safe_positions)): # Remove terms if len > 1
+                        safe_position = safe_positions[safe_position_index]
+
+                        if safe_position['type'] == 'term':
+                            del safe_positions[safe_position_index]
+
+                        safe_position_index -= 1
+
+
+                new_domain = None
+                all_variables_present = True
+
+                for safe_position in safe_positions:
+
+                    if safe_position["type"] == "function":
                         safe_pos_name = safe_position['name']
                         safe_pos_position = safe_position['position']
 
+
                         if safe_pos_name in self.domain and safe_pos_position in self.domain[safe_pos_name]:
-                            new_domain = self.domain[safe_pos_name][safe_pos_position]
 
-                            head = self.current_head_functions[str(self.current_function)]
+                            cur_domain = set(self.domain[safe_pos_name][safe_pos_position])
 
-                            new_name = head.name
-                            new_position = self.current_function_position
+                            if new_domain:
+                                new_domain = new_domain.intersection(cur_domain)
+                            else:
+                                new_domain = cur_domain
+                        else:
+                            all_variables_present = False
+                            break
+                    elif safe_position["type"] == "term":
+                        print("NOT YET IMPLEMENTED")
+                        assert(False)
+                    else:
+                        # not implemented
+                        assert(False)
 
-                            for new_value in new_domain:
-                                self._add_symbolic_term_to_domain(new_name, new_position, new_value)
+                if all_variables_present:
+                    head = self.current_head_functions[str(self.current_function)]
+                    new_name = head.name
+                    new_position = self.current_function_position
+
+
+                    for new_value in new_domain:
+                        self._add_symbolic_term_to_domain(new_name, new_position, new_value)
 
         if self.current_function:
             self.current_function_position += 1
@@ -1242,6 +1284,16 @@ class DomainTransformer(Transformer):
         if str(value) not in self.domain["0_terms"]:
             self.domain["0_terms"].append(str(value))
 
+    def visit_Comparison(self, node):
+
+        print(node)
+        print(node.ast_type)
+        print(node.left)
+        print(node.left.ast_type)
+        print(node.right)
+        print(node.right.ast_type)
+
+        return node
 
 
     def visit_SymbolicTerm(self, node):
