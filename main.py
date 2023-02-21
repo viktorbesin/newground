@@ -52,8 +52,10 @@ class ClingoApp(object):
 
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
+    
 
-        print(''.join(inputs))
+        print("TERM-TRANS-FINISHED")
+        #print(''.join(inputs))
         """
         print(domain)
         print(safe_variables)
@@ -73,6 +75,9 @@ class ClingoApp(object):
 
             new_domain_hash = hash(str(domain))
 
+        print("DOMAIN-FINISHED")
+
+
         with ProgramBuilder(ctl) as bld:
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
             #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
@@ -86,18 +91,25 @@ class ClingoApp(object):
                 #print(transformer.unfounded_rules)
 
                 for key in transformer.unfounded_rules.keys():
-                    unfounded_rules_list = transformer.unfounded_rules[key]
 
-                    unfounded_rules_list = list(set(unfounded_rules_list)) # Remove duplicates
+                    unfounded_rules_heads = transformer.unfounded_rules[key]
 
-                    sum_list = []
-                    for index in range(len(unfounded_rules_list)):
-                        unfounded_rule = unfounded_rules_list[index]
+                    sum_strings = []
 
-                        sum_list.append(f"1,{index} : {unfounded_rule}")
+                    for rule_key in unfounded_rules_heads.keys():
 
+                        unfounded_rules_list = unfounded_rules_heads[rule_key]
+                        unfounded_rules_list = list(set(unfounded_rules_list)) # Remove duplicates
 
-                    self.printer.custom_print(f":- {key}, #sum{{{'; '.join(sum_list)}}} >=1.")
+                        sum_list = []
+                        for index in range(len(unfounded_rules_list)):
+                            unfounded_rule = unfounded_rules_list[index]
+                            sum_list.append(f"1,{index} : {unfounded_rule}")
+
+                        sum_strings.append(f"#sum{{{'; '.join(sum_list)}}} >=1 ")
+
+                    
+                    self.printer.custom_print(f":- {key}, {','.join(sum_strings)}.")
                 
 
                 if not self.ground_guess:
@@ -548,12 +560,7 @@ class NglpDlpTransformer(Transformer):
                         else:
                             head_string = f"{head.name}"
 
-
-                        if head_string not in self.unfounded_rules:
-                            self.unfounded_rules[head_string] = []
-
-                        self.unfounded_rules[head_string].append(unfound_atom)
-
+                        self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
                 # -------------------------------------------
                 # over every body-atom
@@ -657,11 +664,7 @@ class NglpDlpTransformer(Transformer):
                             else:
                                 head_string = f"{head.name}"
 
-
-                            if head_string not in self.unfounded_rules:
-                                self.unfounded_rules[head_string] = []
-
-                            self.unfounded_rules[head_string].append(unfound_atom)
+                            self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
             pred = str(node.head).split('(', 1)[0]
@@ -846,6 +849,18 @@ class NglpDlpTransformer(Transformer):
                     self.printer.custom_print(f"{str(node.head)}.")
                 else:
                     self.printer.custom_print(f"{str(node.head).replace(';', ',')}.")
+
+    def _add_atom_to_unfoundedness_check(self, head_string, unfound_atom):
+
+        if head_string not in self.unfounded_rules:
+            self.unfounded_rules[head_string] = {}
+
+        if str(self.current_rule_position) not in self.unfounded_rules[head_string]:
+            self.unfounded_rules[head_string][str(self.current_rule_position)] = []
+
+        self.unfounded_rules[head_string][str(self.current_rule_position)].append(unfound_atom)
+
+
 
 class TermTransformer(Transformer):
     def __init__(self, sub_doms, printer, no_show=False):
