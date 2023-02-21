@@ -6,7 +6,6 @@ import argparse
 import clingo
 
 from clingo.ast import Transformer, Variable, parse_string
-from newground import ClingoApp
 
 def do_nothing(stuff):
     pass
@@ -27,32 +26,6 @@ def getCompOperator(comp):
     else:
         assert(False) # not implemented
 
-
-
-class AggregateHandler:
-
-    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None):
-        self.no_show = no_show
-        self.ground_guess = ground_guess
-        self.ground = ground
-        self.output_printer = output_printer
-        
-        self.rules = False
-
-    def start(self, contents):
-
-        vrt = AggregateTransformer()
-        parse_string(contents, lambda stm: do_nothing(vrt(stm)))
-
-        shown_predicates = list(set(vrt.shown_predicates))
-
-        program_string = '\n'.join(shown_predicates + vrt.new_prg)
-
-        #print(program_string)
-   
-        newground = ClingoApp("newground", self.no_show, self.ground_guess, self.ground, self.output_printer)
-
-        newground.main(clingo.Control(), [program_string])
 
 class AggregateTransformer(Transformer):
     

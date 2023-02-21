@@ -4,8 +4,8 @@ import argparse
 
 import clingo
 
-from aggregate_transformer import AggregateHandler
-from newground import ClingoApp, DefaultOutputPrinter
+from newground.newground import Newground
+from newground.default_output_printer import DefaultOutputPrinter
 
 def block_print():
     sys.stdout = open(os.devnull, 'w')
@@ -96,9 +96,10 @@ class EquivChecker:
         total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
 
         custom_printer = CustomOutputPrinter()
-        
-        newground_aggregates = AggregateHandler(no_show, ground_guess, ground, output_printer = custom_printer)
-        newground_aggregates.start(total_content)
+       
+
+        newground = Newground(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer)
+        newground.start(total_content)
 
         ctl2 = clingo.Control()
         ctl2.configuration.solve.models = 0
@@ -145,10 +146,5 @@ class EquivChecker:
 
             return (True, len(self.clingo_output), len(self.newground_output))
 
-
-if __name__ == "__main__":
-    checker = EquivChecker()
-    (instance, encoding) = checker.parse()
-    checker.start(instance, encoding, verbose = True)
 
 
