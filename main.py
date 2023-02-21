@@ -34,7 +34,10 @@ class ClingoApp(object):
 
     def main(self, ctl, inputs):
 
+        print(''.join(inputs)) 
+
         combined_inputs = '\n'.join(inputs)
+        
 
         ctl_insts = Control()
         ctl_insts.register_observer(ProgramObserver(self.prg))
@@ -54,7 +57,6 @@ class ClingoApp(object):
         old_domain_hash = None
     
 
-        print("TERM-TRANS-FINISHED")
         #print(''.join(inputs))
         """
         print(domain)
@@ -75,9 +77,6 @@ class ClingoApp(object):
 
             new_domain_hash = hash(str(domain))
 
-        print("DOMAIN-FINISHED")
-
-
         with ProgramBuilder(ctl) as bld:
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
             #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
@@ -86,7 +85,14 @@ class ClingoApp(object):
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
                 self.printer.custom_print(":- not sat.")
                 #parse_string(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.", lambda stm: self.bld.add(stm))
-                self.printer.custom_print(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.")
+
+                sat_strings = []
+                non_ground_rules = transformer.non_ground_rules
+                for non_ground_rule_key in non_ground_rules.keys():
+                    sat_strings.append(f"sat_r{non_ground_rule_key}")
+
+    
+                self.printer.custom_print(f"sat :- {','.join(sat_strings)}.")
 
                 #print(transformer.unfounded_rules)
 
@@ -147,6 +153,7 @@ class NglpDlpTransformer(Transformer):
         self.foundness ={}
         self.f = {}
         self.counter = 0
+        self.non_ground_rules = {}
         self.g_counter = 'A'
 
         self.current_comparison = None
@@ -208,7 +215,9 @@ class NglpDlpTransformer(Transformer):
             self._reset_after_rule()
             if not self.ground:
                 self._outputNodeFormatConform(node)
+
             self.current_rule_position += 1
+            self.counter += 1
             return node
 
         # check if AST is non-ground
@@ -216,7 +225,8 @@ class NglpDlpTransformer(Transformer):
 
         # if so: handle grounding
         if self.ng:
-            self.counter += 1
+            self.non_ground_rules[self.current_rule_position] = self.current_rule_position
+            #self.counter += 1
             if str(node.head) != "#false":
                 head = self.cur_func[0]
             else:
@@ -687,6 +697,7 @@ class NglpDlpTransformer(Transformer):
             # print rule as it is
             self._outputNodeFormatConform(node)
 
+        self.counter += 1
         self.current_rule_position += 1
         self._reset_after_rule()
         return node
