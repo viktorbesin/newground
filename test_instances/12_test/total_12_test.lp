@@ -1,9 +1,8 @@
 #program facts.
 p(1).
-p(2).
 
 #program rules.
-q(1) :- 1 <  #sum{X : p(X)} < 5. 
+q(1) :- 0 <  #sum{X : p(X)} < 2. 
 
 
 

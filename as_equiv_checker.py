@@ -131,17 +131,17 @@ class EquivChecker:
 
         if not works:
             if verbose:
-                print("----------------------")
-                print("----------------------")
-                print("----------------------")
-                print("The answersets DIFFER!")
-                print(f"Clingo produced a total of {len(self.clingo_output)}")
-                print(f"Newground produced a total of {len(self.newground_output)}")
+                print("[INFO] ----------------------")
+                print("[INFO] ----------------------")
+                print("[INFO] ----------------------")
+                print("[INFO] The answersets DIFFER!")
+                print(f"[INFO] Clingo produced a total of {len(self.clingo_output)}")
+                print(f"[INFO] Newground produced a total of {len(self.newground_output)}")
 
             return (False, len(self.clingo_output), len(self.newground_output))
         else: # works
             if verbose:
-                print("The answersets are the SAME!")
+                print("[INFO] The answersets are the SAME!")
 
             return (True, len(self.clingo_output), len(self.newground_output))
 

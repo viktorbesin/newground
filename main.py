@@ -45,7 +45,6 @@ class ClingoApp(object):
             self.printer.custom_print(self.prg)
 
         term_transformer = TermTransformer(self.sub_doms, self.printer, self.no_show)
-        #parse_files(inputs, lambda stm: term_transformer(stm))
         parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
         safe_variables = term_transformer.safe_variable_rules
@@ -81,10 +80,9 @@ class ClingoApp(object):
             transformer = NglpDlpTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, term_transformer.sub_doms, self.ground_guess, self.ground, self.printer, domain, safe_variables)
             #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
             parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
-            if transformer.counter > 0:
+            if len(transformer.non_ground_rules.keys()) > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
                 self.printer.custom_print(":- not sat.")
-                #parse_string(f"sat :- {','.join([f'sat_r{i}' for i in range(1, transformer.counter+1)])}.", lambda stm: self.bld.add(stm))
 
                 sat_strings = []
                 non_ground_rules = transformer.non_ground_rules
@@ -93,8 +91,6 @@ class ClingoApp(object):
 
     
                 self.printer.custom_print(f"sat :- {','.join(sat_strings)}.")
-
-                #print(transformer.unfounded_rules)
 
                 for key in transformer.unfounded_rules.keys():
 
@@ -217,7 +213,7 @@ class NglpDlpTransformer(Transformer):
                 self._outputNodeFormatConform(node)
 
             self.current_rule_position += 1
-            self.counter += 1
+            #self.current_rule_position += 1
             return node
 
         # check if AST is non-ground
@@ -226,7 +222,7 @@ class NglpDlpTransformer(Transformer):
         # if so: handle grounding
         if self.ng:
             self.non_ground_rules[self.current_rule_position] = self.current_rule_position
-            #self.counter += 1
+            #self.current_rule_position += 1
             if str(node.head) != "#false":
                 head = self.cur_func[0]
             else:
@@ -241,14 +237,14 @@ class NglpDlpTransformer(Transformer):
                 disjunction = ""
 
                 for value in values:
-                    disjunction += f"r{self.counter}_{variable}({value}) | "
+                    disjunction += f"r{self.current_rule_position}_{variable}({value}) | "
 
                 if len(disjunction) > 0:
                     disjunction = disjunction[:-3] + "."
                     self.printer.custom_print(disjunction)
 
                 for value in values:
-                    self.printer.custom_print(f"r{self.counter}_{variable}({value}) :- sat.")
+                    self.printer.custom_print(f"r{self.current_rule_position}_{variable}({value}) :- sat.")
 
             # ----------------------------
             # SAT
@@ -294,7 +290,7 @@ class NglpDlpTransformer(Transformer):
                     interpretation = ""
                     for variable in var:
                         if variable in vars:
-                            interpretation += f"r{self.counter}_{variable}({variable_assignments[variable]}),"
+                            interpretation += f"r{self.current_rule_position}_{variable}({variable_assignments[variable]}),"
 
                     left = ComparisonOperations.instantiate_operation(f.left, variable_assignments)
                     right = ComparisonOperations.instantiate_operation(f.right, variable_assignments)
@@ -302,14 +298,14 @@ class NglpDlpTransformer(Transformer):
 
                     interpretation += f" not {comparison}"
 
-                    self.printer.custom_print(f"sat_r{self.counter} :- {interpretation}.")
+                    self.printer.custom_print(f"sat_r{self.current_rule_position} :- {interpretation}.")
 
             # SAT - Functions
             for f in self.cur_func:
                 args_len = len(f.arguments)
                 if (args_len == 0):
                     self.printer.custom_print(
-                        f"sat_r{self.counter} :-{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else ' not'} {f}.")
+                        f"sat_r{self.current_rule_position} :-{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else ' not'} {f}.")
                     continue
                 arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
                 var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
@@ -331,7 +327,7 @@ class NglpDlpTransformer(Transformer):
                         # vars in atom
                         interpretation = ""
                         for v in var:
-                            interpretation += f"r{self.counter}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
+                            interpretation += f"r{self.current_rule_position}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
                             f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
 
                         if len(f_args) > 0:
@@ -339,7 +335,7 @@ class NglpDlpTransformer(Transformer):
                         else:
                             f_args = f"{f.name}"
 
-                        self.printer.custom_print(f"sat_r{self.counter} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not '}{f_args}.")
+                        self.printer.custom_print(f"sat_r{self.current_rule_position} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not '}{f_args}.")
 
             # reduce duplicates; track combinations
             sat_per_f = {}
@@ -458,13 +454,13 @@ class NglpDlpTransformer(Transformer):
                             rem_tuple_list = [r] + head_tuple_list
                             rem_tuple_interpretation = ','.join(rem_tuple_list)
 
-                            self.printer.custom_print(f"1<={{r{self.counter}f_{r}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head}.")
+                            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{r}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head}.")
 
                         else:
                             head_interpretation = f"{head.name}" + (
                                 f"({','.join([combination[g_r[r].index(a)] if a in g_r[r] else a for a in h_args])})" if h_args_len > 0 else "")
                             rem_interpretation = ','.join([combination[g_r[r].index(v)] for v in h_args_nd if v in g_r[r]])
-                            rem_interpretations = ';'.join([f"r{self.counter}f_{r}({v}{','+rem_interpretation if h_args_len>0 else ''})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
+                            rem_interpretations = ';'.join([f"r{self.current_rule_position}f_{r}({v}{','+rem_interpretation if h_args_len>0 else ''})" for v in (self.sub_doms[r] if r in self.sub_doms else self.terms)])
                             mis_vars  = [v for v in h_vars if v not in g_r[r]]
                             if len(h_vars) == len(g_r[r]):  # removed none
                                 self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
@@ -531,7 +527,7 @@ class NglpDlpTransformer(Transformer):
                         for h_arg in h_args:
                             head_combination_list_2.append(head_combination[h_arg])
 
-                        unfound_atom = f"r{self.counter}_unfound({','.join(head_combination_list_2)})"
+                        unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
 
                         body_combination = {}
 
@@ -553,7 +549,7 @@ class NglpDlpTransformer(Transformer):
                                 #if not ComparisonOperations.compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
                                 
                                 body_combination_tmp = [body_combination[v]] + head_combination_list_2
-                                body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
+                                body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
                                 unfound_body_list.append(body_predicate)
 
 
@@ -615,7 +611,7 @@ class NglpDlpTransformer(Transformer):
                             for h_arg in h_args:
                                 head_combination_list_2.append(head_combination[h_arg])
 
-                            unfound_atom = f"r{self.counter}_unfound({','.join(head_combination_list_2)})"
+                            unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
 
 
                             # ---------
@@ -637,7 +633,7 @@ class NglpDlpTransformer(Transformer):
                             for v in f_args_nd:
                                 if v in rem:
                                     body_combination_tmp = [body_combination[v]] + head_combination_list_2
-                                    body_predicate = f"r{self.counter}f_{v}({','.join(body_combination_tmp)})"
+                                    body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
                                     unfound_body_list.append(body_predicate)
 
                             unfound_predicate = f"{f.name}"
@@ -697,7 +693,6 @@ class NglpDlpTransformer(Transformer):
             # print rule as it is
             self._outputNodeFormatConform(node)
 
-        self.counter += 1
         self.current_rule_position += 1
         self._reset_after_rule()
         return node
