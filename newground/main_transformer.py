@@ -323,7 +323,7 @@ class MainTransformer(Transformer):
 
     def _generate_sat_part(self, head):
 
-        self._generate_sat__variable_possibilities()
+        self._generate_sat_variable_possibilities()
         self._generate_sat_comparisons()
         self._generate_sat_functions(head)
 
@@ -414,8 +414,13 @@ class MainTransformer(Transformer):
                 left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
                 right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
-                safe_checks = left_eval and right_eval and str(left_eval).isdigit() and str(right_eval).isdigit()
-                if safe_checks and ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval)):
+                sint = self.ignore_exception(ValueError)(int)
+                left_eval = sint(left_eval)
+                right_eval = sint(right_eval)
+
+
+                safe_checks = left_eval != None and right_eval != None
+                if not safe_checks or (safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))):
 
                     left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
                     right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
@@ -428,7 +433,7 @@ class MainTransformer(Transformer):
 
 
 
-    def _generate_sat__variable_possibilities(self):
+    def _generate_sat_variable_possibilities(self):
 
         # MOD
         # domaining per rule variable
@@ -659,8 +664,13 @@ class MainTransformer(Transformer):
                 left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
                 right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
-                safe_checks = left_eval and right_eval and str(left_eval).isdigit() and str(right_eval).isdigit()
-                if safe_checks and ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval)):
+                sint = self.ignore_exception(ValueError)(int)
+                left_eval = sint(left_eval)
+                right_eval = sint(right_eval)
+
+                safe_checks = left_eval != None and right_eval != None
+            
+                if not safe_checks or (safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))):
 
                     left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
                     right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
@@ -685,12 +695,12 @@ class MainTransformer(Transformer):
                     unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
                     self.printer.custom_print(unfound_rule)
 
-                    if len(head_combination_list_2) > 0:
-                        head_string = f"{head.name}({','.join(head_combination_list_2)})"
-                    else:
-                        head_string = f"{head.name}"
+                if len(head_combination_list_2) > 0:
+                    head_string = f"{head.name}({','.join(head_combination_list_2)})"
+                else:
+                    head_string = f"{head.name}"
 
-                    self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+                self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
 
     def _generate_foundedness_functions(self, head, rem, h_vars, h_args):
@@ -799,3 +809,17 @@ class MainTransformer(Transformer):
                     self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
 
+
+    def ignore_exception(self, IgnoreException=Exception,DefaultVal=None):
+        """ Decorator for ignoring exception from a function
+        e.g.   @ignore_exception(DivideByZero)
+        e.g.2. ignore_exception(DivideByZero)(Divide)(2/0)
+        """
+        def dec(function):
+            def _dec(*args, **kwargs):
+                try:
+                    return function(*args, **kwargs)
+                except IgnoreException:
+                    return DefaultVal
+            return _dec
+        return dec

@@ -226,18 +226,17 @@ class ComparisonTools:
             return (cls.generate_unary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.argument)))[0]
         elif operation.ast_type == clingo.ast.ASTType.BinaryOperation:
             return (cls.generate_binary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.left), cls.generate_domain(variable_assignments, operation.right)))[0]
-        else:
-            print(operation)
-            print(operation.ast_type)
-            assert(False)
+        else:   
+            print(f"[WARNING] - The compare evaluation operation for {operation}, which is of type {operation.ast_type} is not supported")
+            return "NOT-IMPLEMENTED"
 
     @classmethod     
-    def apply_unary_operation(domain, unary_operation):
+    def apply_unary_operation(cls, domain, unary_operation):
 
         new_domain = {}
 
         for element in domain:
-            res = unary_operation(element)
+            res = unary_operation(int(element))
 
             if res not in new_domain:
                 new_domain[res] = res
