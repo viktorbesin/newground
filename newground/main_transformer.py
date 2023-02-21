@@ -411,13 +411,19 @@ class MainTransformer(Transformer):
                     if variable in vars:
                         interpretation += f"r{self.current_rule_position}_{variable}({variable_assignments[variable]}),"
 
-                left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
-                comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
+                right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
-                interpretation += f" not {comparison}"
+                safe_checks = left_eval and right_eval and str(left_eval).isdigit() and str(right_eval).isdigit()
+                if safe_checks and ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval)):
 
-                self.printer.custom_print(f"sat_r{self.current_rule_position} :- {interpretation}.")
+                    left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
+                    right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
+                    comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+
+                    interpretation += f" not {comparison}"
+
+                    self.printer.custom_print(f"sat_r{self.current_rule_position} :- {interpretation}.")
 
 
 
@@ -650,36 +656,41 @@ class MainTransformer(Transformer):
                     else: # Static
                         body_combination[f_arg] = f_arg 
 
-                left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
+                left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
+                right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
-                unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                safe_checks = left_eval and right_eval and str(left_eval).isdigit() and str(right_eval).isdigit()
+                if safe_checks and ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval)):
 
-                unfound_body_list = []
-                for v in f_arguments_nd:
-                    if v in rem:
+                    left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
+                    right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
+                    unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
 
-                        #if not ComparisonTools.compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
-                        
-                        body_combination_tmp = [body_combination[v]] + head_combination_list_2
-                        body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
-                        unfound_body_list.append(body_predicate)
+                    unfound_body_list = []
+                    for v in f_arguments_nd:
+                        if v in rem:
+
+                            #if not ComparisonTools.compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
+                            
+                            body_combination_tmp = [body_combination[v]] + head_combination_list_2
+                            body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
+                            unfound_body_list.append(body_predicate)
 
 
-                if len(unfound_body_list) > 0:
-                    unfound_body = f" {','.join(unfound_body_list)},"
-                else:
-                    unfound_body = ""
+                    if len(unfound_body_list) > 0:
+                        unfound_body = f" {','.join(unfound_body_list)},"
+                    else:
+                        unfound_body = ""
 
-                unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
-                self.printer.custom_print(unfound_rule)
+                    unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
+                    self.printer.custom_print(unfound_rule)
 
-                if len(head_combination_list_2) > 0:
-                    head_string = f"{head.name}({','.join(head_combination_list_2)})"
-                else:
-                    head_string = f"{head.name}"
+                    if len(head_combination_list_2) > 0:
+                        head_string = f"{head.name}({','.join(head_combination_list_2)})"
+                    else:
+                        head_string = f"{head.name}"
 
-                self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+                    self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
 
     def _generate_foundedness_functions(self, head, rem, h_vars, h_args):

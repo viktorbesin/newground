@@ -213,7 +213,24 @@ class ComparisonTools:
 
         assert(False) # not implemented
 
-       
+    @classmethod
+    def evaluate_operation(cls, operation, variable_assignments):
+
+        if operation.ast_type == clingo.ast.ASTType.SymbolicAtom: 
+            return str(operation.symbol)
+        elif operation.ast_type == clingo.ast.ASTType.SymbolicTerm:
+            return str(operation.symbol)
+        elif operation.ast_type == clingo.ast.ASTType.Variable:
+            return variable_assignments[str(operation.name)]
+        elif operation.ast_type == clingo.ast.ASTType.UnaryOperation:
+            return (cls.generate_unary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.argument)))[0]
+        elif operation.ast_type == clingo.ast.ASTType.BinaryOperation:
+            return (cls.generate_binary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.left), cls.generate_domain(variable_assignments, operation.right)))[0]
+        else:
+            print(operation)
+            print(operation.ast_type)
+            assert(False)
+
     @classmethod     
     def apply_unary_operation(domain, unary_operation):
 
