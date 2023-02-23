@@ -325,114 +325,8 @@ class MainTransformer(Transformer):
     def _generate_sat_part(self, head):
 
         self._generate_sat_variable_possibilities()
-        self._generate_sat_comparisons()
-        self._generate_sat_functions(head)
-
-    def _generate_sat_functions(self, head):
-
-        for f in self.cur_func:
-            args_len = len(f.arguments)
-            if (args_len == 0):
-                self.printer.custom_print(
-                    f"sat_r{self.current_rule_position} :-{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else ' not'} {f}.")
-                continue
-            arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
-            var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
-            vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) if args_len > 0 else [] # which have to be grounded per combination
-
-            dom_list = []
-            for variable in vars:
-                values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
-                dom_list.append(values)
-
-            combinations = [p for p in itertools.product(*dom_list)]
-            vars_set = frozenset(vars)
-
-            for c in combinations:
-                c_varset = tuple([c[vars.index(v)] for v in vars_set])
-                #if not self._checkForCoveredSubsets(covered_cmp, list(vars_set), c_varset):  # smaller sets are also possible
-                #if vars_set not in covered_cmp or c_varset not in covered_cmp[vars_set]:
-                f_args = ""
-                # vars in atom
-                interpretation = ""
-                for v in var:
-                    interpretation += f"r{self.current_rule_position}_{v}({c[vars.index(v)]}), " if v in self.cur_var else f""
-                    f_args += f"{c[vars.index(v)]}," if v in self.cur_var else f"{v},"
-
-                if len(f_args) > 0:
-                    f_args = f"{f.name}({f_args[:-1]})"
-                else:
-                    f_args = f"{f.name}"
-
-                self.printer.custom_print(f"sat_r{self.current_rule_position} :- {interpretation}{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else 'not '}{f_args}.")
-
-
-
-    def _generate_sat_comparisons(self):
-
-        covered_cmp = {} # reduce SAT rules when compare-operators are pre-checked
-        for f in self.cur_comp:
-                            
-            symbolic_arguments = ComparisonTools.get_arguments_from_operation(f.left) + ComparisonTools.get_arguments_from_operation(f.right)
-
-            arguments = []
-            for symbolic_argument in symbolic_arguments:
-                arguments.append(str(symbolic_argument))
-
-            var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
-            vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
-            dom_list = []
-            for variable in vars:
-                if str(self.current_rule_position) in self.safe_variables_rules and variable in self.safe_variables_rules[str(self.current_rule_position)]:
-
-                    domain = self._get_domain_values_from_rule_variable(str(self.current_rule_position), variable)
-                        
-                    dom_list.append(domain)
-                else:
-                    dom_list.append(self.domain["0_terms"])
-
-            combinations = [p for p in itertools.product(*dom_list)]
-
-            vars_set = frozenset(vars)
-            if vars_set not in covered_cmp:
-                covered_cmp[vars_set] = set()
-
-            for c in combinations:
-
-                variable_assignments = {}
-                
-                for variable_index in range(len(vars)):
-                    variable = vars[variable_index]
-                    value = c[variable_index]
-
-                    variable_assignments[variable] = value
-
-                interpretation = ""
-                for variable in var:
-                    if variable in vars:
-                        interpretation += f"r{self.current_rule_position}_{variable}({variable_assignments[variable]}),"
-
-                left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
-                right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
-
-                sint = self.ignore_exception(ValueError)(int)
-                left_eval = sint(left_eval)
-                right_eval = sint(right_eval)
-
-
-                safe_checks = left_eval != None and right_eval != None
-                if not safe_checks or (safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))):
-
-                    left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                    right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
-                    comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
-
-                    interpretation += f" not {comparison}"
-
-                    self.printer.custom_print(f"sat_r{self.current_rule_position} :- {interpretation}.")
-
-
-
+        covered_subsets = self._generate_sat_comparisons()
+        self._generate_sat_functions(head, covered_subsets)
 
     def _generate_sat_variable_possibilities(self):
 
@@ -456,6 +350,145 @@ class MainTransformer(Transformer):
 
 
 
+    def _generate_sat_comparisons(self):
+
+        covered_subsets = {} # reduce SAT rules when compare-operators are pre-checked
+        for f in self.cur_comp:
+                            
+            symbolic_arguments = ComparisonTools.get_arguments_from_operation(f.left) + ComparisonTools.get_arguments_from_operation(f.right)
+
+            arguments = []
+            for symbolic_argument in symbolic_arguments:
+                arguments.append(str(symbolic_argument))
+
+            var = list(dict.fromkeys(arguments)) # arguments (without duplicates / incl. terms)
+            vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) # which have to be grounded per combination
+            dom_list = []
+            for variable in vars:
+                if str(self.current_rule_position) in self.safe_variables_rules and variable in self.safe_variables_rules[str(self.current_rule_position)]:
+
+                    domain = self._get_domain_values_from_rule_variable(str(self.current_rule_position), variable)
+                        
+                    dom_list.append(domain)
+                else:
+                    dom_list.append(self.domain["0_terms"])
+
+            combinations = [p for p in itertools.product(*dom_list)]
+
+            for c in combinations:
+
+                variable_assignments = {}
+                
+                for variable_index in range(len(vars)):
+                    variable = vars[variable_index]
+                    value = c[variable_index]
+
+                    variable_assignments[variable] = value
+
+                interpretation_list = []
+                for variable in var:
+                    if variable in vars:
+                        interpretation_list.append(f"r{self.current_rule_position}_{variable}({variable_assignments[variable]})")
+
+                left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
+                right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+
+                sint = self.ignore_exception(ValueError)(int)
+                left_eval = sint(left_eval)
+                right_eval = sint(right_eval)
+
+
+                safe_checks = left_eval != None and right_eval != None
+                if not safe_checks or (safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))):
+
+                    left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
+                    right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
+                    comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+
+                    interpretation = f"{','.join(interpretation_list)}, not {comparison}"
+
+                    sat_atom = f"sat_r{self.current_rule_position}"
+
+                    self.printer.custom_print(f"{sat_atom} :- {interpretation}.")
+
+                    if sat_atom not in covered_subsets:
+                        covered_subsets[sat_atom] = []
+
+                    covered_subsets[sat_atom].append(interpretation_list)
+
+        return covered_subsets
+
+    def _generate_sat_functions(self, head, covered_subsets):
+
+        for f in self.cur_func:
+            args_len = len(f.arguments)
+            if (args_len == 0):
+                self.printer.custom_print(
+                    f"sat_r{self.current_rule_position} :-{'' if (self.cur_func_sign[self.cur_func.index(f)] or f is head) else ' not'} {f}.")
+                continue
+            arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
+            var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
+            vars = list (dict.fromkeys([a for a in arguments if a in self.cur_var])) if args_len > 0 else [] # which have to be grounded per combination
+
+            dom_list = []
+            for variable in vars:
+                values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
+                dom_list.append(values)
+
+            combinations = [p for p in itertools.product(*dom_list)]
+
+            for c in combinations:
+                f_args = ""
+
+                sat_atom = f"sat_r{self.current_rule_position}"
+
+                sat_body_list = []
+                sat_body_dict = {}
+                for v in var:
+                    if v in self.cur_var:
+                        body_sat_predicate = f"r{self.current_rule_position}_{v}({c[vars.index(v)]})"
+                        sat_body_list.append(body_sat_predicate)
+                        sat_body_dict[body_sat_predicate] = body_sat_predicate
+
+                        f_args += f"{c[vars.index(v)]},"
+                    else:
+                        f_args += f"{v},"
+
+                if len(f_args) > 0:
+                    f_args = f"{f.name}({f_args[:-1]})"
+                else:
+                    f_args = f"{f.name}"
+
+                if sat_atom in covered_subsets:
+                    possible_subsets = covered_subsets[sat_atom]
+                    found = False
+
+                    for possible_subset in possible_subsets:
+                        temp_found = True
+                        for possible_subset_predicate in possible_subset:
+                            if possible_subset_predicate not in sat_body_dict:
+                                temp_found = False
+                                break
+
+                        if temp_found == True:
+                            found = True
+                            break
+
+                    if found == True:
+                        continue
+
+
+                if self.cur_func_sign[self.cur_func.index(f)] or f is head:
+                    sat_predicate = f"{f_args}"
+                else:
+                    sat_predicate = f"not {f_args}"
+
+                if len(sat_body_list) > 0:
+                    body_interpretation = ",".join(sat_body_list) + ","
+                else:
+                    body_interpretation = ""
+            
+                self.printer.custom_print(f"{sat_atom} :- {body_interpretation}{sat_predicate}.")
 
     def _generate_foundedness_part(self, head):
 
@@ -517,8 +550,8 @@ class MainTransformer(Transformer):
 
  
         self._generate_foundedness_head(head, rem, g, g_r, h_vars, h_args)
-        self._generate_foundedness_comparisons(head, rem, h_vars, h_args, g)
-        self._generate_foundedness_functions(head, rem, h_vars, h_args, g)
+        covered_subsets = self._generate_foundedness_comparisons(head, rem, h_vars, h_args, g)
+        self._generate_foundedness_functions(head, rem, h_vars, h_args, g, covered_subsets)
 
     def _generate_foundedness_head(self, head, rem, g, g_r, h_vars, h_args):
         # ---------------------------------------------
@@ -558,9 +591,9 @@ class MainTransformer(Transformer):
                     #print(head)
                     head_interpretation = f"{head.name}"
                     #head_tuple_list = [c[index] for index in range(len(c))]
-                    head_tuple_interpretation = ','.join(head_tuple_list)
 
-                    if len(combination) > 0:
+                    if len(head_tuple_list) > 0:
+                        head_tuple_interpretation = ','.join(head_tuple_list)
                         head_interpretation += f"({head_tuple_interpretation})"
 
                     if str(self.current_rule_position) in self.safe_variables_rules and str(r) in self.safe_variables_rules[str(self.current_rule_position)]:
@@ -588,7 +621,7 @@ class MainTransformer(Transformer):
                     if len(g_r[r]) == 0:
                         self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{r}({rem_tuple_interpretation}):{domain_string}}}<=1.")
                     else:
-                        self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{r}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head}.")
+                        self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{r}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head_interpretation}.")
 
                 else:
                     head_interpretation = f"{head.name}" + (
@@ -612,7 +645,9 @@ class MainTransformer(Transformer):
     def _generate_foundedness_comparisons(self, head, rem, h_vars, h_args, g):
         # ---------------------------------------------
         # The next section is about the handling of the comparison operators (foundedness)
-        covered_cmp = {}
+
+
+        covered_subsets = {}
         # for every cmp operator
         for f in self.cur_comp:
 
@@ -630,8 +665,6 @@ class MainTransformer(Transformer):
             f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
             combination_variables = f_vars_needed + f_rem
 
-            vars_set = frozenset(combination_variables)
-
             dom_list = []
             for variable in combination_variables:
                 values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
@@ -639,84 +672,19 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            for c in combinations:
+            for combination in combinations:
+
 
                 variable_assignments = {}
 
                 for variable_index in range(len(combination_variables)):
                     variable = combination_variables[variable_index]
-                    value = c[variable_index]
+                    value = combination[variable_index]
 
                     variable_assignments[variable] = value
 
 
-                head_combination_list_2 = []
-                head_combination = {}
-
-                if len(h_vars) > 0:
-                    head_combination_list = list(c[:len(h_vars)])
-
-                    head_counter = 0
-                    for h_arg in h_args:
-                        if h_arg in h_vars and h_arg in f_vars_needed:
-                            head_combination[h_arg] = c[head_counter]
-                            head_counter += 1
-                        elif h_arg not in h_vars:
-                            head_combination[h_arg] = h_arg
-                        else:   
-                            pass
-
-                    for h_arg in h_args:
-                        if h_arg in head_combination:
-                            head_combination_list_2.append(head_combination[h_arg])
-
-                    if len(head_combination_list_2) > 0:
-                        unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
-                    else:
-                        unfound_atom = f"r{self.current_rule_position}_unfound_"
-
-                    not_head_counter = head_counter
-                elif len(h_args) > 0 and len(h_vars) == 0:
-    
-                    for h_arg in h_args:
-                        head_combination_list_2.append(h_arg)
-                        head_combination[h_arg] = h_arg
-                        
-                    unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
-
-                    not_head_counter = 0
-        
-                else:
-                    unfound_atom = f"r{self.current_rule_position}_unfound"
-                    not_head_counter = 0
-
-
-                """
-                head_combination_list = list(c[:len(h_vars)])
-
-                head_combination = {}
-
-                for h_arg in h_args:
-                    if h_arg in h_vars and h_arg in f_vars_needed:
-                        head_combination[h_arg] = variable_assignments[h_arg]
-                    elif h_arg not in h_vars:
-                        head_combination[h_arg] = h_arg
-                    else:
-                        pass
-
-                head_combination_list_2 = []
-                for h_arg in h_args:
-                    if h_arg in head_combination:
-                        head_combination_list_2.append(head_combination[h_arg])
-
-                """
-
-
-                if len(head_combination_list_2) > 0:
-                    unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
-                else:
-                    unfound_atom = f"r{self.current_rule_position}_unfound_"
-
+                head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                 body_combination = {}
 
@@ -724,22 +692,10 @@ class MainTransformer(Transformer):
                     if f_arg in h_vars and f_arg in f_vars_needed: # Variables in head
                         body_combination[f_arg] = head_combination[f_arg]
                     elif f_arg in f_vars: # Not in head variables
-                        body_combination[f_arg] = (c[not_head_counter])
+                        body_combination[f_arg] = (combination[not_head_counter])
                         not_head_counter += 1
                     else: # Static
                         body_combination[f_arg] = f_arg 
-
-                """
-                body_combination = {}
-
-                for f_arg in arguments:
-                    if f_arg in f_vars: # Is a variable
-                        body_combination[f_arg] = variable_assignments[f_arg]
-                    elif f_arg not in f_vars: # Static
-                        body_combination[f_arg] = f_arg 
-                    else:
-                        pass
-                """
 
                 left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
                 right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
@@ -775,6 +731,10 @@ class MainTransformer(Transformer):
                     unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
                     self.printer.custom_print(unfound_rule)
 
+                    if unfound_atom not in covered_subsets:
+                        covered_subsets[unfound_atom] = []
+
+                    covered_subsets[unfound_atom].append(unfound_body_list)
 
                 dom_list_2 = []
                 for arg in h_args:
@@ -797,9 +757,9 @@ class MainTransformer(Transformer):
 
                     self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
+        return covered_subsets
 
-
-    def _generate_foundedness_functions(self, head, rem, h_vars, h_args, g):
+    def _generate_foundedness_functions(self, head, rem, h_vars, h_args, g, covered_subsets):
         # -------------------------------------------
         # over every body-atom
         for f in self.cur_func:
@@ -815,12 +775,6 @@ class MainTransformer(Transformer):
                 f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
                 #f_vars_needed = h_vars
 
-                vars_set = frozenset(f_vars_needed + f_rem)
-
-
-                
-
-
                 dom_list = []
                 for variable in f_vars_needed + f_rem:
                     values = self._get_domain_values_from_rule_variable(self.current_rule_position, variable) 
@@ -828,47 +782,9 @@ class MainTransformer(Transformer):
 
                 combinations = [p for p in itertools.product(*dom_list)]
 
-                for c in combinations:
+                for combination in combinations:
 
-                    head_combination_list_2 = []
-                    head_combination = {}
-
-                    if len(h_vars) > 0:
-                        head_combination_list = list(c[:len(h_vars)])
-
-                        head_counter = 0
-                        for h_arg in h_args:
-                            if h_arg in h_vars and h_arg in f_vars_needed:
-                                head_combination[h_arg] = c[head_counter]
-                                head_counter += 1
-                            elif h_arg not in h_vars:
-                                head_combination[h_arg] = h_arg
-                            else:   
-                                pass
-
-                        for h_arg in h_args:
-                            if h_arg in head_combination:
-                                head_combination_list_2.append(head_combination[h_arg])
-
-                        if len(head_combination_list_2) > 0:
-                            unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
-                        else:
-                            unfound_atom = f"r{self.current_rule_position}_unfound_"
-
-                        not_head_counter = head_counter
-                    elif len(h_args) > 0 and len(h_vars) == 0:
-        
-                        for h_arg in h_args:
-                            head_combination_list_2.append(h_arg)
-                            head_combination[h_arg] = h_arg
-                            
-                        unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
-
-                        not_head_counter = 0
-            
-                    else:
-                        unfound_atom = f"r{self.current_rule_position}_unfound"
-                        not_head_counter = 0
+                    head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                     # ---------
                     body_combination = {}
@@ -877,18 +793,39 @@ class MainTransformer(Transformer):
                         if f_arg in h_vars and f_arg in f_vars_needed: # Variables in head
                             body_combination[f_arg] = head_combination[f_arg]
                         elif f_arg in f_vars: # Not in head variables
-                            body_combination[f_arg] = (c[not_head_counter])
+                            body_combination[f_arg] = (combination[not_head_counter])
                             not_head_counter += 1
                         else: # Static
                             body_combination[f_arg] = f_arg 
 
+                    unfound_body_dict = {}
                     unfound_body_list = []
                     for v in f_args_nd:
                         if v in rem:
                             body_combination_tmp = [body_combination[v]] + head_combination_list_2
                             body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
                             unfound_body_list.append(body_predicate)
+                            unfound_body_dict[body_predicate] = body_predicate
 
+                    if unfound_atom in covered_subsets:
+                        possible_subsets = covered_subsets[unfound_atom]
+                        found = False
+
+                        for possible_subset in possible_subsets:
+                            temp_found = True
+                            for possible_subset_predicate in possible_subset:
+                                if possible_subset_predicate not in unfound_body_dict:
+                                    temp_found = False
+                                    break
+
+                            if temp_found == True:
+                                found = True
+                                break
+
+                        if found == True:
+                            continue
+                                    
+                            
                     unfound_predicate = f"{f.name}"
                     if len(f_args) > 0:
                         unfound_predicate += f"("
@@ -940,6 +877,51 @@ class MainTransformer(Transformer):
                             head_string = f"{head.name}"
 
                         self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+
+    def generate_head_atom(self, combination, h_vars, h_args, f_vars_needed):
+
+        head_combination_list_2 = []
+        head_combination = {}
+
+        if len(h_vars) > 0:
+            head_combination_list = list(combination[:len(h_vars)])
+
+            head_counter = 0
+            for h_arg in h_args:
+                if h_arg in h_vars and h_arg in f_vars_needed:
+                    head_combination[h_arg] = combination[head_counter]
+                    head_counter += 1
+                elif h_arg not in h_vars:
+                    head_combination[h_arg] = h_arg
+                else:   
+                    pass
+
+            for h_arg in h_args:
+                if h_arg in head_combination:
+                    head_combination_list_2.append(head_combination[h_arg])
+
+            if len(head_combination_list_2) > 0:
+                unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
+            else:
+                unfound_atom = f"r{self.current_rule_position}_unfound_"
+
+            not_head_counter = head_counter
+        elif len(h_args) > 0 and len(h_vars) == 0:
+
+            for h_arg in h_args:
+                head_combination_list_2.append(h_arg)
+                head_combination[h_arg] = h_arg
+                
+            unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
+
+            not_head_counter = 0
+
+        else:
+            unfound_atom = f"r{self.current_rule_position}_unfound"
+            not_head_counter = 0
+    
+        return (head_combination, head_combination_list_2, unfound_atom, not_head_counter)
+
 
 
 
