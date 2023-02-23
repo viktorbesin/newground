@@ -213,6 +213,36 @@ class ComparisonTools:
 
         assert(False) # not implemented
 
+
+    @classmethod
+    def evaluate_binary_operation(cls, operator_type, left_value, right_value):
+
+        if operator_type == int(clingo.ast.BinaryOperator.XOr):
+            return int(left_value) ^ int(right_value)
+            #return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l ^ r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Or):
+            return int(left_value) | int(right_value)
+            #return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l | r)
+        elif operator_type == int(clingo.ast.BinaryOperator.And):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l & r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Plus):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l + r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Minus):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l - r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Multiplication):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l * r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Division):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l / r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Modulo):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l % r)
+        elif operator_type == int(clingo.ast.BinaryOperator.Power):
+            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: pow(l,r))
+        else:
+            print(f"[NOT-IMPLEMENTED] - Binary operator type '{operator_type}' is not implemented!")
+            assert(False) # not implemented
+
+        assert(False) # not implemented
+
     @classmethod
     def evaluate_operation(cls, operation, variable_assignments):
 
@@ -225,7 +255,10 @@ class ComparisonTools:
         elif operation.ast_type == clingo.ast.ASTType.UnaryOperation:
             return (cls.generate_unary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.argument)))[0]
         elif operation.ast_type == clingo.ast.ASTType.BinaryOperation:
-            return (cls.generate_binary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.left), cls.generate_domain(variable_assignments, operation.right)))[0]
+            res = cls.evaluate_binary_operation(operation.operator_type, cls.evaluate_operation(operation.left, variable_assignments), cls.evaluate_operation(operation.right, variable_assignments))
+            #res = (cls.generate_binary_operator_domain(operation.operator_type, cls.generate_domain(variable_assignments, operation.left), cls.generate_domain(variable_assignments, operation.right)))
+
+            return res
         else:   
             print(f"[WARNING] - The compare evaluation operation for {operation}, which is of type {operation.ast_type} is not supported")
             return "NOT-IMPLEMENTED"

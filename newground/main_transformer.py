@@ -1,6 +1,7 @@
 import os 
 import sys
 import re
+import time
 
 import itertools
 import argparse
@@ -101,15 +102,27 @@ class MainTransformer(Transformer):
     def visit_Rule(self, node):
 
         if not self.rules:
+            start_time = time.time()
             self._reset_after_rule()
             if not self.ground:
                 self._outputNodeFormatConform(node)
 
             self.current_rule_position += 1
             #self.current_rule_position += 1
+
+            end_time = time.time()
+            print(f"[INFO] ----> rule duration time: {end_time - start_time}")
+
+
             return node
 
+        start_time = time.time()
+
         self.visit_children(node)
+
+
+        end_time = time.time()
+        print(f"[INFO] ----> rule (beginning) duration time: {end_time - start_time} (rule: {str(node)})")
 
         # if so: handle grounding
         if self.ng:
@@ -120,11 +133,21 @@ class MainTransformer(Transformer):
             else:
                 head = None
 
-            self._generate_sat_part(head)
+            start_time = time.time()
+
+
+            #self._generate_sat_part(head)
+
+            end_time = time.time()
+            print(f"[INFO] ------> SAT TIME: {end_time - start_time}")
+            start_time = time.time()
 
             # FOUND NEW
             if head is not None:
                 self._generate_foundedness_part(head)
+
+            end_time = time.time()
+            print(f"[INFO] ------> FOUNDEDNESS TIME: {end_time - start_time}")
 
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -300,16 +323,17 @@ class MainTransformer(Transformer):
         if str(node.head) == "#false":  # catch constraints and print manually since clingo uses #false
             self.printer.custom_print(f":- {', '.join(str(n) for n in node.body)}.")
         else:
-            if len(node.body) > 0:
-                if (str(node.head).startswith('{')):
-                    self.printer.custom_print(f"{str(node.head)} :- {', '.join([str(b) for b in node.body])}.")
-                else:
-                    self.printer.custom_print(f"{str(node.head).replace(';', ',')} :- {', '.join([str(b) for b in node.body])}.")
+            body_string = f"{', '.join([str(b) for b in node.body])}"
+
+            if node.head.ast_type == clingo.ast.ASTType.Aggregate:
+                head_string = f"{str(node.head)}"
             else:
-                if (str(node.head).startswith('{')):
-                    self.printer.custom_print(f"{str(node.head)}.")
-                else:
-                    self.printer.custom_print(f"{str(node.head).replace(';', ',')}.")
+                head_string = f"{str(node.head).replace(';', ',')}"
+
+            if len(node.body) > 0:  
+                self.printer.custom_print(f"{head_string} :- {body_string}.")
+            else:
+                self.printer.custom_print(f"{head_string}.")
 
     def _add_atom_to_unfoundedness_check(self, head_string, unfound_atom):
 
@@ -324,9 +348,26 @@ class MainTransformer(Transformer):
 
     def _generate_sat_part(self, head):
 
+
+        start_time = time.time()
+
         self._generate_sat_variable_possibilities()
+
+        end_time = time.time()
+        print(f"[INFO] --------> SAT GENERATE POSSIBILITIES TIME {end_time - start_time}")
+        start_time = time.time()
+
         covered_subsets = self._generate_sat_comparisons()
+
+        end_time = time.time()
+        print(f"[INFO] --------> SAT COMPARISONS TIME {end_time - start_time}")
+        start_time = time.time()
+
         self._generate_sat_functions(head, covered_subsets)
+
+        end_time = time.time()
+        print(f"[INFO] --------> SAT FUNCTIONS TIME {end_time - start_time}")
+
 
     def _generate_sat_variable_possibilities(self):
 
@@ -492,6 +533,9 @@ class MainTransformer(Transformer):
 
     def _generate_foundedness_part(self, head):
 
+
+        start_time = time.time()
+
         # head
         h_args_len = len(head.arguments)
         h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
@@ -548,10 +592,32 @@ class MainTransformer(Transformer):
                 for v2 in f_vars:
                     g.add_edge(v1, v2) 
 
+        end_time = time.time()
+        print(f"[INFO] --------> UNFOUNDEDNESS INTRO PART TIME: {end_time - start_time}")
+
+        start_time = time.time()
+        
+
  
         self._generate_foundedness_head(head, rem, g, g_r, h_vars, h_args)
+
+        end_time = time.time()
+        print(f"[INFO] --------> UNFOUNDEDNESS HEAD PART TIME: {end_time - start_time}")
+
+        start_time = time.time()
+
+
         covered_subsets = self._generate_foundedness_comparisons(head, rem, h_vars, h_args, g)
+
+        end_time = time.time()
+        print(f"[INFO] --------> UNFOUNDEDNESS COMPARISON PART TIME: {end_time - start_time}")
+
+
+        start_time = time.time()
         self._generate_foundedness_functions(head, rem, h_vars, h_args, g, covered_subsets)
+        end_time = time.time()
+        print(f"[INFO] --------> UNFOUNDEDNESS FUNCTION PART TIME: {end_time - start_time}")
+
 
     def _generate_foundedness_head(self, head, rem, g, g_r, h_vars, h_args):
         # ---------------------------------------------
@@ -646,10 +712,19 @@ class MainTransformer(Transformer):
         # ---------------------------------------------
         # The next section is about the handling of the comparison operators (foundedness)
 
+        duration_0 = 0
+        duration_1 = 0
+        duration_2 = 0
+        duration_3 = 0
+        duration_4 = 0
+        duration_5 = 0
+
+
 
         covered_subsets = {}
         # for every cmp operator
         for f in self.cur_comp:
+
 
             symbolic_arguments = ComparisonTools.get_arguments_from_operation(f.left) + ComparisonTools.get_arguments_from_operation(f.right)
 
@@ -672,8 +747,25 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
+            # EFFICIENCY
+            # These accesses are expensive!
+            X1_var = str(f.right.left.left)
+            X2_var = str(f.right.right.left)
+            Y1_var = str(f.right.left.right)
+            Y2_var = str(f.right.right.right)
+
+            if str(head) not in self.unfounded_rules:
+                self.unfounded_rules[str(head)] = {}
+
+            if str(self.current_rule_position) not in self.unfounded_rules[str(head)]:
+                self.unfounded_rules[str(head)][str(self.current_rule_position)] = []
+
+            unfounded_head_list = self.unfounded_rules[str(head)][str(self.current_rule_position)]
+
+            print(f"[INFO] -------> NUMBER OF COMBINATIONS: {len(combinations)}")
             for combination in combinations:
 
+                start_time = time.time()
 
                 variable_assignments = {}
 
@@ -697,20 +789,57 @@ class MainTransformer(Transformer):
                     else: # Static
                         body_combination[f_arg] = f_arg 
 
-                left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
-                right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+                end_time = time.time()
+                duration_0 += (end_time - start_time)
+                start_time = time.time()
 
-                sint = self.ignore_exception(ValueError)(int)
-                left_eval = sint(left_eval)
-                right_eval = sint(right_eval)
+                start_time_4 = time.time()
 
-                safe_checks = left_eval != None and right_eval != None
-            
-                if not safe_checks or (safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))):
+                # This is the most expensive (compuationally) part of the entire program...
+                X1 = variable_assignments[X1_var]
+                X2 = variable_assignments[X2_var]
+        
+                if X1 == X2:
 
+                    Y1 = variable_assignments[Y1_var]
+                    Y2 = variable_assignments[Y2_var]
+                    
+                    if Y1 == Y2:
+                        evaluation = True
+                    else:
+                        evaluation = False
+                else:
+                    evaluation = False
+
+                #left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
+                #right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+
+                end_time_4 = time.time()
+                duration_4 += (end_time_4 - start_time_4)
+                start_time_5 = time.time()
+
+                #sint = self.ignore_exception(ValueError)(int)
+                #left_eval = sint(left_eval)
+                #right_eval = sint(right_eval)
+
+                safe_checks = True
+                #safe_checks = left_eval != None and right_eval != None
+                #evaluation = safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))
+
+                end_time_5 = time.time()
+                duration_5 += (end_time_5 - start_time_5)
+
+                end_time = time.time()
+                duration_1 += (end_time - start_time)
+                start_time = time.time()
+
+                if not safe_checks or evaluation:
+
+                    """
                     left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
                     right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
                     unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                    """
 
                     unfound_body_list = []
 
@@ -724,11 +853,13 @@ class MainTransformer(Transformer):
 
 
                     if len(unfound_body_list) > 0:
-                        unfound_body = f" {','.join(unfound_body_list)},"
+                        unfound_body = f" {','.join(unfound_body_list)}"
+                        unfound_rule = f"{unfound_atom} :- {unfound_body}."
                     else:
                         unfound_body = ""
+                        unfound_rule = f"{unfound_atom}."
 
-                    unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
+                    #unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
                     self.printer.custom_print(unfound_rule)
 
                     if unfound_atom not in covered_subsets:
@@ -736,6 +867,11 @@ class MainTransformer(Transformer):
 
                     covered_subsets[unfound_atom].append(unfound_body_list)
 
+                end_time = time.time()
+                duration_2 += (end_time - start_time)
+                start_time = time.time()
+
+                """
                 dom_list_2 = []
                 for arg in h_args:
                     if arg in h_vars and arg not in head_combination: 
@@ -755,7 +891,19 @@ class MainTransformer(Transformer):
                     else:
                         head_string = f"{head.name}"
 
+                    print(f"{head_string}/{unfound_atom}")
                     self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+                """
+           
+                unfounded_head_list.append(unfound_atom)
+
+                #head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
+                #self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+
+                end_time = time.time()
+                duration_3 += (end_time - start_time)
+
+        print(f"[INFO] ----------> DURATION 0: {duration_0}, 1: {duration_1} (with p4: {duration_4}, p5: {duration_5}), 2: {duration_2}, 3: {duration_3}")
 
         return covered_subsets
 

@@ -1,7 +1,6 @@
-#import os 
-
-
+import time
 import clingo
+
 from clingo.ast import Transformer, Variable, parse_string, ProgramBuilder
 
 from clingo.control import Control
@@ -23,8 +22,13 @@ class Newground:
 
     def start(self, contents):
 
+        start_time = time.time()
+
         aggregate_transformer = AggregateTransformer()
         parse_string(contents, lambda stm: aggregate_transformer(stm))
+
+        end_time = time.time()
+        print(f"[INFO] --> Newground aggregate_transformer_duration: {end_time - start_time}")
 
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
@@ -34,6 +38,8 @@ class Newground:
         if self.ground:
             self.output_printer.custom_print(contents)
 
+        start_time = time.time()
+
         term_transformer = TermTransformer(self.output_printer, self.no_show)
         parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
@@ -41,6 +47,12 @@ class Newground:
         domain = term_transformer.domain
 
         comparisons = term_transformer.comparison_operators_variables
+
+        end_time = time.time()
+        print(f"[INFO] --> Newground term_transformer_duration: {end_time - start_time}")
+
+
+        start_time = time.time()
 
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
@@ -58,11 +70,24 @@ class Newground:
 
             new_domain_hash = hash(str(domain))
 
+
+        end_time = time.time()
+        print(f"[INFO] --> Newground domain_transformer_duration: {end_time - start_time}")
+
+
+        start_time = time.time()
+
         ctl = Control()
         with ProgramBuilder(ctl) as bld:
             transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, self.ground_guess, self.ground, self.output_printer, domain, safe_variables)
-            #parse_files(combined_inputs, lambda stm: bld.add(transformer(stm)))
+
             parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
+
+            end_time = time.time()
+            print(f"[INFO] --> Newground main_transformer_duration: {end_time - start_time}")
+
+
+
             if len(transformer.non_ground_rules.keys()) > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))
                 self.output_printer.custom_print(":- not sat.")
@@ -96,7 +121,6 @@ class Newground:
                     
                     self.output_printer.custom_print(f":- {key}, {','.join(sum_strings)}.")
                 
-
                 if not self.ground_guess:
                     for t in transformer.terms:
                         self.output_printer.custom_print(f"dom({t}).")
