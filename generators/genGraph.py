@@ -7,7 +7,17 @@ prob = int(sys.argv[2])
 assert(prob >= 0)
 assert(prob <= 100)
 
+vertices = []
+edges = []
+
 for i in range(1,mx):
-	for j in range(1,mx):
-		if random.randint(0,100) <= prob:
-			print("edge({0},{1}).".format(i,j))
+    vertices.append(f"vertex({i}).")
+    for j in range(1,mx):
+        if random.randint(0,100) <= prob:
+            edges.append("edge({0},{1}).".format(i,j))
+
+for vertex in vertices:
+    print(vertex)
+
+for edge in edges:
+    print(edge)
