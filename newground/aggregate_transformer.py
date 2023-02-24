@@ -62,66 +62,281 @@ class AggregateTransformer(Transformer):
 
     def _add_aggregate_helper_rules(self, aggregate_index):
         aggregate = self.cur_aggregates[aggregate_index]
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+        remaining_body = []
+
+        if str_type == "sum":
+
+            remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
+
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
+
+            self._add_sum_aggregate_rules(aggregate_index)
+        elif str_type == "count":
+
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                left_name = f"{str_type}_ag{str_id}_left(1)"
+                remaining_body.append(left_name)
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                right_name = f"not {str_type}_ag{str_id}_right(1)"
+                remaining_body.append(right_name)
+
+            self._add_count_aggregate_rules(aggregate_index)
+        elif str_type == "min":
+            remaining_body += self._add_min_aggregate_rules(aggregate_index)
+        elif str_type == "max":
+            remaining_body += self._add_max_aggregate_rules(aggregate_index)
+        else: 
+            assert(False) # Not Implemented
+
+        return remaining_body
+
+    def _add_min_aggregate_rules(self, aggregate_index):
+        aggregate = self.cur_aggregates[aggregate_index]
+        elements = aggregate["elements"]
 
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
 
-        if str_type == "sum":
-            self._add_sum_aggregate_rules(aggregate_index)
-        elif str_type == "count":
+        remaining_body = []
 
-            for element_index in range(len(aggregate["elements"])):
-                element = aggregate["elements"][element_index]
-                body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
-                self.new_prg.append(body_string)
+        element_predicate_names = []
 
-
-            new_atoms = []
-            if aggregate["left_guard"]:
-                left_guard = aggregate["left_guard"]
-
-                left_name = f"{str_type}_ag{str_id}_left(1)"
-
-                count = int(str(left_guard.term)) # Assuming constant
-
-                operator = getCompOperator(left_guard.comparison)
-                if operator == "<":
-                    count += 1
-                elif operator == "<=":
-                    count = count
-                else:
-                    assert(False) # Not implemented
-
-                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, aggregate["elements"], str_type, str_id)
-
-                rule_string = f"{left_name} :- {','.join(bodies + helper_bodies)}."
-
-                self.new_prg.append(rule_string)
+        for element_index in range(len(elements)):
+            element = aggregate["elements"][element_index]
+            element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+            element_body = f"{element_predicate_name}({','.join(element['terms'])})"
             
-            if aggregate["right_guard"]:
-                right_guard = aggregate["right_guard"]
+            body_string = f"{element_body} :- {','.join(element['condition'])}."
+            self.new_prg.append(body_string)
+            element_predicate_names.append(element_predicate_name)
 
-                right_name = f"{str_type}_ag{str_id}_right(1)"
+        if aggregate["left_guard"]:
+            left_guard = aggregate["left_guard"]
 
-                count = int(str(right_guard.term)) # Assuming constant
+            left_name = f"{str_type}_ag{str_id}_left(1)"
 
-                operator = getCompOperator(left_guard.comparison)
-                if operator == "<":
-                    count = count
-                elif operator == "<=":
-                    count += 1
-                else:
-                    assert(False) # Not implemented
+            left_guard_term = str(left_guard.term)
+            count = int(left_guard_term) # Assuming constant
 
-                bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count,  aggregate["elements"], str_type, str_id)
+            operator = getCompOperator(left_guard.comparison)
+            if operator == "<":
+                new_operator = "<="
+                remaining_body.append(f"not {left_name}")
+            elif operator == "<=":
+                new_operator = "<"
+                remaining_body.append(f"not {left_name}")
+            elif operator == ">=":
+                new_operator = "<="
+                remaining_body.append({left_name})
+            elif operator == ">":
+                new_operator = "<"
+                remaining_body.append({left_name})
+            else:
+                assert(False) # Not implemented
 
-                rule_string = f"{right_name} :- {','.join(bodies + helper_bodies)}."
+            bodies = []
+            for element_index in range(len(elements)):
+                terms = []
+                element = elements[element_index]
+                for term in element["terms"]:
+                    terms.append(term + str(element_index))
+                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {left_guard_term}"
+                bodies.append(body)
 
-                self.new_prg.append(rule_string)
+
+            rule_string = f"{left_name} :- {','.join(bodies)}."
+
+            self.new_prg.append(rule_string)
+        
+        if aggregate["right_guard"]:
+            right_guard = aggregate["right_guard"]
+
+            right_name = f"{str_type}_ag{str_id}_right(1)"
+
+            right_guard_term = str(right_guard.term)
+            count = int(right_guard_term) # Assuming constant
+
+            operator = getCompOperator(right_guard.comparison)
+            if operator == "<":
+                new_operator = "<"
+                remaining_body.append(right_name)
+            elif operator == "<=":
+                new_operator = "<="
+                remaining_body.append(right_name)
+            else:
+                assert(False) # Not implemented
+
+            bodies = []
+            for element_index in range(len(elements)):
+                terms = []
+                element = elements[element_index]
+                for term in element["terms"]:
+                    terms.append(term + str(element_index))
+
+                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {right_guard_term}"
+                bodies.append(body)
+
+            rule_string = f"{right_name} :- {','.join(bodies)}."
+
+            self.new_prg.append(rule_string)
+
+        return remaining_body
+            
+
+    def _add_max_aggregate_rules(self, aggregate_index):
+        aggregate = self.cur_aggregates[aggregate_index]
+        elements = aggregate["elements"]
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+        remaining_body = []
+
+        element_predicate_names = []
+
+        for element_index in range(len(elements)):
+            element = aggregate["elements"][element_index]
+            element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+            element_body = f"{element_predicate_name}({','.join(element['terms'])})"
+            
+            body_string = f"{element_body} :- {','.join(element['condition'])}."
+            self.new_prg.append(body_string)
+            element_predicate_names.append(element_predicate_name)
+
+        if aggregate["left_guard"]:
+            left_guard = aggregate["left_guard"]
+
+            left_name = f"{str_type}_ag{str_id}_left(1)"
+
+            left_guard_term = str(left_guard.term)
+            count = int(left_guard_term) # Assuming constant
+
+            operator = getCompOperator(left_guard.comparison)
+            if operator == "<":
+                new_operator = ">"
+                remaining_body.append(f"{left_name}")
+            elif operator == "<=":
+                new_operator = ">="
+                remaining_body.append(f"{left_name}")
+            else:
+                assert(False) # Not implemented
+
+            bodies = []
+            for element_index in range(len(elements)):
+                terms = []
+                element = elements[element_index]
+                for term in element["terms"]:
+                    terms.append(term + str(element_index))
+                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {left_guard_term}"
+                bodies.append(body)
 
 
-        else: 
-            assert(False) # Not Implemented
+            rule_string = f"{left_name} :- {','.join(bodies)}."
+
+            self.new_prg.append(rule_string)
+        
+        if aggregate["right_guard"]:
+            right_guard = aggregate["right_guard"]
+
+            right_name = f"{str_type}_ag{str_id}_right(1)"
+
+            right_guard_term = str(right_guard.term)
+            count = int(right_guard_term) # Assuming constant
+
+            operator = getCompOperator(right_guard.comparison)
+            if operator == "<":
+                new_operator = ">="
+                remaining_body.append(f"not {right_name}")
+            elif operator == "<=":
+                new_operator = ">"
+                remaining_body.append(f"not {right_name}")
+            else:
+                assert(False) # Not implemented
+
+            bodies = []
+            for element_index in range(len(elements)):
+                terms = []
+                element = elements[element_index]
+                for term in element["terms"]:
+                    terms.append(term + str(element_index))
+
+                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {right_guard_term}"
+                bodies.append(body)
+
+            rule_string = f"{right_name} :- {','.join(bodies)}."
+
+            self.new_prg.append(rule_string)
+
+        return remaining_body
+            
+
+    def _add_count_aggregate_rules(self, aggregate_index):
+
+        aggregate = self.cur_aggregates[aggregate_index]
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+
+        for element_index in range(len(aggregate["elements"])):
+            element = aggregate["elements"][element_index]
+            body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
+            self.new_prg.append(body_string)
+
+
+        new_atoms = []
+        if aggregate["left_guard"]:
+            left_guard = aggregate["left_guard"]
+
+            left_name = f"{str_type}_ag{str_id}_left(1)"
+
+            count = int(str(left_guard.term)) # Assuming constant
+
+            operator = getCompOperator(left_guard.comparison)
+            if operator == "<":
+                count += 1
+            elif operator == "<=":
+                count = count
+            else:
+                assert(False) # Not implemented
+
+            bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, aggregate["elements"], str_type, str_id)
+
+            rule_string = f"{left_name} :- {','.join(bodies + helper_bodies)}."
+
+            self.new_prg.append(rule_string)
+        
+        if aggregate["right_guard"]:
+            right_guard = aggregate["right_guard"]
+
+            right_name = f"{str_type}_ag{str_id}_right(1)"
+
+            count = int(str(right_guard.term)) # Assuming constant
+
+            operator = getCompOperator(left_guard.comparison)
+            if operator == "<":
+                count = count
+            elif operator == "<=":
+                count += 1
+            else:
+                assert(False) # Not implemented
+
+            bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count,  aggregate["elements"], str_type, str_id)
+
+            rule_string = f"{right_name} :- {','.join(bodies + helper_bodies)}."
+
+            self.new_prg.append(rule_string)
+
 
 
     def _count_generate_bodies_and_helper_bodies(self, count, elements, str_type, str_id):
@@ -269,41 +484,6 @@ class AggregateTransformer(Transformer):
             self.new_prg.append(rule_string)
 
 
-
-    def _new_aggregate_rule(self, aggregate_index):
-
-        aggregate = self.cur_aggregates[aggregate_index]
-
-        remaining_body = []
-
-        str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
-
-        if str_type == "sum":
-            remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
-
-            if aggregate["left_guard"]:
-                guard = aggregate["left_guard"]
-                remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
-            if aggregate["right_guard"]:
-                guard = aggregate["right_guard"]
-                remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
-
-        elif str_type == "count":
-            if aggregate["left_guard"]:
-                guard = aggregate["left_guard"]
-                left_name = f"{str_type}_ag{str_id}_left(1)"
-                remaining_body.append(left_name)
-            if aggregate["right_guard"]:
-                guard = aggregate["right_guard"]
-                right_name = f"not {str_type}_ag{str_id}_right(1)"
-                remaining_body.append(right_name)
-
-        else:
-            assert(False) # Not Implemented
-
-        return remaining_body
-
     def visit_Rule(self, node):
 
         self.visit_children(node)
@@ -323,7 +503,6 @@ class AggregateTransformer(Transformer):
                 self.new_prg.append(f"{str(node.head)}.")
 
         else:
-
             head = str(node.head)
             remaining_body = []
 
@@ -332,10 +511,11 @@ class AggregateTransformer(Transformer):
                     remaining_body.append(str(body_item))
 
             for aggregate_index in range(len(self.cur_aggregates)):
-                remaining_body += self._new_aggregate_rule(aggregate_index)
-
-                self._add_aggregate_helper_rules(aggregate_index)
-                
+                aggregate = self.cur_aggregates[aggregate_index]
+                str_type = aggregate["function"][1]
+                self.new_prg.append(f"#program {str_type}.")
+                remaining_body += self._add_aggregate_helper_rules(aggregate_index)
+                self.new_prg.append(f"#program rules.")
 
             remaining_body_string = ','.join(remaining_body)
             new_rule = f"{head} :- {remaining_body_string}."
