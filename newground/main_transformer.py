@@ -187,7 +187,14 @@ class MainTransformer(Transformer):
 
     def visit_Program(self, node):
 
-        if node.name == 'rules':
+        keyword_dict = {}
+        keyword_dict["rules"] = "rules"
+        keyword_dict["max"] = "max"
+        keyword_dict["min"] = "min"
+        keyword_dict["count"] = "count"
+        keyword_dict["sum"] = "sum"
+
+        if str(node.name) in keyword_dict:
             self.rules = True
         else:
             self.rules = False
