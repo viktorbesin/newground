@@ -120,6 +120,8 @@ class AggregateTransformer(Transformer):
             self.new_prg.append(body_string)
             element_predicate_names.append(element_predicate_name)
 
+        self.new_prg.append(f"#program {str_type}.")
+
         if aggregate["left_guard"]:
             left_guard = aggregate["left_guard"]
 
@@ -213,6 +215,8 @@ class AggregateTransformer(Transformer):
             self.new_prg.append(body_string)
             element_predicate_names.append(element_predicate_name)
 
+        self.new_prg.append(f"#program {str_type}.")
+
         if aggregate["left_guard"]:
             left_guard = aggregate["left_guard"]
 
@@ -293,6 +297,7 @@ class AggregateTransformer(Transformer):
             body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
             self.new_prg.append(body_string)
 
+        self.new_prg.append(f"#program {str_type}.")
 
         new_atoms = []
         if aggregate["left_guard"]:
@@ -387,6 +392,8 @@ class AggregateTransformer(Transformer):
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
 
+        
+        self.new_prg.append(f"#program {str_type}.")
 
         rule_string = f"{str_type}_ag{str_id}(S) :- "
        
@@ -513,7 +520,6 @@ class AggregateTransformer(Transformer):
             for aggregate_index in range(len(self.cur_aggregates)):
                 aggregate = self.cur_aggregates[aggregate_index]
                 str_type = aggregate["function"][1]
-                self.new_prg.append(f"#program {str_type}.")
                 remaining_body += self._add_aggregate_helper_rules(aggregate_index)
                 self.new_prg.append(f"#program rules.")
 
