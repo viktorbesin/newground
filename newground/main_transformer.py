@@ -21,6 +21,8 @@ from .comparison_tools import ComparisonTools
 class MainTransformer(Transformer):  
     def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules):
         self.rules = False
+        self.count = False
+
         self.ng = False
         self.bld = bld
         self.terms = terms
@@ -111,7 +113,7 @@ class MainTransformer(Transformer):
             #self.current_rule_position += 1
 
             end_time = time.time()
-            print(f"[INFO] ----> rule duration time: {end_time - start_time}")
+            #print(f"[INFO] ----> rule duration time: {end_time - start_time}")
 
 
             return node
@@ -122,7 +124,7 @@ class MainTransformer(Transformer):
 
 
         end_time = time.time()
-        print(f"[INFO] ----> rule (beginning) duration time: {end_time - start_time} (rule: {str(node)})")
+        #print(f"[INFO] ----> rule (beginning) duration time: {end_time - start_time} (rule: {str(node)})")
 
         # if so: handle grounding
         if self.ng:
@@ -136,10 +138,10 @@ class MainTransformer(Transformer):
             start_time = time.time()
 
 
-            #self._generate_sat_part(head)
+            self._generate_sat_part(head)
 
             end_time = time.time()
-            print(f"[INFO] ------> SAT TIME: {end_time - start_time}")
+            #print(f"[INFO] ------> SAT TIME: {end_time - start_time}")
             start_time = time.time()
 
             # FOUND NEW
@@ -147,7 +149,7 @@ class MainTransformer(Transformer):
                 self._generate_foundedness_part(head)
 
             end_time = time.time()
-            print(f"[INFO] ------> FOUNDEDNESS TIME: {end_time - start_time}")
+            #print(f"[INFO] ------> FOUNDEDNESS TIME: {end_time - start_time}")
 
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -217,10 +219,14 @@ class MainTransformer(Transformer):
         keyword_dict["count"] = "count"
         keyword_dict["sum"] = "sum"
 
+        self.rules = False
+        self.count = False
+        
         if str(node.name) in keyword_dict:
             self.rules = True
-        else:
-            self.rules = False
+
+        if str(node.name) == "count":
+            self.count = True
 
         return node
 
@@ -361,19 +367,19 @@ class MainTransformer(Transformer):
         self._generate_sat_variable_possibilities()
 
         end_time = time.time()
-        print(f"[INFO] --------> SAT GENERATE POSSIBILITIES TIME {end_time - start_time}")
+        #print(f"[INFO] --------> SAT GENERATE POSSIBILITIES TIME {end_time - start_time}")
         start_time = time.time()
 
         covered_subsets = self._generate_sat_comparisons()
 
         end_time = time.time()
-        print(f"[INFO] --------> SAT COMPARISONS TIME {end_time - start_time}")
+        #print(f"[INFO] --------> SAT COMPARISONS TIME {end_time - start_time}")
         start_time = time.time()
 
         self._generate_sat_functions(head, covered_subsets)
 
         end_time = time.time()
-        print(f"[INFO] --------> SAT FUNCTIONS TIME {end_time - start_time}")
+        #print(f"[INFO] --------> SAT FUNCTIONS TIME {end_time - start_time}")
 
 
     def _generate_sat_variable_possibilities(self):
@@ -423,6 +429,9 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
+            if self.count == True: # Special efficiency mode for count aggregate
+                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(f.right)
+
             for c in combinations:
 
                 variable_assignments = {}
@@ -438,22 +447,42 @@ class MainTransformer(Transformer):
                     if variable in vars:
                         interpretation_list.append(f"r{self.current_rule_position}_{variable}({variable_assignments[variable]})")
 
-                left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
-                right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+                # This is the most expensive (compuationally) part of the entire program...
+                if self.count == False:
+                    left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
+                    right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
-                sint = self.ignore_exception(ValueError)(int)
-                left_eval = sint(left_eval)
-                right_eval = sint(right_eval)
+                    sint = self.ignore_exception(ValueError)(int)
+                    left_eval = sint(left_eval)
+                    right_eval = sint(right_eval)
 
+                    safe_checks = left_eval != None and right_eval != None
+                    evaluation = safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))
+                else: # Aggregate COUNT Efficiency mode
 
-                safe_checks = left_eval != None and right_eval != None
-                if not safe_checks or (safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))):
+                    evaluation = True
 
-                    left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                    right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
-                    comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                    for variable_tuple in count_aggregate_vars:
+                        first = variable_tuple[0]
+                        second = variable_tuple[1]
 
-                    interpretation = f"{','.join(interpretation_list)}, not {comparison}"
+                        first_assigned = variable_assignments[first]
+                        second_assigned = variable_assignments[second]
+
+                        if first_assigned != second_assigned:
+                            evaluation = False
+                            break
+
+                    safe_checks = True
+
+                if not safe_checks or evaluation:
+                    if self.count == False:
+                        left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
+                        right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
+                        unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                        interpretation = f"{','.join(interpretation_list)}, not {unfound_comparison}"
+                    else:
+                        interpretation = f"{','.join(interpretation_list)}"
 
                     sat_atom = f"sat_r{self.current_rule_position}"
 
@@ -600,7 +629,7 @@ class MainTransformer(Transformer):
                     g.add_edge(v1, v2) 
 
         end_time = time.time()
-        print(f"[INFO] --------> UNFOUNDEDNESS INTRO PART TIME: {end_time - start_time}")
+        #print(f"[INFO] --------> UNFOUNDEDNESS INTRO PART TIME: {end_time - start_time}")
 
         start_time = time.time()
         
@@ -609,7 +638,7 @@ class MainTransformer(Transformer):
         self._generate_foundedness_head(head, rem, g, g_r, h_vars, h_args)
 
         end_time = time.time()
-        print(f"[INFO] --------> UNFOUNDEDNESS HEAD PART TIME: {end_time - start_time}")
+        #print(f"[INFO] --------> UNFOUNDEDNESS HEAD PART TIME: {end_time - start_time}")
 
         start_time = time.time()
 
@@ -617,13 +646,13 @@ class MainTransformer(Transformer):
         covered_subsets = self._generate_foundedness_comparisons(head, rem, h_vars, h_args, g)
 
         end_time = time.time()
-        print(f"[INFO] --------> UNFOUNDEDNESS COMPARISON PART TIME: {end_time - start_time}")
+        #print(f"[INFO] --------> UNFOUNDEDNESS COMPARISON PART TIME: {end_time - start_time}")
 
 
         start_time = time.time()
         self._generate_foundedness_functions(head, rem, h_vars, h_args, g, covered_subsets)
         end_time = time.time()
-        print(f"[INFO] --------> UNFOUNDEDNESS FUNCTION PART TIME: {end_time - start_time}")
+        #print(f"[INFO] --------> UNFOUNDEDNESS FUNCTION PART TIME: {end_time - start_time}")
 
 
     def _generate_foundedness_head(self, head, rem, g, g_r, h_vars, h_args):
@@ -754,22 +783,18 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            # EFFICIENCY
-            # These accesses are expensive!
-            X1_var = str(f.right.left.left)
-            X2_var = str(f.right.right.left)
-            Y1_var = str(f.right.left.right)
-            Y2_var = str(f.right.right.right)
+            if self.count == True: # Special efficiency mode for count aggregate
+                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(f.right)
+                if str(head) not in self.unfounded_rules: # Only possible for count special case
+                    self.unfounded_rules[str(head)] = {}
 
-            if str(head) not in self.unfounded_rules:
-                self.unfounded_rules[str(head)] = {}
+                if str(self.current_rule_position) not in self.unfounded_rules[str(head)]: # Only possible for count special case
+                    self.unfounded_rules[str(head)][str(self.current_rule_position)] = []
 
-            if str(self.current_rule_position) not in self.unfounded_rules[str(head)]:
-                self.unfounded_rules[str(head)][str(self.current_rule_position)] = []
 
-            unfounded_head_list = self.unfounded_rules[str(head)][str(self.current_rule_position)]
+                unfounded_head_list = self.unfounded_rules[str(head)][str(self.current_rule_position)]
 
-            print(f"[INFO] -------> NUMBER OF COMBINATIONS: {len(combinations)}")
+            #print(f"[INFO] -------> NUMBER OF COMBINATIONS: {len(combinations)}")
             for combination in combinations:
 
                 start_time = time.time()
@@ -803,36 +828,36 @@ class MainTransformer(Transformer):
                 start_time_4 = time.time()
 
                 # This is the most expensive (compuationally) part of the entire program...
-                X1 = variable_assignments[X1_var]
-                X2 = variable_assignments[X2_var]
-        
-                if X1 == X2:
+                if self.count == False:
+                    left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
+                    right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
-                    Y1 = variable_assignments[Y1_var]
-                    Y2 = variable_assignments[Y2_var]
-                    
-                    if Y1 == Y2:
-                        evaluation = True
-                    else:
-                        evaluation = False
-                else:
-                    evaluation = False
+                    sint = self.ignore_exception(ValueError)(int)
+                    left_eval = sint(left_eval)
+                    right_eval = sint(right_eval)
 
-                #left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
-                #right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+                    safe_checks = left_eval != None and right_eval != None
+                    evaluation = safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))
+                else: # Aggregate COUNT Efficiency mode
+
+                    evaluation = True
+
+                    for variable_tuple in count_aggregate_vars:
+                        first = variable_tuple[0]
+                        second = variable_tuple[1]
+
+                        first_assigned = variable_assignments[first]
+                        second_assigned = variable_assignments[second]
+
+                        if first_assigned != second_assigned:
+                            evaluation = False
+                            break
+
+                    safe_checks = True
 
                 end_time_4 = time.time()
                 duration_4 += (end_time_4 - start_time_4)
                 start_time_5 = time.time()
-
-                #sint = self.ignore_exception(ValueError)(int)
-                #left_eval = sint(left_eval)
-                #right_eval = sint(right_eval)
-
-                safe_checks = True
-                #safe_checks = left_eval != None and right_eval != None
-                #evaluation = safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))
-
                 end_time_5 = time.time()
                 duration_5 += (end_time_5 - start_time_5)
 
@@ -842,17 +867,15 @@ class MainTransformer(Transformer):
 
                 if not safe_checks or evaluation:
 
-                    """
-                    left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                    right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
-                    unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
-                    """
+                    if self.count == False:
+                        left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
+                        right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
+                        unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
 
                     unfound_body_list = []
 
                     for v in f_arguments_nd:
                         if v in rem:
-                            #if not ComparisonTools.compareTerms(f.comparison, f_args_unf_left, f_args_unf_right):
                             
                             body_combination_tmp = [body_combination[v]] + head_combination_list_2
                             body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
@@ -861,12 +884,18 @@ class MainTransformer(Transformer):
 
                     if len(unfound_body_list) > 0:
                         unfound_body = f" {','.join(unfound_body_list)}"
-                        unfound_rule = f"{unfound_atom} :- {unfound_body}."
+                        unfound_rule = f"{unfound_atom} :- {unfound_body}"
+                        if self.count == False:
+                            unfound_rule += f", not {unfound_comparison}."
+                        else:
+                            unfound_rule += "."
                     else:
-                        unfound_body = ""
-                        unfound_rule = f"{unfound_atom}."
+                        unfound_rule = f"{unfound_atom}"
+                        if self.count == False:
+                            unfound_rule += f" :- not {unfound_comparison}."
+                        else:
+                            unfound_rule += "."
 
-                    #unfound_rule = f"{unfound_atom} :-{unfound_body} not {unfound_comparison}."
                     self.printer.custom_print(unfound_rule)
 
                     if unfound_atom not in covered_subsets:
@@ -878,39 +907,35 @@ class MainTransformer(Transformer):
                 duration_2 += (end_time - start_time)
                 start_time = time.time()
 
-                """
-                dom_list_2 = []
-                for arg in h_args:
-                    if arg in h_vars and arg not in head_combination: 
-                        values = self._get_domain_values_from_rule_variable(self.current_rule_position, arg) 
-                        dom_list_2.append(values)
-                    elif arg in h_vars and arg in head_combination:
-                        dom_list_2.append([head_combination[arg]])
-                    else:
-                        dom_list_2.append([arg])
+                if self.count == False:
+                    dom_list_2 = []
+                    for arg in h_args:
+                        if arg in h_vars and arg not in head_combination: 
+                            values = self._get_domain_values_from_rule_variable(self.current_rule_position, arg) 
+                            dom_list_2.append(values)
+                        elif arg in h_vars and arg in head_combination:
+                            dom_list_2.append([head_combination[arg]])
+                        else:
+                            dom_list_2.append([arg])
 
-                combinations_2 = [p for p in itertools.product(*dom_list_2)]
+                    combinations_2 = [p for p in itertools.product(*dom_list_2)]
 
-                for combination_2 in combinations_2:
+                    for combination_2 in combinations_2:
 
-                    if len(head_combination_list_2) > 0:
-                        head_string = f"{head.name}({','.join(list(combination_2))})"
-                    else:
-                        head_string = f"{head.name}"
+                        if len(head_combination_list_2) > 0:
+                            head_string = f"{head.name}({','.join(list(combination_2))})"
+                        else:
+                            head_string = f"{head.name}"
 
-                    print(f"{head_string}/{unfound_atom}")
-                    self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
-                """
-           
-                unfounded_head_list.append(unfound_atom)
-
-                #head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
-                #self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+                        #print(f"{head_string}/{unfound_atom}")
+                        self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
+                else:  # For count aggregate
+                    unfounded_head_list.append(unfound_atom)
 
                 end_time = time.time()
                 duration_3 += (end_time - start_time)
 
-        print(f"[INFO] ----------> DURATION 0: {duration_0}, 1: {duration_1} (with p4: {duration_4}, p5: {duration_5}), 2: {duration_2}, 3: {duration_3}")
+        #print(f"[INFO] ----------> DURATION 0: {duration_0}, 1: {duration_1} (with p4: {duration_4}, p5: {duration_5}), 2: {duration_2}, 3: {duration_3}")
 
         return covered_subsets
 

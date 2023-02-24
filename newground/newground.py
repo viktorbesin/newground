@@ -28,7 +28,7 @@ class Newground:
         parse_string(contents, lambda stm: aggregate_transformer(stm))
 
         end_time = time.time()
-        print(f"[INFO] --> Newground aggregate_transformer_duration: {end_time - start_time}")
+        #print(f"[INFO] --> Newground aggregate_transformer_duration: {end_time - start_time}")
 
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
@@ -49,7 +49,7 @@ class Newground:
         comparisons = term_transformer.comparison_operators_variables
 
         end_time = time.time()
-        print(f"[INFO] --> Newground term_transformer_duration: {end_time - start_time}")
+        #print(f"[INFO] --> Newground term_transformer_duration: {end_time - start_time}")
 
 
         start_time = time.time()
@@ -72,7 +72,7 @@ class Newground:
 
 
         end_time = time.time()
-        print(f"[INFO] --> Newground domain_transformer_duration: {end_time - start_time}")
+        #print(f"[INFO] --> Newground domain_transformer_duration: {end_time - start_time}")
 
 
         start_time = time.time()
@@ -84,7 +84,7 @@ class Newground:
             parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
 
             end_time = time.time()
-            print(f"[INFO] --> Newground main_transformer_duration: {end_time - start_time}")
+            #print(f"[INFO] --> Newground main_transformer_duration: {end_time - start_time}")
 
 
 

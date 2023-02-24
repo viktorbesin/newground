@@ -219,24 +219,22 @@ class ComparisonTools:
 
         if operator_type == int(clingo.ast.BinaryOperator.XOr):
             return int(left_value) ^ int(right_value)
-            #return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l ^ r)
         elif operator_type == int(clingo.ast.BinaryOperator.Or):
             return int(left_value) | int(right_value)
-            #return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l | r)
         elif operator_type == int(clingo.ast.BinaryOperator.And):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l & r)
+            return int(left_value) & int(right_value)
         elif operator_type == int(clingo.ast.BinaryOperator.Plus):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l + r)
+            return int(left_value) + int(right_value)
         elif operator_type == int(clingo.ast.BinaryOperator.Minus):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l - r)
+            return int(left_value) - int(right_value)
         elif operator_type == int(clingo.ast.BinaryOperator.Multiplication):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l * r)
+            return int(left_value) * int(right_value)
         elif operator_type == int(clingo.ast.BinaryOperator.Division):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l / r)
+            return int(left_value) / int(right_value)
         elif operator_type == int(clingo.ast.BinaryOperator.Modulo):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: l % r)
+            return int(left_value) % int(right_value)
         elif operator_type == int(clingo.ast.BinaryOperator.Power):
-            return cls.apply_binary_operation(left_domain, right_domain, lambda l,r: pow(l,r))
+            return pow(int(left_value), int(right_value))
         else:
             print(f"[NOT-IMPLEMENTED] - Binary operator type '{operator_type}' is not implemented!")
             assert(False) # not implemented
@@ -290,4 +288,13 @@ class ComparisonTools:
 
         return list(new_domain.keys())
 
+    @classmethod
+    def aggregate_count_special_variable_getter(cls, binary_operation):
+        if binary_operation.ast_type is clingo.ast.ASTType.BinaryOperation and binary_operation.operator_type == int(clingo.ast.BinaryOperator.XOr):
+            return [(str(binary_operation.left), str(binary_operation.right))]
+
+        elif binary_operation.ast_type is clingo.ast.ASTType.BinaryOperation and binary_operation.operator_type == int(clingo.ast.BinaryOperator.Or):
+            return cls.aggregate_count_special_variable_getter(binary_operation.left) + cls.aggregate_count_special_variable_getter(binary_operation.right)
+        else:
+            assert(False) # not implemented
 
