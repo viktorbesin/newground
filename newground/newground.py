@@ -5,7 +5,7 @@ from clingo.ast import Transformer, Variable, parse_string, ProgramBuilder
 
 from clingo.control import Control
 
-from .aggregate_transformer import AggregateTransformer
+from .aggregate_transformer import AggregateTransformer, AggregateMode
 from .term_transformer import TermTransformer
 from .domain_transformer import DomainTransformer
 from .main_transformer import MainTransformer
@@ -17,6 +17,9 @@ class Newground:
         self.ground_guess = ground_guess
         self.ground = ground
         self.output_printer = output_printer
+
+        self.aggregate_mode = AggregateMode.REWRITING
+        #self.aggregate_mode = AggregateMode.REPLACE
         
         self.rules = False
 
@@ -24,11 +27,11 @@ class Newground:
 
         start_time = time.time()
 
-        aggregate_transformer = AggregateTransformer()
+        aggregate_transformer = AggregateTransformer(self.aggregate_mode)
         parse_string(contents, lambda stm: aggregate_transformer(stm))
 
         end_time = time.time()
-        #print(f"[INFO] --> Newground aggregate_transformer_duration: {end_time - start_time}")
+        print(f"[INFO] --> Newground aggregate_transformer_duration: {end_time - start_time}")
 
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
@@ -40,6 +43,9 @@ class Newground:
 
         start_time = time.time()
 
+
+
+
         term_transformer = TermTransformer(self.output_printer, self.no_show)
         parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
@@ -49,7 +55,7 @@ class Newground:
         comparisons = term_transformer.comparison_operators_variables
 
         end_time = time.time()
-        #print(f"[INFO] --> Newground term_transformer_duration: {end_time - start_time}")
+        print(f"[INFO] --> Newground term_transformer_duration: {end_time - start_time}")
 
 
         start_time = time.time()
@@ -72,19 +78,20 @@ class Newground:
 
 
         end_time = time.time()
-        #print(f"[INFO] --> Newground domain_transformer_duration: {end_time - start_time}")
+        print(f"[INFO] --> Newground domain_transformer_duration: {end_time - start_time}")
 
 
         start_time = time.time()
 
+
         ctl = Control()
         with ProgramBuilder(ctl) as bld:
-            transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, self.ground_guess, self.ground, self.output_printer, domain, safe_variables)
+            transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, self.ground_guess, self.ground, self.output_printer, domain, safe_variables, self.aggregate_mode)
 
             parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
 
             end_time = time.time()
-            #print(f"[INFO] --> Newground main_transformer_duration: {end_time - start_time}")
+            print(f"[INFO] --> Newground main_transformer_duration: {end_time - start_time}")
 
 
 

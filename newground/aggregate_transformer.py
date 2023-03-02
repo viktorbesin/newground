@@ -1,11 +1,17 @@
 import os
 import sys
 
+from enum import Enum
+
 import argparse
 
 import clingo
 
 from clingo.ast import Transformer, Variable, parse_string
+
+class AggregateMode(Enum):
+    REWRITING = 1
+    REPLACE = 2
 
 def do_nothing(stuff):
     pass
@@ -29,7 +35,9 @@ def getCompOperator(comp):
 
 class AggregateTransformer(Transformer):
     
-    def __init__(self):
+    def __init__(self, aggregate_mode):
+        self.aggregate_mode = aggregate_mode
+
         self.new_prg = []
         self.aggregate_count = 0
 
@@ -65,38 +73,107 @@ class AggregateTransformer(Transformer):
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
 
+
         remaining_body = []
+        if self.aggregate_mode == AggregateMode.REWRITING:
 
-        if str_type == "sum":
 
-            remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
+            if str_type == "sum":
+
+                remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
+
+                if aggregate["left_guard"]:
+                    guard = aggregate["left_guard"]
+                    remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
+                if aggregate["right_guard"]:
+                    guard = aggregate["right_guard"]
+                    remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
+
+                self._add_sum_aggregate_rules(aggregate_index)
+            elif str_type == "count":
+
+                if aggregate["left_guard"]:
+                    guard = aggregate["left_guard"]
+                    left_name = f"{str_type}_ag{str_id}_left(1)"
+                    remaining_body.append(left_name)
+                if aggregate["right_guard"]:
+                    guard = aggregate["right_guard"]
+                    right_name = f"not {str_type}_ag{str_id}_right(1)"
+                    remaining_body.append(right_name)
+
+                self._add_count_aggregate_rules(aggregate_index)
+            elif str_type == "min":
+                remaining_body += self._add_min_aggregate_rules(aggregate_index)
+            elif str_type == "max":
+                remaining_body += self._add_max_aggregate_rules(aggregate_index)
+            else: 
+                assert(False) # Not Implemented
+
+        elif self.aggregate_mode == AggregateMode.REPLACE:
+
+            aggregate_helper_name = f"{str_type}_ag{str_id}"
+            remaining_body.append(aggregate_helper_name)
+
+            aggregate = self.cur_aggregates[aggregate_index]
+            elements = aggregate["elements"]
+
+            str_type = aggregate["function"][1]
+            str_id = aggregate["id"] 
+
+            element_predicate_names = []
+
+            for element_index in range(len(elements)):
+                element = aggregate["elements"][element_index]
+                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
+                
+                body_string = f"{element_body} :- {','.join(element['condition'])}."
+                self.new_prg.append(body_string)
+                element_predicate_names.append(element_predicate_name)
+
+            self.new_prg.append(f"#program {str_type}.")
+
+
+            new_elements = []
+
+            for element_index in range(len(elements)):
+                element = aggregate["elements"][element_index]
+
+                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
+ 
+
+                new_element = f"{','.join(element['terms'])} : {element_body}"
+
+                new_elements.append(new_element)
+
+            new_rule = f"{aggregate_helper_name} :- "
 
             if aggregate["left_guard"]:
-                guard = aggregate["left_guard"]
-                remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
+                left_guard = aggregate["left_guard"]
+                left_guard_term = str(left_guard.term)
+
+                operator = getCompOperator(left_guard.comparison)
+
+                new_rule += f"{left_guard_term} {operator} "
+
+            new_rule += f"#{str_type}{{{';'.join(new_elements)}}}"
+
             if aggregate["right_guard"]:
-                guard = aggregate["right_guard"]
-                remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
+                right_guard = aggregate["right_guard"]
+                right_guard_term = str(right_guard.term)
 
-            self._add_sum_aggregate_rules(aggregate_index)
-        elif str_type == "count":
+                operator = getCompOperator(right_guard.comparison)
 
-            if aggregate["left_guard"]:
-                guard = aggregate["left_guard"]
-                left_name = f"{str_type}_ag{str_id}_left(1)"
-                remaining_body.append(left_name)
-            if aggregate["right_guard"]:
-                guard = aggregate["right_guard"]
-                right_name = f"not {str_type}_ag{str_id}_right(1)"
-                remaining_body.append(right_name)
+                new_rule += f" {operator} {right_guard_term}"
 
-            self._add_count_aggregate_rules(aggregate_index)
-        elif str_type == "min":
-            remaining_body += self._add_min_aggregate_rules(aggregate_index)
-        elif str_type == "max":
-            remaining_body += self._add_max_aggregate_rules(aggregate_index)
-        else: 
-            assert(False) # Not Implemented
+            new_rule += "."
+
+            self.new_prg.append(new_rule)
+
+        else:
+            print(f"Aggregate mode {self.aggregate_mode} not implemented!")
+            assert(False)
 
         return remaining_body
 

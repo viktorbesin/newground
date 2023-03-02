@@ -16,12 +16,18 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 from .comparison_tools import ComparisonTools
+from .aggregate_transformer import AggregateMode
 
 
 class MainTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules):
+    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode):
         self.rules = False
         self.count = False
+        self.sum = False
+        self.min = False
+        self.max = False
+        
+        self.aggregate_mode = aggregate_mode
 
         self.ng = False
         self.bld = bld
@@ -110,13 +116,18 @@ class MainTransformer(Transformer):
                 self._outputNodeFormatConform(node)
 
             self.current_rule_position += 1
-            #self.current_rule_position += 1
 
             end_time = time.time()
             #print(f"[INFO] ----> rule duration time: {end_time - start_time}")
 
 
             return node
+
+        if (self.count or self.sum or self.min or self.max) and self.aggregate_mode == AggregateMode.REPLACE:
+            if not self.ground:
+                self._outputNodeFormatConform(node)
+
+            return node # In this mode do nothing here
 
         start_time = time.time()
 
@@ -221,12 +232,24 @@ class MainTransformer(Transformer):
 
         self.rules = False
         self.count = False
+        self.sum = False
+        self.min = False
+        self.max = False
         
         if str(node.name) in keyword_dict:
             self.rules = True
 
         if str(node.name) == "count":
             self.count = True
+
+        if str(node.name) == "sum":
+            self.sum = True
+
+        if str(node.name) == "min":
+            self.min = True
+
+        if str(node.name) == "max":
+            self.max = True
 
         return node
 
@@ -964,6 +987,8 @@ class MainTransformer(Transformer):
 
                 for combination in combinations:
 
+                    start_time = time.time()
+
                     head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                     # ---------
@@ -987,6 +1012,7 @@ class MainTransformer(Transformer):
                             unfound_body_list.append(body_predicate)
                             unfound_body_dict[body_predicate] = body_predicate
 
+    
                     if unfound_atom in covered_subsets:
                         possible_subsets = covered_subsets[unfound_atom]
                         found = False
@@ -1030,8 +1056,8 @@ class MainTransformer(Transformer):
                     else: # i.e. a ''negative'' occurence (e.g. q(X) :- p(X), not p(1). -> p(1) is negative)
                         sign_adjusted_predicate = f"{unfound_predicate}"
 
-                    
                     unfound_rule = f"{unfound_atom} :-{unfound_body} {sign_adjusted_predicate}."
+
                     self.printer.custom_print(unfound_rule)
 
                     dom_list_2 = []
