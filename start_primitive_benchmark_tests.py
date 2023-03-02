@@ -85,6 +85,21 @@ class PrimitiveBenchmark:
             one_directional_equivalence: If True, then only the direction clingo -> newground is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the newground result as well (but therefore it could be, that newground has more answersets)
         """
 
+
+        temp_file = tempfile.NamedTemporaryFile()
+    
+        with open(temp_file.name, "w") as f:
+            f.write(instance_file_contents + encoding_file_contents)
+
+        clingo_start_time = time.time()   
+
+        subprocess.run(["clingo",f"{temp_file.name}"])       
+
+        clingo_end_time = time.time()   
+        clingo_duration = clingo_end_time - clingo_start_time
+        print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
+
+        """
         clingo_start_time = time.time()   
  
         ctl = clingo.Control()
@@ -96,7 +111,10 @@ class PrimitiveBenchmark:
 
         clingo_end_time = time.time()
 
-        print(f"[INFO] - Clingo needed {clingo_end_time - clingo_start_time} seconds!")
+        clingo_duration = clingo_end_time - clingo_start_time
+
+        print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
+        """
         
         no_show = False
         ground_guess = False
@@ -132,7 +150,9 @@ class PrimitiveBenchmark:
 
         newground_total_duration = newground_duration_0 + newground_duration_1
 
+        print(f"[INFO] - <<<<<<<<<<>>>>>>>>>>")
         print(f"[INFO] - Newground needed {newground_total_duration} seconds!")
+        print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
 
 
         """
