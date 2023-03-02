@@ -452,7 +452,7 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            if self.count == True: # Special efficiency mode for count aggregate
+            if self.count == True and self.aggregate_mode == AggregateMode.REWRITING: # Special efficiency mode for count aggregate
                 count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(f.right)
 
             for c in combinations:
@@ -471,7 +471,7 @@ class MainTransformer(Transformer):
                         interpretation_list.append(f"r{self.current_rule_position}_{variable}({variable_assignments[variable]})")
 
                 # This is the most expensive (compuationally) part of the entire program...
-                if self.count == False:
+                if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                     left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
                     right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
@@ -499,7 +499,7 @@ class MainTransformer(Transformer):
                     safe_checks = True
 
                 if not safe_checks or evaluation:
-                    if self.count == False:
+                    if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                         left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
                         right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
                         unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
@@ -806,7 +806,7 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            if self.count == True: # Special efficiency mode for count aggregate
+            if self.count == True and self.aggregate_mode == AggregateMode.REWRITING: # Special efficiency mode for count aggregate
                 count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(f.right)
                 if str(head) not in self.unfounded_rules: # Only possible for count special case
                     self.unfounded_rules[str(head)] = {}
@@ -851,7 +851,7 @@ class MainTransformer(Transformer):
                 start_time_4 = time.time()
 
                 # This is the most expensive (compuationally) part of the entire program...
-                if self.count == False:
+                if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                     left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
                     right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
 
@@ -890,7 +890,7 @@ class MainTransformer(Transformer):
 
                 if not safe_checks or evaluation:
 
-                    if self.count == False:
+                    if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                         left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
                         right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
                         unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
@@ -908,13 +908,13 @@ class MainTransformer(Transformer):
                     if len(unfound_body_list) > 0:
                         unfound_body = f" {','.join(unfound_body_list)}"
                         unfound_rule = f"{unfound_atom} :- {unfound_body}"
-                        if self.count == False:
+                        if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                             unfound_rule += f", not {unfound_comparison}."
                         else:
                             unfound_rule += "."
                     else:
                         unfound_rule = f"{unfound_atom}"
-                        if self.count == False:
+                        if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                             unfound_rule += f" :- not {unfound_comparison}."
                         else:
                             unfound_rule += "."
@@ -930,7 +930,7 @@ class MainTransformer(Transformer):
                 duration_2 += (end_time - start_time)
                 start_time = time.time()
 
-                if self.count == False:
+                if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                     dom_list_2 = []
                     for arg in h_args:
                         if arg in h_vars and arg not in head_combination: 

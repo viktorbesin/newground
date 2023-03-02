@@ -9,29 +9,15 @@ import clingo
 
 from clingo.ast import Transformer, Variable, parse_string
 
+from .comparison_tools import ComparisonTools
+
 class AggregateMode(Enum):
     REWRITING = 1
     REPLACE = 2
+    REWRITING_NO_BODY = 3
 
 def do_nothing(stuff):
     pass
-
-def getCompOperator(comp):
-    if comp is int(clingo.ast.ComparisonOperator.Equal):
-        return "="
-    elif comp is int(clingo.ast.ComparisonOperator.NotEqual):
-        return "!="
-    elif comp is int(clingo.ast.ComparisonOperator.GreaterEqual):
-        return ">="
-    elif comp is int(clingo.ast.ComparisonOperator.GreaterThan):
-        return ">"
-    elif comp is int(clingo.ast.ComparisonOperator.LessEqual):
-        return "<="
-    elif comp is int(clingo.ast.ComparisonOperator.LessThan):
-        return "<"
-    else:
-        assert(False) # not implemented
-
 
 class AggregateTransformer(Transformer):
     
@@ -84,10 +70,10 @@ class AggregateTransformer(Transformer):
 
                 if aggregate["left_guard"]:
                     guard = aggregate["left_guard"]
-                    remaining_body.append(f"{guard.term} {getCompOperator(guard.comparison)} S{aggregate_index}")
+                    remaining_body.append(f"{guard.term} {ComparisonTools.getCompOperator(guard.comparison)} S{aggregate_index}")
                 if aggregate["right_guard"]:
                     guard = aggregate["right_guard"]
-                    remaining_body.append(f"S{aggregate_index} {getCompOperator(guard.comparison)} {guard.term}")
+                    remaining_body.append(f"S{aggregate_index} {ComparisonTools.getCompOperator(guard.comparison)} {guard.term}")
 
                 self._add_sum_aggregate_rules(aggregate_index)
             elif str_type == "count":
@@ -108,6 +94,19 @@ class AggregateTransformer(Transformer):
                 remaining_body += self._add_max_aggregate_rules(aggregate_index)
             else: 
                 assert(False) # Not Implemented
+        elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and str_type == "count":
+
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                left_name = f"{str_type}_ag{str_id}_left(1)"
+                remaining_body.append(left_name)
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                right_name = f"not {str_type}_ag{str_id}_right(1)"
+                remaining_body.append(right_name)
+
+            self._add_count_aggregate_rules(aggregate_index)
+
 
         elif self.aggregate_mode == AggregateMode.REPLACE:
 
@@ -153,7 +152,7 @@ class AggregateTransformer(Transformer):
                 left_guard = aggregate["left_guard"]
                 left_guard_term = str(left_guard.term)
 
-                operator = getCompOperator(left_guard.comparison)
+                operator = ComparisonTools.getCompOperator(left_guard.comparison)
 
                 new_rule += f"{left_guard_term} {operator} "
 
@@ -163,7 +162,7 @@ class AggregateTransformer(Transformer):
                 right_guard = aggregate["right_guard"]
                 right_guard_term = str(right_guard.term)
 
-                operator = getCompOperator(right_guard.comparison)
+                operator = ComparisonTools.getCompOperator(right_guard.comparison)
 
                 new_rule += f" {operator} {right_guard_term}"
 
@@ -207,7 +206,7 @@ class AggregateTransformer(Transformer):
             left_guard_term = str(left_guard.term)
             count = int(left_guard_term) # Assuming constant
 
-            operator = getCompOperator(left_guard.comparison)
+            operator = ComparisonTools.getCompOperator(left_guard.comparison)
             if operator == "<":
                 new_operator = "<="
                 remaining_body.append(f"not {left_name}")
@@ -245,7 +244,7 @@ class AggregateTransformer(Transformer):
             right_guard_term = str(right_guard.term)
             count = int(right_guard_term) # Assuming constant
 
-            operator = getCompOperator(right_guard.comparison)
+            operator = ComparisonTools.getCompOperator(right_guard.comparison)
             if operator == "<":
                 new_operator = "<"
                 remaining_body.append(right_name)
@@ -302,7 +301,7 @@ class AggregateTransformer(Transformer):
             left_guard_term = str(left_guard.term)
             count = int(left_guard_term) # Assuming constant
 
-            operator = getCompOperator(left_guard.comparison)
+            operator = ComparisonTools.getCompOperator(left_guard.comparison)
             if operator == "<":
                 new_operator = ">"
                 remaining_body.append(f"{left_name}")
@@ -334,7 +333,7 @@ class AggregateTransformer(Transformer):
             right_guard_term = str(right_guard.term)
             count = int(right_guard_term) # Assuming constant
 
-            operator = getCompOperator(right_guard.comparison)
+            operator = ComparisonTools.getCompOperator(right_guard.comparison)
             if operator == "<":
                 new_operator = ">="
                 remaining_body.append(f"not {right_name}")
@@ -369,10 +368,11 @@ class AggregateTransformer(Transformer):
         str_id = aggregate["id"] 
 
 
-        for element_index in range(len(aggregate["elements"])):
-            element = aggregate["elements"][element_index]
-            body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
-            self.new_prg.append(body_string)
+        if self.aggregate_mode == AggregateMode.REWRITING:
+            for element_index in range(len(aggregate["elements"])):
+                element = aggregate["elements"][element_index]
+                body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
+                self.new_prg.append(body_string)
 
         self.new_prg.append(f"#program {str_type}.")
 
@@ -384,7 +384,7 @@ class AggregateTransformer(Transformer):
 
             count = int(str(left_guard.term)) # Assuming constant
 
-            operator = getCompOperator(left_guard.comparison)
+            operator = ComparisonTools.getCompOperator(left_guard.comparison)
             if operator == "<":
                 count += 1
             elif operator == "<=":
@@ -405,7 +405,7 @@ class AggregateTransformer(Transformer):
 
             count = int(str(right_guard.term)) # Assuming constant
 
-            operator = getCompOperator(left_guard.comparison)
+            operator = ComparisonTools.getCompOperator(left_guard.comparison)
             if operator == "<":
                 count = count
             elif operator == "<=":
@@ -433,9 +433,68 @@ class AggregateTransformer(Transformer):
                 for term in element["terms"]:
                     new_terms.append(f"{str(term)}_{str(element_index)}_{str(index)}")
 
+                    
+                    """
+                    REWRITING = 1
+                    REPLACE = 2
+                    REWRITING_NO_BODY = 3
+                    """
+
+
                 terms.append(new_terms)
 
-                bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({','.join(new_terms)})") 
+                if self.aggregate_mode == AggregateMode.REWRITING:
+                    bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({','.join(new_terms)})") 
+                elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+
+
+                    new_conditions = []
+
+                    for condition in element["condition"]:
+
+                        if "arguments" in condition:
+
+                            new_condition = condition["name"]
+
+                            new_args = []
+
+
+                            for argument in condition["arguments"]:
+                                if "variable" in argument:
+                                    variable = argument["variable"]
+
+                                    new_args.append(f"{variable}_{str(element_index)}_{str(index)}")
+                                elif "term" in argument:
+                                    new_args.append(f"{argument['term']}")
+
+                            if len(new_args) > 0:
+                                new_condition += f"({','.join(new_args)})"
+
+                            new_conditions.append(new_condition)
+                        elif "comparison" in condition:
+                            comparison = condition["comparison"]
+
+                            variable_assignments = {}
+
+                            for argument in ComparisonTools.get_arguments_from_operation(comparison.left):
+                                if argument.ast_type == clingo.ast.ASTType.Variable:
+                                    variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
+
+                            for argument in ComparisonTools.get_arguments_from_operation(comparison.right):
+                                if argument.ast_type == clingo.ast.ASTType.Variable:
+                                    variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
+
+
+                            instantiated_left = ComparisonTools.instantiate_operation(comparison.left, variable_assignments)
+                            instantiated_right = ComparisonTools.instantiate_operation(comparison.right, variable_assignments)
+
+                            new_conditions.append(ComparisonTools.comparison_handlings(comparison.comparison, instantiated_left, instantiated_right))
+
+
+                        else:
+                            assert(False) # Not implemented
+
+                    bodies.append(f"{','.join(new_conditions)}")
 
         helper_bodies = []
         for index_1 in range(len(terms)):
@@ -658,7 +717,54 @@ class AggregateTransformer(Transformer):
 
             condition_strings = []
             for condition in node.condition:
-                condition_strings.append(str(condition))
+
+                if self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+                    if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
+                        cur_dict = {}
+                        cur_dict["all"] = str(condition)
+                        cur_dict["name"] = str(condition.atom.symbol.name) 
+                        cur_dict["arguments"] = []
+
+
+                        for argument in condition.atom.symbol.arguments:
+                            if argument.ast_type == clingo.ast.ASTType.Variable:
+                                variable_argument = {}
+                                variable_argument["variable"] = str(argument)
+                                
+                                cur_dict["arguments"].append(variable_argument)
+
+                            elif argument.ast_type == clingo.ast.ASTType.SymbolicTerm:
+                                term_argument = {}
+                                term_argument["term"] = str(argument)
+                                
+                                cur_dict["arguments"].append(term_argument)
+
+                            else:
+                                print(argument)
+                                print(argument.ast_type)
+                                print("NOT IMPLEMENTED")
+                                assert(False) # Not implemented
+
+                        condition_strings.append(cur_dict)
+                    elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
+                        cur_dict = {}
+                        cur_dict["all"] = str(condition)
+                        cur_dict["comparison"] = condition.atom
+
+                        condition_strings.append(cur_dict)
+
+                    else:
+                        print(condition)
+                        print(condition.ast_type)
+                        assert(False)
+                        condition_strings.append(str(condition))
+                    
+
+                else:
+                    print(condition)
+                    print(condition.ast_type)
+                    print("NOT IMPLEMENTED")
+                    assert(False) # Not implemented
 
             element_dict["condition"] = condition_strings
 

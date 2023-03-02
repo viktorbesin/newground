@@ -18,8 +18,9 @@ class Newground:
         self.ground = ground
         self.output_printer = output_printer
 
-        self.aggregate_mode = AggregateMode.REWRITING
+        #self.aggregate_mode = AggregateMode.REWRITING
         #self.aggregate_mode = AggregateMode.REPLACE
+        self.aggregate_mode = AggregateMode.REWRITING_NO_BODY 
         
         self.rules = False
 
