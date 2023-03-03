@@ -94,18 +94,23 @@ class AggregateTransformer(Transformer):
                 remaining_body += self._add_max_aggregate_rules(aggregate_index)
             else: 
                 assert(False) # Not Implemented
-        elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and str_type == "count":
+        elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and (str_type == "count" or str_type == "max" or str_type == "min"):
 
-            if aggregate["left_guard"]:
-                guard = aggregate["left_guard"]
-                left_name = f"{str_type}_ag{str_id}_left(1)"
-                remaining_body.append(left_name)
-            if aggregate["right_guard"]:
-                guard = aggregate["right_guard"]
-                right_name = f"not {str_type}_ag{str_id}_right(1)"
-                remaining_body.append(right_name)
+            if str_type == "count":
+                if aggregate["left_guard"]:
+                    guard = aggregate["left_guard"]
+                    left_name = f"{str_type}_ag{str_id}_left(1)"
+                    remaining_body.append(left_name)
+                if aggregate["right_guard"]:
+                    guard = aggregate["right_guard"]
+                    right_name = f"not {str_type}_ag{str_id}_right(1)"
+                    remaining_body.append(right_name)
 
-            self._add_count_aggregate_rules(aggregate_index)
+                self._add_count_aggregate_rules(aggregate_index)
+            elif str_type == "min":
+                remaining_body += self._add_min_aggregate_rules(aggregate_index)
+            elif str_type == "max":
+                remaining_body += self._add_max_aggregate_rules(aggregate_index)
 
 
         elif self.aggregate_mode == AggregateMode.REPLACE:
@@ -187,14 +192,15 @@ class AggregateTransformer(Transformer):
 
         element_predicate_names = []
 
-        for element_index in range(len(elements)):
-            element = aggregate["elements"][element_index]
-            element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-            element_body = f"{element_predicate_name}({','.join(element['terms'])})"
-            
-            body_string = f"{element_body} :- {','.join(element['condition'])}."
-            self.new_prg.append(body_string)
-            element_predicate_names.append(element_predicate_name)
+        if self.aggregate_mode == AggregateMode.REWRITING:
+            for element_index in range(len(elements)):
+                element = aggregate["elements"][element_index]
+                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
+                
+                body_string = f"{element_body} :- {','.join(element['condition'])}."
+                self.new_prg.append(body_string)
+                element_predicate_names.append(element_predicate_name)
 
         self.new_prg.append(f"#program {str_type}.")
 
@@ -222,20 +228,12 @@ class AggregateTransformer(Transformer):
             else:
                 assert(False) # Not implemented
 
-            bodies = []
             for element_index in range(len(elements)):
-                terms = []
                 element = elements[element_index]
-                for term in element["terms"]:
-                    terms.append(term + str(element_index))
-                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {left_guard_term}"
-                bodies.append(body)
-
-
-            rule_string = f"{left_name} :- {','.join(bodies)}."
-
-            self.new_prg.append(rule_string)
-        
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term)
+                rule_string = f"{left_name} :- {','.join(bodies)}."
+                self.new_prg.append(rule_string)
+ 
         if aggregate["right_guard"]:
             right_guard = aggregate["right_guard"]
 
@@ -254,21 +252,74 @@ class AggregateTransformer(Transformer):
             else:
                 assert(False) # Not implemented
 
-            bodies = []
             for element_index in range(len(elements)):
-                terms = []
                 element = elements[element_index]
-                for term in element["terms"]:
-                    terms.append(term + str(element_index))
-
-                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {right_guard_term}"
-                bodies.append(body)
-
-            rule_string = f"{right_name} :- {','.join(bodies)}."
-
-            self.new_prg.append(rule_string)
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term)
+                rule_string = f"{right_name} :- {','.join(bodies)}."
+                self.new_prg.append(rule_string)
 
         return remaining_body
+
+    def _add_min_max_aggregate_helper(self, element, element_index, new_operator, guard_term):
+
+        bodies = []
+
+        terms = []
+        for term in element["terms"]:
+            terms.append(f"{term}_{str(element_index)}")
+
+        if self.aggregate_mode == AggregateMode.REWRITING:
+            body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {guard_term}"
+            bodies.append(body)
+
+        elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+
+            new_conditions = []
+            for condition in element["condition"]:
+                if "arguments" in condition: # is a function
+
+                    new_arguments = []
+                    for argument in condition["arguments"]:
+                        if "variable" in argument:
+                            new_arguments.append(f"{argument['variable']}_{element_index}")
+                        elif "term" in argument:
+                            new_arguments.append(f"{argument['term']}")
+                        else:
+                            assert(False) # Not implemented
+
+                    condition_string = f"{condition['name']}"
+                    if len(new_arguments) > 0:
+                        condition_string += f"({','.join(new_arguments)})"
+
+                    new_conditions.append(condition_string)
+
+                elif "comparison" in condition: # is a comparison
+                    comparison = condition["comparison"]
+
+                    variable_assignments = {}
+
+                    for argument in ComparisonTools.get_arguments_from_operation(comparison.left):
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
+
+                    for argument in ComparisonTools.get_arguments_from_operation(comparison.right):
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
+
+
+                    instantiated_left = ComparisonTools.instantiate_operation(comparison.left, variable_assignments)
+                    instantiated_right = ComparisonTools.instantiate_operation(comparison.right, variable_assignments)
+
+                    new_conditions.append(ComparisonTools.comparison_handlings(comparison.comparison, instantiated_left, instantiated_right))
+
+                else:
+                    assert(False) # Not implemented
+
+            new_conditions.append(f"{terms[0]} {new_operator} {guard_term}")
+
+            bodies += new_conditions
+
+        return bodies
             
 
     def _add_max_aggregate_rules(self, aggregate_index):
@@ -282,14 +333,15 @@ class AggregateTransformer(Transformer):
 
         element_predicate_names = []
 
-        for element_index in range(len(elements)):
-            element = aggregate["elements"][element_index]
-            element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-            element_body = f"{element_predicate_name}({','.join(element['terms'])})"
-            
-            body_string = f"{element_body} :- {','.join(element['condition'])}."
-            self.new_prg.append(body_string)
-            element_predicate_names.append(element_predicate_name)
+        if self.aggregate_mode == AggregateMode.REWRITING:
+            for element_index in range(len(elements)):
+                element = aggregate["elements"][element_index]
+                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
+                
+                body_string = f"{element_body} :- {','.join(element['condition'])}."
+                self.new_prg.append(body_string)
+                element_predicate_names.append(element_predicate_name)
 
         self.new_prg.append(f"#program {str_type}.")
 
@@ -311,20 +363,12 @@ class AggregateTransformer(Transformer):
             else:
                 assert(False) # Not implemented
 
-            bodies = []
             for element_index in range(len(elements)):
-                terms = []
                 element = elements[element_index]
-                for term in element["terms"]:
-                    terms.append(term + str(element_index))
-                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {left_guard_term}"
-                bodies.append(body)
-
-
-            rule_string = f"{left_name} :- {','.join(bodies)}."
-
-            self.new_prg.append(rule_string)
-        
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term)
+                rule_string = f"{left_name} :- {','.join(bodies)}."
+                self.new_prg.append(rule_string)
+            
         if aggregate["right_guard"]:
             right_guard = aggregate["right_guard"]
 
@@ -343,19 +387,11 @@ class AggregateTransformer(Transformer):
             else:
                 assert(False) # Not implemented
 
-            bodies = []
             for element_index in range(len(elements)):
-                terms = []
                 element = elements[element_index]
-                for term in element["terms"]:
-                    terms.append(term + str(element_index))
-
-                body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {right_guard_term}"
-                bodies.append(body)
-
-            rule_string = f"{right_name} :- {','.join(bodies)}."
-
-            self.new_prg.append(rule_string)
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term)
+                rule_string = f"{right_name} :- {','.join(bodies)}."
+                self.new_prg.append(rule_string)
 
         return remaining_body
             
@@ -432,14 +468,6 @@ class AggregateTransformer(Transformer):
                 new_terms = []
                 for term in element["terms"]:
                     new_terms.append(f"{str(term)}_{str(element_index)}_{str(index)}")
-
-                    
-                    """
-                    REWRITING = 1
-                    REPLACE = 2
-                    REWRITING_NO_BODY = 3
-                    """
-
 
                 terms.append(new_terms)
 
@@ -757,14 +785,10 @@ class AggregateTransformer(Transformer):
                         print(condition)
                         print(condition.ast_type)
                         assert(False)
-                        condition_strings.append(str(condition))
                     
 
                 else:
-                    print(condition)
-                    print(condition.ast_type)
-                    print("NOT IMPLEMENTED")
-                    assert(False) # Not implemented
+                    condition_strings.append(str(condition))
 
             element_dict["condition"] = condition_strings
 
