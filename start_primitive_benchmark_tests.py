@@ -81,10 +81,6 @@ class PrimitiveBenchmark:
 
 
     def start(self, instance_file_contents, encoding_file_contents, verbose = True, one_directional_equivalence = True):
-        """ 
-            one_directional_equivalence: If True, then only the direction clingo -> newground is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the newground result as well (but therefore it could be, that newground has more answersets)
-        """
-
 
         temp_file = tempfile.NamedTemporaryFile()
     
@@ -93,29 +89,13 @@ class PrimitiveBenchmark:
 
         clingo_start_time = time.time()   
 
+
         subprocess.run(["clingo",f"{temp_file.name}"])       
 
         clingo_end_time = time.time()   
         clingo_duration = clingo_end_time - clingo_start_time
         print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
 
-        """
-        clingo_start_time = time.time()   
- 
-        ctl = clingo.Control()
-        ctl.configuration.solve.models = 0
-        ctl.add('base',[], instance_file_contents + encoding_file_contents)
-        ctl.ground([('base',[])], context=Context())
-        ctl.solve()
-        #ctl.solve(on_model=lambda m: self.on_model(m, self.clingo_output, self.clingo_hashes))
-
-        clingo_end_time = time.time()
-
-        clingo_duration = clingo_end_time - clingo_start_time
-
-        print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
-        """
-        
         no_show = False
         ground_guess = False
         ground = False
@@ -126,6 +106,7 @@ class PrimitiveBenchmark:
       
         newground_start_time = time.time()   
 
+        
         newground = Newground(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer)
         newground.start(total_content)
 
@@ -155,21 +136,6 @@ class PrimitiveBenchmark:
         print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
 
 
-        """
-        newground_start_time = time.time()   
-        ctl2 = clingo.Control()
-        ctl2.configuration.solve.models = 0
-
-        ctl2.add('base',[], )
-        ctl2.ground([('base',[])], context=Context())
-
-        newground_end_time = time.time()
-        print(f"[INFO] - Newground needed {newground_end_time - newground_start_time} seconds!")
-
-        newground_start_time = time.time()   
-
-        ctl2.solve()
-        """
 if __name__ == "__main__":
     checker = PrimitiveBenchmark()
     (instance, encoding) = checker.parse()
