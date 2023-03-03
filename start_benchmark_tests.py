@@ -126,6 +126,8 @@ class Benchmark:
         encoding_path = os.path.join(input_path, "encoding.lp")
         encoding_file_contents = open(encoding_path, 'r').read()
 
+        output_data = []
+
         for instance_file in instance_files:
             print("")
             print(f">>>> Now solving: {instance_file}")
@@ -146,6 +148,15 @@ class Benchmark:
                 print(f"[INFO] - Newground timed out ({newground_duration})!")
             else:
                 print(f"[INFO] - Newground needed {newground_duration} seconds!")
+
+            output_data.append(f"{instance_file},{clingo_duration},{clingo_timeout_occured},{newground_duration},{newground_timeout_occured}")
+
+        with open(output_filename, "w") as output_file:
+            
+            write_string = "instance,clingo-duration,clingo-timeout-occured,newground-duration,newground-timeout-occured\n"
+            write_string += '\n'.join(output_data)
+
+            output_file.write(write_string)
 
             
     def clingo_benchmark(self, instance_file_contents, encoding_file_contents, timeout = None):
