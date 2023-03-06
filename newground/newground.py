@@ -37,10 +37,10 @@ class Newground:
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
 
-        #print(program_string)
+        print(program_string)
         #print("<<<<>>>>")
         #print("<<<<>>>>")
-        #quit()
+        quit()
 
         combined_inputs = program_string
 

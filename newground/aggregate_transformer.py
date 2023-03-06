@@ -28,14 +28,20 @@ class AggregateTransformer(Transformer):
         self.aggregate_count = 0
 
         self.shown_predicates = []
+        
+        self.cur_function = None
 
+        self.cur_head = None
         self.cur_has_aggregate = False
         self.cur_aggregates = []
+        self.cur_variable_dependencies = {}
 
     def reset_temporary_variables(self):
 
+        self.cur_head = None
         self.cur_has_aggregate = False
         self.cur_aggregates = []
+        self.cur_variable_dependencies = {}
 
     def visit_Program(self, node):
 
@@ -50,7 +56,14 @@ class AggregateTransformer(Transformer):
 
     def visit_Function(self, node):
 
+        self.cur_function = node
+
+        self.visit_children(node)
+
         self.shown_predicates.append(f"#show {node.name}/{len(node.arguments)}.")
+
+
+        self.cur_function = None
 
         return node
 
@@ -58,6 +71,22 @@ class AggregateTransformer(Transformer):
         aggregate = self.cur_aggregates[aggregate_index]
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
+
+
+        # Get all variables into a list that occur in all elements of the aggregate
+        all_aggregate_variables = []
+        for element in aggregate["elements"]:
+            temporary_variables = element["condition_variables"]
+
+            for variable in temporary_variables:
+                if variable not in all_aggregate_variables:
+                    all_aggregate_variables.append(variable)
+
+        variables_dependencies_aggregate = []
+
+        for variable in all_aggregate_variables:
+            if variable in self.cur_variable_dependencies:
+                variables_dependencies_aggregate.append(variable)
 
 
         remaining_body = []
@@ -78,16 +107,24 @@ class AggregateTransformer(Transformer):
                 self._add_sum_aggregate_rules(aggregate_index)
             elif str_type == "count":
 
+
+                count_name_ending = ""
+                if len(variables_dependencies_aggregate) == 0:
+                    count_name_ending += "(1)"
+                else:
+                    count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
+
+                # self.cur_variable_dependencies 
                 if aggregate["left_guard"]:
                     guard = aggregate["left_guard"]
-                    left_name = f"{str_type}_ag{str_id}_left(1)"
+                    left_name = f"{str_type}_ag{str_id}_left{count_name_ending}"
                     remaining_body.append(left_name)
                 if aggregate["right_guard"]:
                     guard = aggregate["right_guard"]
-                    right_name = f"not {str_type}_ag{str_id}_right(1)"
+                    right_name = f"not {str_type}_ag{str_id}_right{count_name_ending}"
                     remaining_body.append(right_name)
 
-                self._add_count_aggregate_rules(aggregate_index)
+                self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
             elif str_type == "min":
                 remaining_body += self._add_min_aggregate_rules(aggregate_index)
             elif str_type == "max":
@@ -124,7 +161,7 @@ class AggregateTransformer(Transformer):
             str_type = aggregate["function"][1]
             str_id = aggregate["id"] 
 
-            element_predicate_names = []
+            #element_predicate_names = []
 
             for element_index in range(len(elements)):
                 element = aggregate["elements"][element_index]
@@ -133,7 +170,7 @@ class AggregateTransformer(Transformer):
                 
                 body_string = f"{element_body} :- {','.join(element['condition'])}."
                 self.new_prg.append(body_string)
-                element_predicate_names.append(element_predicate_name)
+                #element_predicate_names.append(element_predicate_name)
 
             self.new_prg.append(f"#program {str_type}.")
 
@@ -230,7 +267,7 @@ class AggregateTransformer(Transformer):
 
             for element_index in range(len(elements)):
                 element = elements[element_index]
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term)
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names)
                 rule_string = f"{left_name} :- {','.join(bodies)}."
                 self.new_prg.append(rule_string)
  
@@ -260,7 +297,7 @@ class AggregateTransformer(Transformer):
 
         return remaining_body
 
-    def _add_min_max_aggregate_helper(self, element, element_index, new_operator, guard_term):
+    def _add_min_max_aggregate_helper(self, element, element_index, new_operator, guard_term, element_predicate_names):
 
         bodies = []
 
@@ -365,7 +402,7 @@ class AggregateTransformer(Transformer):
 
             for element_index in range(len(elements)):
                 element = elements[element_index]
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term)
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names)
                 rule_string = f"{left_name} :- {','.join(bodies)}."
                 self.new_prg.append(rule_string)
             
@@ -396,9 +433,11 @@ class AggregateTransformer(Transformer):
         return remaining_body
             
 
-    def _add_count_aggregate_rules(self, aggregate_index):
+    def _add_count_aggregate_rules(self, aggregate_index, variable_dependencies):
 
         aggregate = self.cur_aggregates[aggregate_index]
+
+        print(aggregate)
 
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
@@ -406,7 +445,15 @@ class AggregateTransformer(Transformer):
 
         if self.aggregate_mode == AggregateMode.REWRITING:
             for element_index in range(len(aggregate["elements"])):
+                
                 element = aggregate["elements"][element_index]
+
+                # TODO
+                """
+                for variable in element["condition_variables"]:
+                    if variable in variable_dependencies:
+                """
+
                 body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
                 self.new_prg.append(body_string)
 
@@ -657,7 +704,12 @@ class AggregateTransformer(Transformer):
 
     def visit_Rule(self, node):
 
+        self.cur_head = node.head
+
         self.visit_children(node)
+
+
+
 
         if not self.cur_has_aggregate or not self.rules:
             body_rep = ""
@@ -743,8 +795,16 @@ class AggregateTransformer(Transformer):
 
             element_dict["terms"] = term_strings
 
+            element_dict["condition_variables"] = []
+
             condition_strings = []
             for condition in node.condition:
+
+                for argument in condition.atom.symbol.arguments:
+                    if argument.ast_type == clingo.ast.ASTType.Variable:
+                        if str(argument) not in element_dict["condition_variables"]:
+                            element_dict["condition_variables"].append(str(argument))
+
 
                 if self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
                     if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
@@ -797,6 +857,15 @@ class AggregateTransformer(Transformer):
         return node
 
     def visit_Variable(self, node):
+
+        if str(self.cur_function) == str(self.cur_head):
+            return node
+
+        if str(node) not in self.cur_variable_dependencies:
+            self.cur_variable_dependencies[str(node)] = []
+
+        self.cur_variable_dependencies[str(node)].append(self.cur_function)
+
         return node
 
 if __name__ == "__main__":
