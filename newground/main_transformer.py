@@ -701,20 +701,32 @@ class MainTransformer(Transformer):
                     #head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
 
                     head_tuple_list = []
+                    partly_head_tuple_list = []
 
                     comb_counter = 0
                     for h_arg in h_args:
                         if h_arg in h_vars and h_arg in g_r[r]:
                             head_tuple_list.append(combination[comb_counter])
+                            partly_head_tuple_list.append(combination[comb_counter])
                             comb_counter += 1
                         elif h_arg not in h_vars:
                             head_tuple_list.append(h_arg)
+                            partly_head_tuple_list.append(h_arg)
                         else:
-                            pass
+                            head_tuple_list.append(h_arg)
 
 
                     #print(head)
                     head_interpretation = f"{head.name}"
+
+                    """
+                    print(h_args)
+                    print(combination)
+
+                    if head_interpretation == "count_ag0_left_1":
+                        quit()
+                    """
+
                     #head_tuple_list = [c[index] for index in range(len(c))]
 
                     if len(head_tuple_list) > 0:
@@ -739,7 +751,7 @@ class MainTransformer(Transformer):
 
 
 
-                    rem_tuple_list = [r] + head_tuple_list
+                    rem_tuple_list = [r] + partly_head_tuple_list
                     rem_tuple_interpretation = ','.join(rem_tuple_list)
 
 
@@ -988,7 +1000,7 @@ class MainTransformer(Transformer):
                 for combination in combinations:
 
                     start_time = time.time()
-
+                   
                     head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                     # ---------

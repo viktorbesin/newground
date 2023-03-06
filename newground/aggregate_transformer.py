@@ -1,6 +1,8 @@
 import os
 import sys
 
+import itertools
+
 from enum import Enum
 
 import argparse
@@ -84,6 +86,7 @@ class AggregateTransformer(Transformer):
 
         variables_dependencies_aggregate = []
 
+
         for variable in all_aggregate_variables:
             if variable in self.cur_variable_dependencies:
                 variables_dependencies_aggregate.append(variable)
@@ -117,11 +120,11 @@ class AggregateTransformer(Transformer):
                 # self.cur_variable_dependencies 
                 if aggregate["left_guard"]:
                     guard = aggregate["left_guard"]
-                    left_name = f"{str_type}_ag{str_id}_left{count_name_ending}"
+                    left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
                     remaining_body.append(left_name)
                 if aggregate["right_guard"]:
                     guard = aggregate["right_guard"]
-                    right_name = f"not {str_type}_ag{str_id}_right{count_name_ending}"
+                    right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
                     remaining_body.append(right_name)
 
                 self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
@@ -437,33 +440,32 @@ class AggregateTransformer(Transformer):
 
         aggregate = self.cur_aggregates[aggregate_index]
 
-        print(aggregate)
-
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
-
 
         if self.aggregate_mode == AggregateMode.REWRITING:
             for element_index in range(len(aggregate["elements"])):
                 
                 element = aggregate["elements"][element_index]
 
-                # TODO
-                """
+                element_dependent_variables = []
                 for variable in element["condition_variables"]:
                     if variable in variable_dependencies:
-                """
+                        element_dependent_variables.append(variable)
 
-                body_string = f"body_{str_type}_ag{str_id}_{element_index}({','.join(element['terms'])}) :- {','.join(element['condition'])}."
+                term_string = f"{','.join(element['terms'] + element_dependent_variables)}"
+
+                body_string = f"body_{str_type}_ag{str_id}_{element_index}({term_string}) :- {','.join(element['condition'])}."
                 self.new_prg.append(body_string)
 
         self.new_prg.append(f"#program {str_type}.")
+
 
         new_atoms = []
         if aggregate["left_guard"]:
             left_guard = aggregate["left_guard"]
 
-            left_name = f"{str_type}_ag{str_id}_left(1)"
+            left_name = f"{str_type}_ag{str_id}_left"
 
             count = int(str(left_guard.term)) # Assuming constant
 
@@ -475,16 +477,15 @@ class AggregateTransformer(Transformer):
             else:
                 assert(False) # Not implemented
 
-            bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count, aggregate["elements"], str_type, str_id)
+            rules_strings = self._count_generate_bodies_and_helper_bodies(left_name, count, aggregate["elements"], str_type, str_id, variable_dependencies)
 
-            rule_string = f"{left_name} :- {','.join(bodies + helper_bodies)}."
-
-            self.new_prg.append(rule_string)
+            for rule_string in rules_strings:
+                self.new_prg.append(rule_string)
         
         if aggregate["right_guard"]:
             right_guard = aggregate["right_guard"]
 
-            right_name = f"{str_type}_ag{str_id}_right(1)"
+            right_name = f"{str_type}_ag{str_id}_right"
 
             count = int(str(right_guard.term)) # Assuming constant
 
@@ -496,30 +497,65 @@ class AggregateTransformer(Transformer):
             else:
                 assert(False) # Not implemented
 
-            bodies, helper_bodies = self._count_generate_bodies_and_helper_bodies(count,  aggregate["elements"], str_type, str_id)
+            rules_strings = self._count_generate_bodies_and_helper_bodies(right_name, count,  aggregate["elements"], str_type, str_id, variable_dependencies)
 
-            rule_string = f"{right_name} :- {','.join(bodies + helper_bodies)}."
+            for rule_string in rules_strings:
+                self.new_prg.append(rule_string)
+                
+    def _count_generate_bodies_and_helper_bodies(self, rule_head_name, count, elements, str_type, str_id, variable_dependencies):
 
-            self.new_prg.append(rule_string)
+        rules_strings = []
+        rules_head_strings = []
 
+        combination_lists = []
+        for index in range(count):
+            combination_lists.append(list(range(len(elements))))
 
+        combination_list = list(itertools.product(*combination_lists))
+        refined_combination_list = []
+        for combination in combination_list:
+            cur = list(combination)
+            cur.sort()
 
-    def _count_generate_bodies_and_helper_bodies(self, count, elements, str_type, str_id):
+            if cur not in refined_combination_list:
+                refined_combination_list.append(cur)
 
-        terms = []
-        bodies = []
-        for element_index in range(len(elements)):
-            element = elements[element_index]
+        for combination_index in range(len(refined_combination_list)):
+
+            combination = refined_combination_list[combination_index]
+
+            combination_variables = []
+            terms = []
+            bodies = []
 
             for index in range(count):
+
+                element_index = combination[index]
+                element = elements[element_index]
+
+
+                element_dependent_variables = []
+                for variable in element["condition_variables"]:
+                    if variable in variable_dependencies:
+                        element_dependent_variables.append(variable)
+                        if variable not in combination_variables:
+                            combination_variables.append(variable)
+
+
                 new_terms = []
                 for term in element["terms"]:
-                    new_terms.append(f"{str(term)}_{str(element_index)}_{str(index)}")
+                    if self.check_string_is_int(str(term)) == True:
+                        new_terms.append(str(term))
+                    else:
+                        new_terms.append(f"{str(term)}_{str(element_index)}_{str(index)}")
 
                 terms.append(new_terms)
 
                 if self.aggregate_mode == AggregateMode.REWRITING:
-                    bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({','.join(new_terms)})") 
+                    terms_string = f"{','.join(new_terms + element_dependent_variables)}"
+
+                    bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({terms_string})") 
+
                 elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
 
 
@@ -571,26 +607,64 @@ class AggregateTransformer(Transformer):
 
                     bodies.append(f"{','.join(new_conditions)}")
 
-        helper_bodies = []
-        for index_1 in range(len(terms)):
-            for index_2 in range(index_1 + 1, len(terms)):
+            helper_bodies = []
+            for index_1 in range(len(terms)):
+                for index_2 in range(index_1 + 1, len(terms)):
 
-                helper_body = "0 != "
+                    helper_body = "0 != "
 
-                term_length = min(len(terms[index_1]), len(terms[index_2])) 
+                    if len(terms[index_1]) != len(terms[index_2]):
+                        continue
 
-                term_combinations = [] 
-                for term_index in range(term_length):
-                    first_term = terms[index_1][term_index]
-                    second_term = terms[index_2][term_index]
 
-                    term_combinations.append(f"({first_term} ^ {second_term})")
 
-                helper_body = f"0 != {'?'.join(term_combinations)}"
-                helper_bodies.append(helper_body)
+                    term_length = min(len(terms[index_1]), len(terms[index_2])) 
 
-        return (bodies, helper_bodies)
+                    term_combinations = [] 
+                    for term_index in range(term_length):
+                        first_term = terms[index_1][term_index]
+                        second_term = terms[index_2][term_index]
 
+                        if self.check_string_is_int(first_term) == False and self.check_string_is_int(second_term) == False: 
+                            term_combinations.append(f"({first_term} ^ {second_term})")
+
+                    helper_body = f"0 != {'?'.join(term_combinations)}"
+                    helper_bodies.append(helper_body)
+
+            if len(combination_variables) == 0:
+                rule_head_ending = "(1)"
+            else:
+                rule_head_ending = f"({','.join(combination_variables)})"
+
+            rule_head = f"{rule_head_name}_{combination_index}{rule_head_ending}"
+   
+            rules_head_strings.append(rule_head) 
+            rules_strings.append(f"{rule_head} :- {','.join(bodies + helper_bodies)}.")
+            # END OF FOR LOOP
+            # -----------------
+
+        count_name_ending = ""
+        if len(variable_dependencies) == 0:
+            count_name_ending += "(1)"
+        else:
+            count_name_ending += f"({','.join(variable_dependencies)})"
+
+        spawner_functions = []
+        for variable in variable_dependencies:
+            if variable in self.cur_variable_dependencies:
+                cur_spawner_functions = self.cur_variable_dependencies[variable]
+                for function in cur_spawner_functions:
+                    spawner_functions.append(str(function))
+
+        negated_head_strings = []
+        for head_string in rules_head_strings:
+            negated_head_strings.append(f"not {head_string}")
+
+        helper_rule = f"not_{rule_head_name}{count_name_ending} :- {','.join(spawner_functions + negated_head_strings)}."
+
+        rules_strings.append(helper_rule)
+
+        return (rules_strings)
 
 
     def _add_sum_aggregate_rules(self, aggregate_index):
@@ -868,6 +942,13 @@ class AggregateTransformer(Transformer):
 
         return node
 
+    def check_string_is_int(self, string):
+        try:
+            a = int(string, 10)
+            return True
+        except ValueError:
+            return False
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
     parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
@@ -902,3 +983,6 @@ if __name__ == "__main__":
 
     handler = AggregateHandler()
     handler.start(total_contents)
+
+
+
