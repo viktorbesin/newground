@@ -1,1 +1,1 @@
-q(X) :- p(X), 2 <= #max{Y : a(X,Y)}.
+q(X) :- p(X), 2 <= #min{Y : a(X,Y)}.
