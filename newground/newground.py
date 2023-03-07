@@ -40,7 +40,7 @@ class Newground:
         print(program_string)
         #print("<<<<>>>>")
         #print("<<<<>>>>")
-        quit()
+        #quit()
 
         combined_inputs = program_string
 

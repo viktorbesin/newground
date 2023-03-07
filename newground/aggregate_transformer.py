@@ -129,9 +129,9 @@ class AggregateTransformer(Transformer):
 
                 self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
             elif str_type == "min":
-                remaining_body += self._add_min_aggregate_rules(aggregate_index)
+                remaining_body += self._add_min_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
             elif str_type == "max":
-                remaining_body += self._add_max_aggregate_rules(aggregate_index)
+                remaining_body += self._add_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
             else: 
                 assert(False) # Not Implemented
         elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and (str_type == "count" or str_type == "max" or str_type == "min"):
@@ -156,7 +156,7 @@ class AggregateTransformer(Transformer):
 
                 self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
             elif str_type == "min":
-                remaining_body += self._add_min_aggregate_rules(aggregate_index)
+                remaining_body += self._add_min_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
             elif str_type == "max":
                 remaining_body += self._add_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
 
@@ -229,7 +229,7 @@ class AggregateTransformer(Transformer):
 
         return remaining_body
 
-    def _add_min_aggregate_rules(self, aggregate_index):
+    def _add_min_aggregate_rules(self, aggregate_index, variable_dependencies):
         aggregate = self.cur_aggregates[aggregate_index]
         elements = aggregate["elements"]
 
@@ -237,84 +237,287 @@ class AggregateTransformer(Transformer):
         str_id = aggregate["id"] 
 
         remaining_body = []
+        left_head_names = []
+        right_head_names = []
 
         element_predicate_names = []
 
-        if self.aggregate_mode == AggregateMode.REWRITING:
-            for element_index in range(len(elements)):
-                element = aggregate["elements"][element_index]
+        for element_index in range(len(elements)):
+
+            element = elements[element_index]
+
+            element_dependent_variables = []
+
+            for variable in element["condition_variables"]:
+                if variable in variable_dependencies:
+                    element_dependent_variables.append(variable)
+
+            terms = element["terms"]
+
+            if self.aggregate_mode == AggregateMode.REWRITING:
+
                 element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
-                
+
+                terms_string = f"{','.join(terms + element_dependent_variables)}"
+
+                element_body = f"{element_predicate_name}({terms_string})"
                 body_string = f"{element_body} :- {','.join(element['condition'])}."
+
                 self.new_prg.append(body_string)
+
                 element_predicate_names.append(element_predicate_name)
 
-        self.new_prg.append(f"#program {str_type}.")
+            self.new_prg.append(f"#program {str_type}.")
 
-        if aggregate["left_guard"]:
-            left_guard = aggregate["left_guard"]
-
-            left_name = f"{str_type}_ag{str_id}_left(1)"
-
-            left_guard_term = str(left_guard.term)
-            count = int(left_guard_term) # Assuming constant
-
-            operator = ComparisonTools.getCompOperator(left_guard.comparison)
-            if operator == "<":
-                new_operator = "<="
-                remaining_body.append(f"not {left_name}")
-            elif operator == "<=":
-                new_operator = "<"
-                remaining_body.append(f"not {left_name}")
-            elif operator == ">=":
-                new_operator = "<="
-                remaining_body.append({left_name})
-            elif operator == ">":
-                new_operator = "<"
-                remaining_body.append({left_name})
+            if len(element_dependent_variables) == 0:
+                rule_head_ending = "(1)"
             else:
-                assert(False) # Not implemented
+                rule_head_ending = f"({','.join(element_dependent_variables)})"
 
-            for element_index in range(len(elements)):
-                element = elements[element_index]
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names)
-                rule_string = f"{left_name} :- {','.join(bodies)}."
+
+
+            if aggregate["left_guard"]:
+                left_guard = aggregate["left_guard"]
+
+                left_name = f"{str_type}_ag{str_id}_left"
+                left_head_name = f"{left_name}_{element_index}{rule_head_ending}"
+
+                left_guard_term = str(left_guard.term)
+                count = int(left_guard_term) # Assuming constant
+
+                operator = ComparisonTools.getCompOperator(left_guard.comparison)
+                if operator == "<":
+                    new_operator = "<="
+                elif operator == "<=":
+                    new_operator = "<"
+                else:
+                    assert(False) # Not implemented
+
+
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names, element_dependent_variables)
+
+
+                rule_string = f"{left_head_name} :- {','.join(bodies)}."
+
+                left_head_names.append(left_head_name)
+
                 self.new_prg.append(rule_string)
  
-        if aggregate["right_guard"]:
-            right_guard = aggregate["right_guard"]
+            if aggregate["right_guard"]:
+                right_guard = aggregate["right_guard"]
 
-            right_name = f"{str_type}_ag{str_id}_right(1)"
+                right_name = f"{str_type}_ag{str_id}_right"
+                right_head_name = f"{right_name}_{element_index}{rule_head_ending}"
 
-            right_guard_term = str(right_guard.term)
-            count = int(right_guard_term) # Assuming constant
+                right_guard_term = str(right_guard.term)
+                count = int(right_guard_term) # Assuming constant
 
-            operator = ComparisonTools.getCompOperator(right_guard.comparison)
-            if operator == "<":
-                new_operator = "<"
-                remaining_body.append(right_name)
-            elif operator == "<=":
-                new_operator = "<="
-                remaining_body.append(right_name)
-            else:
-                assert(False) # Not implemented
+                operator = ComparisonTools.getCompOperator(right_guard.comparison)
 
-            for element_index in range(len(elements)):
-                element = elements[element_index]
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term)
-                rule_string = f"{right_name} :- {','.join(bodies)}."
+                if operator == "<":
+                    new_operator = "<"
+                elif operator == "<=":
+                    new_operator = "<="
+                else:
+                    assert(False) # Not implemented
+
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term, element_predicate_names, element_dependent_variables)
+
+
+                rule_string = f"{right_head_name} :- {','.join(bodies)}."
+                
+                right_head_names.append(right_head_name)
+
                 self.new_prg.append(rule_string)
+
+        if len(variable_dependencies) == 0:
+            rule_head_ending = "(1)"
+        else:
+            rule_head_ending = f"({','.join(variable_dependencies)})"
+
+        spawner_functions = []
+        for variable in variable_dependencies:
+            if variable in self.cur_variable_dependencies:
+                cur_spawner_functions = self.cur_variable_dependencies[variable]
+                for function in cur_spawner_functions:
+                    spawner_functions.append(str(function))
+
+        if len(left_head_names) > 1:
+            left_intermediate_rule = f"not_{left_name}{rule_head_ending}"
+
+            negated_head_strings = []
+            for left_name in left_head_names:
+                negated_head_strings.append(f"not {left_name}")
+
+            helper_rule = f"{left_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
+            self.new_prg.append(helper_rule)
+            remaining_body.append(f"not not {left_intermediate_rule}")
+        elif len(left_head_names) == 1:
+            remaining_body.append(f"not {left_head_names[0]}")
+
+        if len(right_head_names) > 1:
+            right_intermediate_rule = f"not_{right_name}{rule_head_ending}"
+
+            negated_head_strings = []
+            for right_name in right_head_names:
+                negated_head_strings.append(f"not {right_name}")
+
+            helper_rule = f"{right_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
+            self.new_prg.append(helper_rule)
+            remaining_body.append(f"not {right_intermediate_rule}")
+        elif len(right_head_names) == 1:
+            remaining_body.append(f"{right_head_names[0]}")
 
         return remaining_body
 
-    def _add_min_max_aggregate_helper(self, element, element_index, new_operator, guard_term, element_predicate_names):
+
+    def _add_max_aggregate_rules(self, aggregate_index, variable_dependencies):
+        aggregate = self.cur_aggregates[aggregate_index]
+        elements = aggregate["elements"]
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+        remaining_body = []
+        element_predicate_names = []
+
+        left_head_names = []
+        right_head_names = []
+
+        for element_index in range(len(elements)):
+
+            element = elements[element_index]
+            element_dependent_variables = []
+
+            for variable in element["condition_variables"]:
+                if variable in variable_dependencies:
+                    element_dependent_variables.append(variable)
+
+            terms = element["terms"]
+
+            if self.aggregate_mode == AggregateMode.REWRITING:
+
+                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+
+                terms_string = f"{','.join(terms + element_dependent_variables)}"
+
+                element_body = f"{element_predicate_name}({terms_string})"
+                body_string = f"{element_body} :- {','.join(element['condition'])}."
+
+                self.new_prg.append(body_string)
+
+                element_predicate_names.append(element_predicate_name)
+
+            self.new_prg.append(f"#program {str_type}.")
+
+            if len(element_dependent_variables) == 0:
+                rule_head_ending = "(1)"
+            else:
+                rule_head_ending = f"({','.join(element_dependent_variables)})"
+
+            if aggregate["left_guard"]:
+                left_guard = aggregate["left_guard"]
+
+
+                left_name = f"{str_type}_ag{str_id}_left"
+                left_head_name = f"{left_name}_{element_index}{rule_head_ending}"
+
+                left_guard_term = str(left_guard.term)
+                count = int(left_guard_term) # Assuming constant
+
+                operator = ComparisonTools.getCompOperator(left_guard.comparison)
+                if operator == "<":
+                    new_operator = ">"
+                elif operator == "<=":
+                    new_operator = ">="
+                else:
+                    assert(False) # Not implemented
+
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names, element_dependent_variables)
+
+
+                rule_string = f"{left_head_name} :- {','.join(bodies)}."
+
+                left_head_names.append(left_head_name)
+
+                self.new_prg.append(rule_string)
+            
+            if aggregate["right_guard"]:
+                right_guard = aggregate["right_guard"]
+
+                right_name = f"{str_type}_ag{str_id}_right"
+                right_head_name = f"{right_name}_{element_index}{rule_head_ending}"
+
+                right_guard_term = str(right_guard.term)
+                count = int(right_guard_term) # Assuming constant
+
+                operator = ComparisonTools.getCompOperator(right_guard.comparison)
+                if operator == "<":
+                    new_operator = ">="
+                elif operator == "<=":
+                    new_operator = ">"
+                else:
+                    assert(False) # Not implemented
+
+                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term, element_predicate_names, element_dependent_variables)
+
+
+                rule_string = f"{right_head_name} :- {','.join(bodies)}."
+                
+                right_head_names.append(right_head_name)
+
+                self.new_prg.append(rule_string)
+
+
+        if len(variable_dependencies) == 0:
+            rule_head_ending = "(1)"
+        else:
+            rule_head_ending = f"({','.join(variable_dependencies)})"
+
+        spawner_functions = []
+        for variable in variable_dependencies:
+            if variable in self.cur_variable_dependencies:
+                cur_spawner_functions = self.cur_variable_dependencies[variable]
+                for function in cur_spawner_functions:
+                    spawner_functions.append(str(function))
+
+        if len(left_head_names) > 1:
+            left_intermediate_rule = f"not_{left_name}{rule_head_ending}"
+
+            negated_head_strings = []
+            for left_name in left_head_names:
+                negated_head_strings.append(f"not {left_name}")
+
+            helper_rule = f"{left_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
+            self.new_prg.append(helper_rule)
+            remaining_body.append(f"not {left_intermediate_rule}")
+        elif len(left_head_names) == 1:
+            remaining_body.append(f"{left_head_names[0]}")
+
+        if len(right_head_names) > 1:
+            right_intermediate_rule = f"not_{right_name}{rule_head_ending}"
+
+            negated_head_strings = []
+            for right_name in right_head_names:
+                negated_head_strings.append(f"not {right_name}")
+
+            helper_rule = f"{right_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
+            self.new_prg.append(helper_rule)
+            remaining_body.append(f"not not {right_intermediate_rule}")
+        elif len(right_head_names) == 1:
+            remaining_body.append(f"not {right_head_names[0]}")
+
+        return remaining_body
+ 
+    def _add_min_max_aggregate_helper(self, element, element_index, new_operator, guard_term, element_predicate_names, element_dependent_variables):
 
         bodies = []
 
         terms = []
         for term in element["terms"]:
             terms.append(f"{term}_{str(element_index)}")
+
+        terms += element_dependent_variables
 
         if self.aggregate_mode == AggregateMode.REWRITING:
             body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {guard_term}"
@@ -329,7 +532,11 @@ class AggregateTransformer(Transformer):
                     new_arguments = []
                     for argument in condition["arguments"]:
                         if "variable" in argument:
-                            new_arguments.append(f"{argument['variable']}_{element_index}")
+                            variable = argument['variable']
+                            if str(variable) in element_dependent_variables:
+                                new_arguments.append(str(variable))
+                            else:
+                                new_arguments.append(f"{str(variable)}_{element_index}")
                         elif "term" in argument:
                             new_arguments.append(f"{argument['term']}")
                         else:
@@ -348,12 +555,17 @@ class AggregateTransformer(Transformer):
 
                     for argument in ComparisonTools.get_arguments_from_operation(comparison.left):
                         if argument.ast_type == clingo.ast.ASTType.Variable:
-                            variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
+                            if str(argument) in element_dependent_variables:
+                                variable_assignments[str(argument)] = str(argument)
+                            else:
+                                variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
 
                     for argument in ComparisonTools.get_arguments_from_operation(comparison.right):
                         if argument.ast_type == clingo.ast.ASTType.Variable:
-                            variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
-
+                            if str(argument) in element_dependent_variables:
+                                variable_assignments[str(argument)] = str(argument)
+                            else:
+                                variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
 
                     instantiated_left = ComparisonTools.instantiate_operation(comparison.left, variable_assignments)
                     instantiated_right = ComparisonTools.instantiate_operation(comparison.right, variable_assignments)
@@ -368,116 +580,7 @@ class AggregateTransformer(Transformer):
             bodies += new_conditions
 
         return bodies
-            
-
-    def _add_max_aggregate_rules(self, aggregate_index, variable_dependencies):
-        aggregate = self.cur_aggregates[aggregate_index]
-        elements = aggregate["elements"]
-
-        str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
-
-        remaining_body = []
-        element_predicate_names = []
-
-        combination_variables = []
-
-        for element_index in range(len(elements)):
-
-            element = elements[element_index]
-
-            element_dependent_variables = []
-
-
-
-            for variable in element["condition_variables"]:
-                if variable in variable_dependencies:
-                    element_dependent_variables.append(variable)
-                    if variable not in combination_variables:
-                        combination_variables.append(variable)
-
-            new_terms = []
-            for term in element["terms"]:
-                if self.check_string_is_int(str(term)) == True:
-                    new_terms.append(str(term))
-                else:
-                    new_terms.append(f"{str(term)}_{str(element_index)}_{str(index)}")
-
-
-            if self.aggregate_mode == AggregateMode.REWRITING:
-
-                terms.append(new_terms)
-
-                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-
-                terms_string = f"{','.join(new_terms + element_dependent_variables)}"
-
-                element_body = f"{element_predicate_name}({terms_string})") 
-                body_string = f"{element_body} :- {','.join(element['condition'])}."
-
-                self.new_prg.append(body_string)
-                self.element_predicate_names.append(element_predicate_name)
-
-            self.new_prg.append(f"#program {str_type}.")
-
-            if len(element_dependent_variables) == 0:
-                rule_head_ending = "(1)"
-            else:
-                rule_head_ending = f"({','.join(element_dependent_variables)})"
-
-            if aggregate["left_guard"]:
-                left_guard = aggregate["left_guard"]
-
-
-                # TODO HERE
-                left_name = f"{str_type}_ag{str_id}_left"
-
-                left_guard_term = str(left_guard.term)
-                count = int(left_guard_term) # Assuming constant
-
-                operator = ComparisonTools.getCompOperator(left_guard.comparison)
-                if operator == "<":
-                    new_operator = ">"
-                    remaining_body.append(f"{left_name}")
-                elif operator == "<=":
-                    new_operator = ">="
-                    remaining_body.append(f"{left_name}")
-                else:
-                    assert(False) # Not implemented
-
-                #TODO - Modify bodies accordingly that variables are correctly named (the dependent ones)
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names)
-                rule_string = f"{left_name}_{element_index}{rule_head_ending} :- {','.join(bodies)}."
-                self.new_prg.append(rule_string)
-            
-            if aggregate["right_guard"]:
-                right_guard = aggregate["right_guard"]
-
-                right_name = f"{str_type}_ag{str_id}_right"
-
-                right_guard_term = str(right_guard.term)
-                count = int(right_guard_term) # Assuming constant
-
-                operator = ComparisonTools.getCompOperator(right_guard.comparison)
-                if operator == "<":
-                    new_operator = ">="
-                    remaining_body.append(f"not {right_name}")
-                elif operator == "<=":
-                    new_operator = ">"
-                    remaining_body.append(f"not {right_name}")
-                else:
-                    assert(False) # Not implemented
-
-                #TODO - Modify bodies accordingly that variables are correctly named (the dependent ones)
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term)
-                rule_string = f"{right_name}_{element_index}{rule_head_ending} :- {','.join(bodies)}."
-                self.new_prg.append(rule_string)
-
-        #TODO
-        #Add not_left_max(X,H) :- p(X), o(H), not left_max_0(X), not left_max_1(H).
-
-        return remaining_body
-            
+                       
 
     def _add_count_aggregate_rules(self, aggregate_index, variable_dependencies):
 
@@ -929,10 +1032,29 @@ class AggregateTransformer(Transformer):
             condition_strings = []
             for condition in node.condition:
 
-                for argument in condition.atom.symbol.arguments:
-                    if argument.ast_type == clingo.ast.ASTType.Variable:
-                        if str(argument) not in element_dict["condition_variables"]:
-                            element_dict["condition_variables"].append(str(argument))
+                if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
+                    for argument in condition.atom.symbol.arguments:
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            if str(argument) not in element_dict["condition_variables"]:
+                                element_dict["condition_variables"].append(str(argument))
+                elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
+
+                    left_arguments = ComparisonTools.get_arguments_from_operation(condition.atom.left)
+                    for argument in left_arguments:
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            if str(argument) not in element_dict["condition_variables"]:
+                                element_dict["condition_variables"].append(str(argument))
+
+                    right_arguments = ComparisonTools.get_arguments_from_operation(condition.atom.right)
+                    for argument in right_arguments:
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            if str(argument) not in element_dict["condition_variables"]:
+                                element_dict["condition_variables"].append(str(argument))
+
+                else:
+                    print(condition)
+                    print(condition.ast_type)
+                    assert(False)
 
 
                 if self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
