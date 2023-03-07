@@ -163,43 +163,58 @@ class AggregateTransformer(Transformer):
 
         elif self.aggregate_mode == AggregateMode.REPLACE:
 
-            aggregate_helper_name = f"{str_type}_ag{str_id}"
-            remaining_body.append(aggregate_helper_name)
-
             aggregate = self.cur_aggregates[aggregate_index]
             elements = aggregate["elements"]
 
             str_type = aggregate["function"][1]
             str_id = aggregate["id"] 
 
-            #element_predicate_names = []
+            element_dependent_variables_list = []
 
             for element_index in range(len(elements)):
-                element = aggregate["elements"][element_index]
+                element = elements[element_index]
+                element_dependent_variables = []
+
+                for variable in element["condition_variables"]:
+                    if variable in variables_dependencies_aggregate:
+                        element_dependent_variables.append(variable)
+
+                element_dependent_variables_list.append(element_dependent_variables)
+
+                terms = element["terms"]
+
                 element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
-                
+
+                terms_string = f"{','.join(terms + element_dependent_variables)}"
+
+                element_body = f"{element_predicate_name}({terms_string})"
                 body_string = f"{element_body} :- {','.join(element['condition'])}."
+
                 self.new_prg.append(body_string)
-                #element_predicate_names.append(element_predicate_name)
-
-            self.new_prg.append(f"#program {str_type}.")
-
 
             new_elements = []
 
             for element_index in range(len(elements)):
                 element = aggregate["elements"][element_index]
 
+                element_dependent_variables = element_dependent_variables_list[element_index]
+                terms = element["terms"]
+
                 element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-                element_body = f"{element_predicate_name}({','.join(element['terms'])})"
- 
+
+                terms_string = f"{','.join(terms + element_dependent_variables)}"
+
+                element_body = f"{element_predicate_name}({terms_string})"
+
+
+                #element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+                #element_body = f"{element_predicate_name}({','.join(element['terms'])})"
 
                 new_element = f"{','.join(element['terms'])} : {element_body}"
 
                 new_elements.append(new_element)
 
-            new_rule = f"{aggregate_helper_name} :- "
+            new_aggregate = f""
 
             if aggregate["left_guard"]:
                 left_guard = aggregate["left_guard"]
@@ -207,9 +222,9 @@ class AggregateTransformer(Transformer):
 
                 operator = ComparisonTools.getCompOperator(left_guard.comparison)
 
-                new_rule += f"{left_guard_term} {operator} "
+                new_aggregate += f"{left_guard_term} {operator} "
 
-            new_rule += f"#{str_type}{{{';'.join(new_elements)}}}"
+            new_aggregate += f"#{str_type}{{{';'.join(new_elements)}}}"
 
             if aggregate["right_guard"]:
                 right_guard = aggregate["right_guard"]
@@ -217,11 +232,10 @@ class AggregateTransformer(Transformer):
 
                 operator = ComparisonTools.getCompOperator(right_guard.comparison)
 
-                new_rule += f" {operator} {right_guard_term}"
+                new_aggregate += f" {operator} {right_guard_term}"
 
-            new_rule += "."
-
-            self.new_prg.append(new_rule)
+            self.new_prg.append("#program no_rules.")
+            remaining_body.append(new_aggregate)
 
         else:
             print(f"Aggregate mode {self.aggregate_mode} not implemented!")
@@ -969,11 +983,11 @@ class AggregateTransformer(Transformer):
                 aggregate = self.cur_aggregates[aggregate_index]
                 str_type = aggregate["function"][1]
                 remaining_body += self._add_aggregate_helper_rules(aggregate_index)
-                self.new_prg.append(f"#program rules.")
 
             remaining_body_string = ','.join(remaining_body)
             new_rule = f"{head} :- {remaining_body_string}."
             self.new_prg.append(new_rule)
+            self.new_prg.append(f"#program rules.")
 
         self.reset_temporary_variables() # MUST BE LAST
         return node
