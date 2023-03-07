@@ -129,9 +129,10 @@ class AggregateTransformer(Transformer):
 
                 self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
             elif str_type == "min":
-                remaining_body += self._add_min_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
+                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._min_operator_functions, self._min_remaining_body_functions)
             elif str_type == "max":
-                remaining_body += self._add_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
+
+                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._max_operator_functions, self._max_remaining_body_functions)
             else: 
                 assert(False) # Not Implemented
         elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and (str_type == "count" or str_type == "max" or str_type == "min"):
@@ -156,9 +157,9 @@ class AggregateTransformer(Transformer):
 
                 self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
             elif str_type == "min":
-                remaining_body += self._add_min_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
+                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._min_operator_functions, self._min_remaining_body_functions)
             elif str_type == "max":
-                remaining_body += self._add_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate)
+                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._max_operator_functions, self._max_remaining_body_functions)
 
 
         elif self.aggregate_mode == AggregateMode.REPLACE:
@@ -243,149 +244,89 @@ class AggregateTransformer(Transformer):
 
         return remaining_body
 
-    def _add_min_aggregate_rules(self, aggregate_index, variable_dependencies):
-        aggregate = self.cur_aggregates[aggregate_index]
-        elements = aggregate["elements"]
+    #--------------------------------------------------------------------------------------------------------
+    #------------------------------------ MIN-MAX-PART ------------------------------------------------------
+    #--------------------------------------------------------------------------------------------------------
 
-        str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
-
-        remaining_body = []
-        left_head_names = []
-        right_head_names = []
-
-        element_predicate_names = []
-
-        for element_index in range(len(elements)):
-
-            element = elements[element_index]
-
-            element_dependent_variables = []
-
-            for variable in element["condition_variables"]:
-                if variable in variable_dependencies:
-                    element_dependent_variables.append(variable)
-
-            terms = element["terms"]
-
-            if self.aggregate_mode == AggregateMode.REWRITING:
-
-                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-
-                terms_string = f"{','.join(terms + element_dependent_variables)}"
-
-                element_body = f"{element_predicate_name}({terms_string})"
-                body_string = f"{element_body} :- {','.join(element['condition'])}."
-
-                self.new_prg.append(body_string)
-
-                element_predicate_names.append(element_predicate_name)
-
-            self.new_prg.append(f"#program {str_type}.")
-
-            if len(element_dependent_variables) == 0:
-                rule_head_ending = "(1)"
+    def _max_operator_functions(self, operator_side, operator):
+        if operator_side == "left":
+            if operator == "<":
+                new_operator = ">"
+            elif operator == "<=":
+                new_operator = ">="
             else:
-                rule_head_ending = f"({','.join(element_dependent_variables)})"
-
-
-
-            if aggregate["left_guard"]:
-                left_guard = aggregate["left_guard"]
-
-                left_name = f"{str_type}_ag{str_id}_left"
-                left_head_name = f"{left_name}_{element_index}{rule_head_ending}"
-
-                left_guard_term = str(left_guard.term)
-                count = int(left_guard_term) # Assuming constant
-
-                operator = ComparisonTools.getCompOperator(left_guard.comparison)
-                if operator == "<":
-                    new_operator = "<="
-                elif operator == "<=":
-                    new_operator = "<"
-                else:
-                    assert(False) # Not implemented
-
-
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names, element_dependent_variables)
-
-
-                rule_string = f"{left_head_name} :- {','.join(bodies)}."
-
-                left_head_names.append(left_head_name)
-
-                self.new_prg.append(rule_string)
- 
-            if aggregate["right_guard"]:
-                right_guard = aggregate["right_guard"]
-
-                right_name = f"{str_type}_ag{str_id}_right"
-                right_head_name = f"{right_name}_{element_index}{rule_head_ending}"
-
-                right_guard_term = str(right_guard.term)
-                count = int(right_guard_term) # Assuming constant
-
-                operator = ComparisonTools.getCompOperator(right_guard.comparison)
-
-                if operator == "<":
-                    new_operator = "<"
-                elif operator == "<=":
-                    new_operator = "<="
-                else:
-                    assert(False) # Not implemented
-
-                bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term, element_predicate_names, element_dependent_variables)
-
-
-                rule_string = f"{right_head_name} :- {','.join(bodies)}."
-                
-                right_head_names.append(right_head_name)
-
-                self.new_prg.append(rule_string)
-
-        if len(variable_dependencies) == 0:
-            rule_head_ending = "(1)"
+                assert(False) # Not implemented
+        elif operator_side == "right":
+            if operator == "<":
+                new_operator = ">="
+            elif operator == "<=":
+                new_operator = ">"
+            else:
+                assert(False) # Not implemented
         else:
-            rule_head_ending = f"({','.join(variable_dependencies)})"
+            assert(False) 
 
-        spawner_functions = []
-        for variable in variable_dependencies:
-            if variable in self.cur_variable_dependencies:
-                cur_spawner_functions = self.cur_variable_dependencies[variable]
-                for function in cur_spawner_functions:
-                    spawner_functions.append(str(function))
+        return new_operator
 
-        if len(left_head_names) > 1:
-            left_intermediate_rule = f"not_{left_name}{rule_head_ending}"
+    def _max_remaining_body_functions(self, operator_side, head_count, name):
+        if operator_side == "left":
+            if head_count > 1:
+                string =  f"not {name}"
+            elif head_count == 1:
+                string = f"{name}"
+            else:
+                assert(False)
+        elif operator_side == "right":
+            if head_count > 1:
+                string = f"not not {name}"
+            elif head_count == 1:
+                string = f"not {name}"
+        else:
+            assert(False)
 
-            negated_head_strings = []
-            for left_name in left_head_names:
-                negated_head_strings.append(f"not {left_name}")
+        return string
 
-            helper_rule = f"{left_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
-            self.new_prg.append(helper_rule)
-            remaining_body.append(f"not not {left_intermediate_rule}")
-        elif len(left_head_names) == 1:
-            remaining_body.append(f"not {left_head_names[0]}")
+    def _min_operator_functions(self, operator_side, operator):
+        if operator_side == "left":
+            if operator == "<":
+                new_operator = "<="
+            elif operator == "<=":
+                new_operator = "<"
+            else:
+                assert(False) # Not implemented
+        elif operator_side == "right":
+            if operator == "<":
+                new_operator = "<"
+            elif operator == "<=":
+                new_operator = "<="
+            else:
+                assert(False) # Not implemented
+        else:
+            assert(False) 
 
-        if len(right_head_names) > 1:
-            right_intermediate_rule = f"not_{right_name}{rule_head_ending}"
+        return new_operator
 
-            negated_head_strings = []
-            for right_name in right_head_names:
-                negated_head_strings.append(f"not {right_name}")
+    def _min_remaining_body_functions(self, operator_side, head_count, name):
+        if operator_side == "left":
+            if head_count > 1:
+                string =  f"not not {name}"
+            elif head_count == 1:
+                string = f"not {name}"
+            else:
+                assert(False)
+        elif operator_side == "right":
+            if head_count > 1:
+                string = f"not {name}"
+            elif head_count == 1:
+                string = f"{name}"
+        else:
+            assert(False)
 
-            helper_rule = f"{right_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
-            self.new_prg.append(helper_rule)
-            remaining_body.append(f"not {right_intermediate_rule}")
-        elif len(right_head_names) == 1:
-            remaining_body.append(f"{right_head_names[0]}")
-
-        return remaining_body
+        return string
 
 
-    def _add_max_aggregate_rules(self, aggregate_index, variable_dependencies):
+
+    def _add_min_max_aggregate_rules(self, aggregate_index, variable_dependencies, new_operator_functions, remaining_body_functions):
         aggregate = self.cur_aggregates[aggregate_index]
         elements = aggregate["elements"]
 
@@ -440,12 +381,8 @@ class AggregateTransformer(Transformer):
                 count = int(left_guard_term) # Assuming constant
 
                 operator = ComparisonTools.getCompOperator(left_guard.comparison)
-                if operator == "<":
-                    new_operator = ">"
-                elif operator == "<=":
-                    new_operator = ">="
-                else:
-                    assert(False) # Not implemented
+
+                new_operator = new_operator_functions("left", operator)
 
                 bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, left_guard_term, element_predicate_names, element_dependent_variables)
 
@@ -466,12 +403,8 @@ class AggregateTransformer(Transformer):
                 count = int(right_guard_term) # Assuming constant
 
                 operator = ComparisonTools.getCompOperator(right_guard.comparison)
-                if operator == "<":
-                    new_operator = ">="
-                elif operator == "<=":
-                    new_operator = ">"
-                else:
-                    assert(False) # Not implemented
+
+                new_operator = new_operator_functions("right", operator)
 
                 bodies = self._add_min_max_aggregate_helper(element, element_index, new_operator, right_guard_term, element_predicate_names, element_dependent_variables)
 
@@ -504,9 +437,9 @@ class AggregateTransformer(Transformer):
 
             helper_rule = f"{left_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
             self.new_prg.append(helper_rule)
-            remaining_body.append(f"not {left_intermediate_rule}")
+            remaining_body.append(remaining_body_functions("left",len(left_head_names),left_intermediate_rule))
         elif len(left_head_names) == 1:
-            remaining_body.append(f"{left_head_names[0]}")
+            remaining_body.append(remaining_body_functions("left",len(left_head_names),left_head_names[0]))
 
         if len(right_head_names) > 1:
             right_intermediate_rule = f"not_{right_name}{rule_head_ending}"
@@ -517,9 +450,10 @@ class AggregateTransformer(Transformer):
 
             helper_rule = f"{right_intermediate_rule} :- {','.join(spawner_functions + negated_head_strings)}."
             self.new_prg.append(helper_rule)
-            remaining_body.append(f"not not {right_intermediate_rule}")
+
+            remaining_body.append(remaining_body_functions("right",len(left_head_names),right_intermediate_rule))
         elif len(right_head_names) == 1:
-            remaining_body.append(f"not {right_head_names[0]}")
+            remaining_body.append(remaining_body_functions("right",len(left_head_names),right_head_names[0]))
 
         return remaining_body
  
@@ -594,7 +528,11 @@ class AggregateTransformer(Transformer):
             bodies += new_conditions
 
         return bodies
-                       
+ 
+    #--------------------------------------------------------------------------------------------------------
+    #------------------------------------ COUNT-PART --------------------------------------------------------
+    #--------------------------------------------------------------------------------------------------------
+                      
 
     def _add_count_aggregate_rules(self, aggregate_index, variable_dependencies):
 
@@ -839,6 +777,10 @@ class AggregateTransformer(Transformer):
         return (rules_strings)
 
 
+    #--------------------------------------------------------------------------------------------------------
+    #------------------------------------ SUM-PART ----------------------------------------------------------
+    #--------------------------------------------------------------------------------------------------------
+                      
     def _add_sum_aggregate_rules(self, aggregate_index):
         """
             Adds the necessary rules for the recursive sum aggregate.
@@ -947,6 +889,10 @@ class AggregateTransformer(Transformer):
             rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1_def_terms}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1_def_terms})."
             self.new_prg.append(rule_string)
 
+    #--------------------------------------------------------------------------------------------------------
+    #------------------------------------ TRANSFORMER-PART --------------------------------------------------
+    #--------------------------------------------------------------------------------------------------------
+                      
 
     def visit_Rule(self, node):
 
