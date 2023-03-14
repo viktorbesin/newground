@@ -135,14 +135,30 @@ class Benchmark:
             instance_path = os.path.join(input_path, instance_file)
             instance_file_contents = open(instance_path, 'r').read()
 
-            clingo_timeout_occured, clingo_duration = self.clingo_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            #clingo_timeout_occured, clingo_duration = self.clingo_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            dlv_timeout_occured, dlv_duration = self.dlv_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            #newground_timeout_occured, newground_duration = self.newground_benchmark(instance_file_contents, encoding_file_contents, timeout)
 
-            newground_timeout_occured, newground_duration = self.newground_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            clingo_timeout_occured = False
+            clingo_duration = 0
+
+            newground_timeout_occured = False
+            newground_duration = 0
+
+
+
 
             if clingo_timeout_occured:
                 print(f"[INFO] - Clingo timed out ({clingo_duration})!")
             else:
                 print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
+
+            if dlv_timeout_occured:
+                print(f"[INFO] - Dlv timed out ({dlv_duration})!")
+            else:
+                print(f"[INFO] - Dlv needed {dlv_duration} seconds!")
+
+
 
             if newground_timeout_occured:
                 print(f"[INFO] - Newground timed out ({newground_duration})!")
@@ -158,6 +174,29 @@ class Benchmark:
 
             output_file.write(write_string)
 
+    def dlv_benchmark(self, instance_file_contents, encoding_file_contents, timeout = None):
+
+        clingo_out_of_time = False
+        temp_file = tempfile.NamedTemporaryFile()
+    
+        with open(temp_file.name, "w") as f:
+            f.write(instance_file_contents + encoding_file_contents)
+
+        clingo_start_time = time.time()   
+
+
+        if timeout == None:
+            subprocess.run(["./dlv.bin",f"{temp_file.name}"])       
+        else:
+            try:
+                subprocess.run(["./dlv.bin",f"{temp_file.name}"], timeout = timeout)       
+            except Exception as ex:
+                clingo_out_of_time = True
+
+        clingo_end_time = time.time()   
+        clingo_duration = clingo_end_time - clingo_start_time
+
+        return (clingo_out_of_time, clingo_duration)
             
     def clingo_benchmark(self, instance_file_contents, encoding_file_contents, timeout = None):
 

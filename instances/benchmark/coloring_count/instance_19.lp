@@ -190,7 +190,22 @@ edge(18,13).
 edge(18,16).
 edge(18,17).
 
-1 <= {g(X); b(X); r(X)} <= 1 :- vertex(X).
+x(X) :- vertex(X).
+g(X) :- x(X), not g_1(X).
+g_1(X) :- vertex(X), not g(X).
+
+r(X) :- x(X), not r_1(X).
+r_1(X) :- vertex(X), not r(X).
+
+b(X) :- x(X), not b_1(X).
+b_1(X) :- vertex(X), not b(X).
+
+:- g(X), r(X).
+:- g(X), b(X).
+:- r(X), b(X).
+:- vertex(X), not g(X), not r(X), not b(X).
+
+
 
 violation(X,Y) :- edge(X,Y), g(X), g(Y).
 violation(X,Y) :- edge(X,Y), b(X), b(Y).
