@@ -1,4 +1,4 @@
 *.swp
 
-dlv.x86-64-linux-elf-unixodbc.bin
+dlv*
 __pycache__
