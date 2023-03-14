@@ -1,0 +1,12 @@
+instance,clingo-duration,clingo-timeout-occured,dlv-duration,dlv-timeout-occured,newground-duration,newground-timeout-occured
+instance_05.lp,0,False,0.009835004806518555,False,0,False
+instance_10.lp,0,False,0.16658425331115723,False,0,False
+instance_12.lp,0,False,0.5182325839996338,False,0,False
+instance_15.lp,0,False,1.419800043106079,False,0,False
+instance_17.lp,0,False,6.381687164306641,False,0,False
+instance_19.lp,0,False,9.590895175933838,False,0,False
+instance_21.lp,0,False,14.30258560180664,False,0,False
+instance_23.lp,0,False,33.09960079193115,False,0,False
+instance_25.lp,0,False,54.4011652469635,False,0,False
+instance_27.lp,0,False,73.54873514175415,False,0,False
+instance_29.lp,0,False,129.1373152732849,False,0,False
