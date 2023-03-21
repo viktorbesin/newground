@@ -4,6 +4,7 @@ import argparse
 
 from newground.newground import Newground
 from newground.default_output_printer import DefaultOutputPrinter
+from newground.aggregate_transformer import AggregateMode
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
@@ -12,10 +13,10 @@ if __name__ == "__main__":
                         help='Additionally ground guesses which results in (fully) grounded output. ')
     parser.add_argument('--ground', action='store_true',
                         help='Output program fully grounded. ')
-    parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
+    parser.add_argument('--aggregate-strategy', default='replace', choices=['replace','rewrite','rewrite-no-body'])
+    parser.add_argument('files', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
-    # no output from clingo itself
-    #sys.argv.append("--outf=3")
+
     no_show = False
     ground_guess = False
     ground = False
@@ -30,14 +31,19 @@ if __name__ == "__main__":
         ground_guess = True
         ground = True
 
+    aggregate_strategy = None
+    if args.aggregate_strategy == 'replace':
+        aggregate_strategy = AggregateMode.REPLACE
+    elif args.aggregate_strategy == 'rewrite':
+        aggregate_strategy = AggregateMode.REWRITING
+    elif args.aggregate_strategy == 'rewrite-no-body':
+        aggregate_strategy = AggregateMode.REWRITING_NO_BODY
 
     contents = ""
-    for f in sys.argv[1:]:
-        contents += open(f, "r").read()
+    for f in args.files:
+        contents += f.read()
 
-    #clingo.clingo_main(ClingoApp(sys.argv[0], no_show, ground_guess, ground), sys.argv[1:])
-
-    newground = Newground(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter())
+    newground = Newground(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter(), aggregate_strategy = aggregate_strategy)
     newground.start(contents)
 
 

@@ -12,16 +12,14 @@ from .main_transformer import MainTransformer
 
 class Newground:
 
-    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None):
+    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_strategy = AggregateMode.REPLACE):
         self.no_show = no_show
         self.ground_guess = ground_guess
         self.ground = ground
         self.output_printer = output_printer
 
-        self.aggregate_mode = AggregateMode.REWRITING
-        #self.aggregate_mode = AggregateMode.REPLACE
-        #self.aggregate_mode = AggregateMode.REWRITING_NO_BODY 
-        
+        self.aggregate_mode = aggregate_strategy
+
         self.rules = False
 
     def start(self, contents):
@@ -37,7 +35,7 @@ class Newground:
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
 
-        print(program_string)
+        #print(program_string)
         #print("<<<<>>>>")
         #print("<<<<>>>>")
         #quit()

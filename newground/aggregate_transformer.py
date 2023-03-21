@@ -207,10 +207,6 @@ class AggregateTransformer(Transformer):
 
                 element_body = f"{element_predicate_name}({terms_string})"
 
-
-                #element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-                #element_body = f"{element_predicate_name}({','.join(element['terms'])})"
-
                 new_element = f"{','.join(element['terms'])} : {element_body}"
 
                 new_elements.append(new_element)
@@ -694,7 +690,7 @@ class AggregateTransformer(Transformer):
                                     else:
                                         new_args.append(f"{str(argument)}_{str(element_index)}_{str(index)}")
 
-                                    #variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
+                                    variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
 
                             for argument in ComparisonTools.get_arguments_from_operation(comparison.right):
                                 if argument.ast_type == clingo.ast.ASTType.Variable:
@@ -703,7 +699,7 @@ class AggregateTransformer(Transformer):
                                     else:
                                         new_args.append(f"{str(argument)}_{str(element_index)}_{str(index)}")
 
-                                    #variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
+                                    variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
 
 
                             instantiated_left = ComparisonTools.instantiate_operation(comparison.left, variable_assignments)
