@@ -13,6 +13,7 @@ import clingo
 
 from newground.newground import Newground
 from newground.default_output_printer import DefaultOutputPrinter
+from newground.aggregate_transformer import AggregateMode
 
 def handler(signum, frame):
     print("Benchmark timeout")
@@ -38,10 +39,11 @@ class CustomOutputPrinter(DefaultOutputPrinter):
 
 class NewgroundHelper:
 
-    def __init__(self, instance_file_contents, encoding_file_contents, timeout = None):
+    def __init__(self, instance_file_contents, encoding_file_contents, timeout = None, aggregate_strategy = AggregateMode.REPLACE):
         self.instance_file_contents = instance_file_contents
         self.encoding_file_contents = encoding_file_contents
         self.timeout = timeout
+        self.aggregate_strategy = aggregate_strategy
 
     def newground_helper_start(self):
 
@@ -50,7 +52,7 @@ class NewgroundHelper:
         custom_printer = CustomOutputPrinter() 
         total_content = f"{self.instance_file_contents}\n#program rules.\n{self.encoding_file_contents}"
         
-        newground = Newground(no_show = False, ground_guess = False, ground = False, output_printer = custom_printer)
+        newground = Newground(no_show = False, ground_guess = False, ground = False, output_printer = custom_printer, aggregate_strategy = self.aggregate_strategy)
         newground.start(total_content)
 
         newground_end_time = time.time()   
@@ -111,7 +113,7 @@ class Benchmark:
         input_path = args.input_folder
         output_filename = args.output_file
 
-        instance_pattern = re.compile("^instance_[0-9][0-9]\.lp$")
+        instance_pattern = re.compile("^instance_[0-9][0-9][0-9]\.lp$")
 
         instance_files = []
 
@@ -126,6 +128,9 @@ class Benchmark:
         encoding_path = os.path.join(input_path, "encoding.lp")
         encoding_file_contents = open(encoding_path, 'r').read()
 
+        additional_instance_path = os.path.join(input_path, "additional_instance.lp")
+        additional_instance_file_contents = open(additional_instance_path, 'r').read()
+
         output_data = []
 
         for instance_file in instance_files:
@@ -135,22 +140,24 @@ class Benchmark:
             instance_path = os.path.join(input_path, instance_file)
             instance_file_contents = open(instance_path, 'r').read()
 
+            instance_file_contents += additional_instance_file_contents
+
             clingo_timeout_occured, clingo_duration = self.clingo_benchmark(instance_file_contents, encoding_file_contents, timeout)
-            dlv_timeout_occured, dlv_duration = self.dlv_benchmark(instance_file_contents, encoding_file_contents, timeout)
-            idlv_timeout_occured, idlv_duration = self.idlv_benchmark(instance_file_contents, encoding_file_contents, timeout)
-            newground_timeout_occured, newground_duration = self.newground_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            #dlv_timeout_occured, dlv_duration = self.dlv_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            #idlv_timeout_occured, idlv_duration = self.idlv_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            #newground_timeout_occured, newground_duration = self.newground_benchmark(instance_file_contents, encoding_file_contents, timeout)
 
             #clingo_timeout_occured = False
             #clingo_duration = 0
 
-            #dlv_timeout_occured = False
-            #dlv_duration = 0
+            dlv_timeout_occured = False
+            dlv_duration = 0
 
-            #idlv_timeout_occured = False
-            #idlv_duration = 0
+            idlv_timeout_occured = False
+            idlv_duration = 0
 
-            #newground_timeout_occured = False
-            #newground_duration = 0
+            newground_timeout_occured = False
+            newground_duration = 0
 
 
             if clingo_timeout_occured:
@@ -275,7 +282,7 @@ class Benchmark:
 
     def newground_benchmark(self, instance_file_contents, encoding_file_contents, timeout = None):
 
-        newground_helper = NewgroundHelper(instance_file_contents, encoding_file_contents)
+        newground_helper = NewgroundHelper(instance_file_contents, encoding_file_contents, aggregate_strategy = AggregateMode.REWRITING_NO_BODY)
         newground_out_of_time = False
 
         start_time = time.time()
