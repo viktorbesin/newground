@@ -1,23 +1,31 @@
 import sys
 import random
 
-mx = int(sys.argv[1])
-prob = int(sys.argv[2])
+def gen_graph(mx, prob):
+    assert(prob >= 0)
+    assert(prob <= 100)
 
-assert(prob >= 0)
-assert(prob <= 100)
+    vertices = []
+    edges = []
 
-vertices = []
-edges = []
+    for i in range(1,mx):
+        vertices.append(f"vertex({i}).")
+        for j in range(1,mx):
+            if random.randint(0,100) <= prob:
+                edges.append("edge({0},{1}).".format(i,j))
 
-for i in range(1,mx):
-    vertices.append(f"vertex({i}).")
-    for j in range(1,mx):
-        if random.randint(0,100) <= prob:
-            edges.append("edge({0},{1}).".format(i,j))
+    return (vertices, edges)
 
-for vertex in vertices:
-    print(vertex)
+if __name__ == '__main__':
 
-for edge in edges:
-    print(edge)
+    mx = int(sys.argv[1])
+    prob = int(sys.argv[2])
+
+    vertices, edges = gen_graph(mx, prob)
+
+    for vertex in vertices:
+        print(vertex)
+
+    for edge in edges:
+        print(edge)
+
