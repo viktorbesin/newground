@@ -1,87 +1,15 @@
 import os
 import sys
-import argparse
+
 import time
+import re
+
 import subprocess
 
-import re
-import multiprocessing
-
 import tempfile
-
-import clingo
-
-from newground.newground import Newground
-from newground.default_output_printer import DefaultOutputPrinter
-from newground.aggregate_transformer import AggregateMode
-
-def handler(signum, frame):
-    print("Benchmark timeout")
-    raise Exception("end of time")
-
-class CustomOutputPrinter(DefaultOutputPrinter):
-
-    def __init__(self):
-        self.current_rule_hashes = {}
-        self.string = ""
-
-    def custom_print(self, string):
-        string_hash = hash(string)
-
-        if string_hash in self.current_rule_hashes:
-            return
-        else:
-            self.current_rule_hashes[string_hash] = string_hash
-            self.string = self.string + str(string) + '\n'
-
-    def get_string(self):
-        return self.string
-
-class NewgroundHelper:
-
-    def __init__(self, instance_file_contents, encoding_file_contents, timeout = None, aggregate_strategy = AggregateMode.REPLACE):
-        self.instance_file_contents = instance_file_contents
-        self.encoding_file_contents = encoding_file_contents
-        self.timeout = timeout
-        self.aggregate_strategy = aggregate_strategy
-
-    def newground_helper_start(self):
-
-        newground_start_time = time.time()   
-
-        custom_printer = CustomOutputPrinter() 
-        total_content = f"{self.instance_file_contents}\n#program rules.\n{self.encoding_file_contents}"
-        
-        newground = Newground(no_show = False, ground_guess = False, ground = False, output_printer = custom_printer, aggregate_strategy = self.aggregate_strategy)
-        newground.start(total_content)
-
-        newground_end_time = time.time()   
-        newground_duration_0 = newground_end_time - newground_start_time
-
-        output_string = custom_printer.get_string()
-
-        temp_file = tempfile.NamedTemporaryFile()
-    
-        with open(temp_file.name, "w") as f:
-            f.write(output_string)
-
-        newground_start_time = time.time()   
-
-        subprocess.run(["clingo",f"{temp_file.name}"])       
-
-        newground_end_time = time.time()   
-        newground_duration_1 = newground_end_time - newground_start_time
-
-        newground_total_duration = newground_duration_0 + newground_duration_1
+import argparse
 
 
-
-class Context:
-    def id(self, x):
-        return x
-
-    def seq(self, x, y):
-        return [x, y]
 
 class Benchmark:
 
@@ -421,7 +349,7 @@ if __name__ == "__main__":
     checker = Benchmark()
 
     timeout = 1800
-    checker.parse(timeout)
+    checker.parse(timeout = timeout)
 
 
 
