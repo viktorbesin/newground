@@ -135,9 +135,15 @@ class DomainTransformer(Transformer):
                     comparisons = self.comparisons[str(self.current_rule_position)][str(node)]
 
                     for comparison in comparisons:
-                        if str(node) == str(comparison.left) and str(comparison.right).isdigit() and (comparison.comparison == int(clingo.ast.ComparisonOperator.LessThan) or comparison.comparison == int(clingo.ast.ComparisonOperator.LessEqual)):
-                            new_domain = list(new_domain)
 
+                        if len(comparison.guards) >= 2:
+                            assert(False) # Not implemented (only e.g. A = B implemented, not A = B = C)
+                        left = comparison.term
+                        right = comparison.guards[0].term
+                        comparison_operator = comparison.guards[0].comparison
+
+                        if str(node) == str(left) and str(right).isdigit() and (comparison_operator == int(clingo.ast.ComparisonOperator.LessThan) or comparison_operator == int(clingo.ast.ComparisonOperator.LessEqual)):
+                            new_domain = list(new_domain)
 
                             new_domain_index = 0
 
@@ -147,12 +153,42 @@ class DomainTransformer(Transformer):
    
                                 violates = False
  
-                                if comparison.comparison == int(clingo.ast.ComparisonOperator.LessEqual):
-                                    if int(domain_element) > int(str(comparison.right)):
+                                if comparison_operator == int(clingo.ast.ComparisonOperator.LessEqual):
+                                    if int(domain_element) > int(str(right)):
                                         violates = True
   
-                                if comparison.comparison == int(clingo.ast.ComparisonOperator.LessThan):
-                                    if int(domain_element) >= int(str(comparison.right)):
+                                if comparison_operator == int(clingo.ast.ComparisonOperator.LessThan):
+                                    if int(domain_element) >= int(str(right)):
+                                        violates = True          
+
+                                if violates:
+                                    del new_domain[new_domain_index]
+
+                                    new_domain_index -= 1
+
+                                new_domain_index += 1
+                            
+
+                            new_domain = set(new_domain)
+
+
+                        if str(node) == str(right) and str(left).isdigit() and (comparison_operator == int(clingo.ast.ComparisonOperator.GreaterThan) or comparison_operator == int(clingo.ast.ComparisonOperator.GreaterEqual)):
+                            new_domain = list(new_domain)
+
+                            new_domain_index = 0
+
+                            while new_domain_index < len(new_domain):
+
+                                domain_element = new_domain[new_domain_index]
+   
+                                violates = False
+ 
+                                if comparison_operator == int(clingo.ast.ComparisonOperator.GreaterEqual):
+                                    if int(domain_element) > int(str(left)):
+                                        violates = True
+  
+                                if comparison_operator == int(clingo.ast.ComparisonOperator.GreaterThan):
+                                    if int(domain_element) >= int(str(left)):
                                         violates = True          
 
                                 if violates:

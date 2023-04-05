@@ -257,8 +257,14 @@ class MainTransformer(Transformer):
         # currently implements only terms/variables
         supported_types = [clingo.ast.ASTType.Variable, clingo.ast.ASTType.SymbolicTerm, clingo.ast.ASTType.BinaryOperation, clingo.ast.ASTType.UnaryOperation, clingo.ast.ASTType.Function]
 
-        assert(node.left.ast_type in supported_types)
-        assert (node.right.ast_type in supported_types)
+        if len(node.guards) >= 2:
+            assert(False) # Not implemented
+
+        left = node.term
+        right = node.guards[0].term
+
+        assert(left.ast_type in supported_types)
+        assert (right.ast_type in supported_types)
 
         self.cur_comp.append(node)
 
@@ -431,8 +437,13 @@ class MainTransformer(Transformer):
 
         covered_subsets = {} # reduce SAT rules when compare-operators are pre-checked
         for f in self.cur_comp:
+
+            left = f.term
+            assert(len(f.guards) <= 1)
+            right = f.guards[0].term
+            comparison_operator = f.guards[0].comparison
                             
-            symbolic_arguments = ComparisonTools.get_arguments_from_operation(f.left) + ComparisonTools.get_arguments_from_operation(f.right)
+            symbolic_arguments = ComparisonTools.get_arguments_from_operation(left) + ComparisonTools.get_arguments_from_operation(right)
 
             arguments = []
             for symbolic_argument in symbolic_arguments:
@@ -453,7 +464,7 @@ class MainTransformer(Transformer):
             combinations = [p for p in itertools.product(*dom_list)]
 
             if self.count == True and self.aggregate_mode == AggregateMode.REWRITING: # Special efficiency mode for count aggregate
-                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(f.right)
+                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(right)
 
             for c in combinations:
 
@@ -472,15 +483,15 @@ class MainTransformer(Transformer):
 
                 # This is the most expensive (compuationally) part of the entire program...
                 if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                    left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
-                    right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+                    left_eval = ComparisonTools.evaluate_operation(left, variable_assignments)
+                    right_eval = ComparisonTools.evaluate_operation(right, variable_assignments)
 
                     sint = self.ignore_exception(ValueError)(int)
                     left_eval = sint(left_eval)
                     right_eval = sint(right_eval)
 
                     safe_checks = left_eval != None and right_eval != None
-                    evaluation = safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))
+                    evaluation = safe_checks and not ComparisonTools.compareTerms(comparison_operator, int(left_eval), int(right_eval))
                 else: # Aggregate COUNT Efficiency mode
 
                     evaluation = True
@@ -500,9 +511,9 @@ class MainTransformer(Transformer):
 
                 if not safe_checks or evaluation:
                     if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                        left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                        right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
-                        unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                        left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
+                        right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
+                        unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
                         interpretation = f"{','.join(interpretation_list)}, not {unfound_comparison}"
                     else:
                         interpretation = f"{','.join(interpretation_list)}"
@@ -640,7 +651,11 @@ class MainTransformer(Transformer):
 
         for comp in self.cur_comp:
 
-            unparsed_f_args = ComparisonTools.get_arguments_from_operation(comp.left) + ComparisonTools.get_arguments_from_operation(comp.right)
+            left = comp.term
+            assert(len(comp.guards) <= 1)
+            right = comp.guards[0].term
+
+            unparsed_f_args = ComparisonTools.get_arguments_from_operation(left) + ComparisonTools.get_arguments_from_operation(right)
             f_vars = []
             for unparsed_f_arg in unparsed_f_args:
                 f_arg = str(unparsed_f_arg)
@@ -796,8 +811,12 @@ class MainTransformer(Transformer):
         # for every cmp operator
         for f in self.cur_comp:
 
+            left = f.term
+            assert(len(f.guards) <= 1)
+            right = f.guards[0].term
+            comparison_operator = f.guards[0].comparison
 
-            symbolic_arguments = ComparisonTools.get_arguments_from_operation(f.left) + ComparisonTools.get_arguments_from_operation(f.right)
+            symbolic_arguments = ComparisonTools.get_arguments_from_operation(left) + ComparisonTools.get_arguments_from_operation(right)
 
             arguments = []
             for symbolic_argument in symbolic_arguments:
@@ -819,7 +838,7 @@ class MainTransformer(Transformer):
             combinations = [p for p in itertools.product(*dom_list)]
 
             if self.count == True and self.aggregate_mode == AggregateMode.REWRITING: # Special efficiency mode for count aggregate
-                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(f.right)
+                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(right)
                 if str(head) not in self.unfounded_rules: # Only possible for count special case
                     self.unfounded_rules[str(head)] = {}
 
@@ -864,15 +883,15 @@ class MainTransformer(Transformer):
 
                 # This is the most expensive (compuationally) part of the entire program...
                 if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                    left_eval = ComparisonTools.evaluate_operation(f.left, variable_assignments)
-                    right_eval = ComparisonTools.evaluate_operation(f.right, variable_assignments)
+                    left_eval = ComparisonTools.evaluate_operation(left, variable_assignments)
+                    right_eval = ComparisonTools.evaluate_operation(right, variable_assignments)
 
                     sint = self.ignore_exception(ValueError)(int)
                     left_eval = sint(left_eval)
                     right_eval = sint(right_eval)
 
                     safe_checks = left_eval != None and right_eval != None
-                    evaluation = safe_checks and not ComparisonTools.compareTerms(f.comparison, int(left_eval), int(right_eval))
+                    evaluation = safe_checks and not ComparisonTools.compareTerms(comparison_operator, int(left_eval), int(right_eval))
                 else: # Aggregate COUNT Efficiency mode
 
                     evaluation = True
@@ -903,9 +922,9 @@ class MainTransformer(Transformer):
                 if not safe_checks or evaluation:
 
                     if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                        left = ComparisonTools.instantiate_operation(f.left, variable_assignments)
-                        right = ComparisonTools.instantiate_operation(f.right, variable_assignments)
-                        unfound_comparison = ComparisonTools.comparison_handlings(f.comparison, left, right)
+                        left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
+                        right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
+                        unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
 
                     unfound_body_list = []
 
