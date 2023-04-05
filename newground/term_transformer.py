@@ -178,12 +178,38 @@ class TermTransformer(Transformer):
 
         self.current_comparison = node
 
+        """
+        print(node)
+        print(node.ast_type)
+        print(node.term)
+        print(node.guards)
+        """
+
+        if len(node.guards) >= 2:
+            assert(False) # Not implemented (only e.g. A = B implemented, not A = B = C)
+
+        left = node.term
+
+        guard = node.guards[0]
+
+        comparison = guard.comparison
+        right = guard.term
+
+        if comparison == int(clingo.ast.ComparisonOperator.Equal):
+            if left.ast_type == clingo.ast.ASTType.Variable:
+                self._add_comparison_to_safe_variables(str(left), right)
+
+            if right.ast_type == clingo.ast.ASTType.Variable: 
+                self._add_comparison_to_safe_variables(str(right), left)
+
+        """
         if node.comparison == int(clingo.ast.ComparisonOperator.Equal):
             if node.left.ast_type == clingo.ast.ASTType.Variable:
                 self._add_comparison_to_safe_variables(str(node.left), node.right)
 
             if node.right.ast_type == clingo.ast.ASTType.Variable: 
                 self._add_comparison_to_safe_variables(str(node.right), node.left)
+        """
    
         self.visit_children(node)
 

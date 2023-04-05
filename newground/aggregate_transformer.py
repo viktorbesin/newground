@@ -995,13 +995,20 @@ class AggregateTransformer(Transformer):
                                 element_dict["condition_variables"].append(str(argument))
                 elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
 
-                    left_arguments = ComparisonTools.get_arguments_from_operation(condition.atom.left)
+                    comparison = condition.atom
+
+                    left = comparison.term
+                    assert(len(comparison.guards) <= 1)
+                    right = comparison.guards[0].term
+                    comparison_operator = comparison.guards[0].comparison
+
+                    left_arguments = ComparisonTools.get_arguments_from_operation(left)
                     for argument in left_arguments:
                         if argument.ast_type == clingo.ast.ASTType.Variable:
                             if str(argument) not in element_dict["condition_variables"]:
                                 element_dict["condition_variables"].append(str(argument))
 
-                    right_arguments = ComparisonTools.get_arguments_from_operation(condition.atom.right)
+                    right_arguments = ComparisonTools.get_arguments_from_operation(right)
                     for argument in right_arguments:
                         if argument.ast_type == clingo.ast.ASTType.Variable:
                             if str(argument) not in element_dict["condition_variables"]:
