@@ -497,24 +497,31 @@ class AggregateTransformer(Transformer):
 
                     variable_assignments = {}
 
-                    for argument in ComparisonTools.get_arguments_from_operation(comparison.left):
+                    left = comparison.term
+                    assert(len(comparison.guards) <= 1)
+                    right = comparison.guards[0].term
+                    comparison_operator = comparison.guards[0].comparison
+
+
+
+                    for argument in ComparisonTools.get_arguments_from_operation(left):
                         if argument.ast_type == clingo.ast.ASTType.Variable:
                             if str(argument) in element_dependent_variables:
                                 variable_assignments[str(argument)] = str(argument)
                             else:
                                 variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
 
-                    for argument in ComparisonTools.get_arguments_from_operation(comparison.right):
+                    for argument in ComparisonTools.get_arguments_from_operation(right):
                         if argument.ast_type == clingo.ast.ASTType.Variable:
                             if str(argument) in element_dependent_variables:
                                 variable_assignments[str(argument)] = str(argument)
                             else:
                                 variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}"
 
-                    instantiated_left = ComparisonTools.instantiate_operation(comparison.left, variable_assignments)
-                    instantiated_right = ComparisonTools.instantiate_operation(comparison.right, variable_assignments)
+                    instantiated_left = ComparisonTools.instantiate_operation(left, variable_assignments)
+                    instantiated_right = ComparisonTools.instantiate_operation(right, variable_assignments)
 
-                    new_conditions.append(ComparisonTools.comparison_handlings(comparison.comparison, instantiated_left, instantiated_right))
+                    new_conditions.append(ComparisonTools.comparison_handlings(comparison_operator, instantiated_left, instantiated_right))
 
                 else:
                     assert(False) # Not implemented
@@ -683,7 +690,12 @@ class AggregateTransformer(Transformer):
 
                             variable_assignments = {}
 
-                            for argument in ComparisonTools.get_arguments_from_operation(comparison.left):
+                            left = comparison.term
+                            assert(len(comparison.guards) <= 1)
+                            right = comparison.guards[0].term
+                            comparison_operator = comparison.guards[0].comparison
+
+                            for argument in ComparisonTools.get_arguments_from_operation(left):
                                 if argument.ast_type == clingo.ast.ASTType.Variable:
                                     if str(argument) in element_dependent_variables:
                                         new_args.append(f"{str(argument)}")
@@ -692,7 +704,7 @@ class AggregateTransformer(Transformer):
 
                                     variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
 
-                            for argument in ComparisonTools.get_arguments_from_operation(comparison.right):
+                            for argument in ComparisonTools.get_arguments_from_operation(right):
                                 if argument.ast_type == clingo.ast.ASTType.Variable:
                                     if str(argument) in element_dependent_variables:
                                         new_args.append(f"{str(argument)}")
@@ -702,10 +714,10 @@ class AggregateTransformer(Transformer):
                                     variable_assignments[str(argument)] = f"{str(argument)}_{str(element_index)}_{str(index)}"
 
 
-                            instantiated_left = ComparisonTools.instantiate_operation(comparison.left, variable_assignments)
-                            instantiated_right = ComparisonTools.instantiate_operation(comparison.right, variable_assignments)
+                            instantiated_left = ComparisonTools.instantiate_operation(left, variable_assignments)
+                            instantiated_right = ComparisonTools.instantiate_operation(right, variable_assignments)
 
-                            new_conditions.append(ComparisonTools.comparison_handlings(comparison.comparison, instantiated_left, instantiated_right))
+                            new_conditions.append(ComparisonTools.comparison_handlings(comparison_operator, instantiated_left, instantiated_right))
 
 
                         else:

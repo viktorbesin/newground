@@ -1,3 +1,4 @@
+#!/home/thinklex/programs/python3.11.3/bin/python3
 import os
 import sys
 
@@ -18,7 +19,17 @@ class Benchmark:
         self.newground_output = []
 
         self.clingo_hashes = {}
-        self.newground_hashes = {}
+        self.newground_hashes = {} 
+
+        self.clingo_command = "./clingo"
+        self.gringo_command = "./gringo"
+        self.idlv_command = "./idlv"
+        self.python_command = "./python3"
+
+        # Strategies ->  {replace,rewrite,rewrite-no-body}
+        #self.rewriting_strategy = "--aggregate-strategy=rewrite-no-body"
+        #self.rewriting_strategy = "--aggregate-strategy=rewrite"
+        self.rewriting_strategy = "--aggregate-strategy=replace"
 
     def on_model(self, m, output, hashes):
         symbols = m.symbols(shown=True)
@@ -34,6 +45,7 @@ class Benchmark:
     def parse(self, timeout = None):
         parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
 
+        # If set to false -> Benchmark -> otherwise use mokcup (i.e. skip)
         clingo_mockup = False
         newground_mockup = False
         idlv_mockup = False
@@ -220,10 +232,10 @@ class Benchmark:
         if output != None and idlv_duration < timeout:
 
             if timeout == None:
-                subprocess.run(["clingo","--mode=clasp",f"{temp_file_2.name}"])       
+                subprocess.run([self.clingo_command,"--mode=clasp",f"{temp_file_2.name}"])       
             else:
                 try:
-                    subprocess.run(["clingo","--mode=clasp",f"{temp_file_2.name}"], timeout = (timeout - idlv_duration)) 
+                    subprocess.run([self.clingo_command,"--mode=clasp",f"{temp_file_2.name}"], timeout = (timeout - idlv_duration)) 
                 except Exception as ex:
                     idlv_out_of_time = True
 
@@ -245,11 +257,11 @@ class Benchmark:
 
         output = None
         if timeout == None:
-            output = subprocess.run(["gringo", f"{temp_file.name}"], stdout=temp_file_2)       
+            output = subprocess.run([self.gringo_command, f"{temp_file.name}"], stdout=temp_file_2)       
             
         else:
             try:
-                output = subprocess.run(["gringo", f"{temp_file.name}"], timeout = timeout, stdout=temp_file_2)       
+                output = subprocess.run([self.gringo_command, f"{temp_file.name}"], timeout = timeout, stdout=temp_file_2)       
             except Exception as ex:
                 clingo_out_of_time = True
 
@@ -266,10 +278,10 @@ class Benchmark:
         if output != None and gringo_duration < timeout:
 
             if timeout == None:
-                subprocess.run(["clingo","--mode=clasp",f"{temp_file_2.name}"])       
+                subprocess.run([self.clingo_command,"--mode=clasp",f"{temp_file_2.name}"])       
             else:
                 try:
-                    subprocess.run(["clingo","--mode=clasp",f"{temp_file_2.name}"], timeout = (timeout - gringo_duration))       
+                    subprocess.run([self.clingo_command,"--mode=clasp",f"{temp_file_2.name}"], timeout = (timeout - gringo_duration))       
                 except Exception as ex:
                     clingo_out_of_time = True
 
@@ -295,11 +307,11 @@ class Benchmark:
 
         output = None
         if timeout == None:
-            output = subprocess.run(["python", "start_newground.py", f"{temp_file.name}"], stdout=temp_file_2)       
+            output = subprocess.run([self.python_command, "start_newground.py", self.rewriting_strategy, f"{temp_file.name}"], stdout=temp_file_2)       
             
         else:
             try:
-                output = subprocess.run(["python", "start_newground.py", f"{temp_file.name}"], timeout = timeout, stdout=temp_file_2)       
+                output = subprocess.run([self.python_command, "start_newground.py", self.rewriting_strategy,  f"{temp_file.name}"], timeout = timeout, stdout=temp_file_2)       
             except Exception as ex:
                 newground_out_of_time = True
 
@@ -313,10 +325,10 @@ class Benchmark:
         if output != None and newground_duration < timeout:
 
             if timeout == None:
-                subprocess.run(["gringo",f"{temp_file_2.name}"], stdout=temp_file_3)       
+                subprocess.run([self.gringo_command,f"{temp_file_2.name}"], stdout=temp_file_3)       
             else:
                 try:
-                    subprocess.run(["gringo",f"{temp_file_2.name}"], timeout = (timeout - newground_duration), stdout=temp_file_3)       
+                    subprocess.run([self.gringo_command,f"{temp_file_2.name}"], timeout = (timeout - newground_duration), stdout=temp_file_3)       
                 except Exception as ex:
                     newground_out_of_time = True
 
@@ -333,10 +345,10 @@ class Benchmark:
         if output != None and newground_duration < timeout:
 
             if timeout == None:
-                subprocess.run(["clingo","--mode=clasp",f"{temp_file_3.name}"])       
+                subprocess.run([self.clingo_command,"--mode=clasp",f"{temp_file_3.name}"])       
             else:
                 try:
-                    subprocess.run(["clingo","--mode=clasp",f"{temp_file_3.name}"], timeout = (timeout - newground_duration))       
+                    subprocess.run([self.clingo_command,"--mode=clasp",f"{temp_file_3.name}"], timeout = (timeout - newground_duration))       
                 except Exception as ex:
                     newground_out_of_time = True
 
