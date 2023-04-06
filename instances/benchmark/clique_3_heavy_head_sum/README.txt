@@ -1,0 +1,1 @@
+- All graphs were procuded with 50 percent density with the graph generation script in the ''generators'' folder
