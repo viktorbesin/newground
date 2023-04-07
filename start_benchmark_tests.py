@@ -33,9 +33,9 @@ class Benchmark:
         self.python_command = "./python3"
 
         # Strategies ->  {replace,rewrite,rewrite-no-body}
-        #self.rewriting_strategy = "--aggregate-strategy=rewrite-no-body"
+        self.rewriting_strategy = "--aggregate-strategy=rewrite-no-body"
         #self.rewriting_strategy = "--aggregate-strategy=rewrite"
-        self.rewriting_strategy = "--aggregate-strategy=replace"
+        #self.rewriting_strategy = "--aggregate-strategy=replace"
 
 
     def on_model(self, m, output, hashes):
@@ -53,9 +53,9 @@ class Benchmark:
         parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
 
         # If set to false -> Benchmark -> otherwise use mokcup (i.e. skip)
-        clingo_mockup = False
+        clingo_mockup = True
         newground_mockup = False
-        idlv_mockup = False
+        idlv_mockup = True
 
         parser.add_argument('input_folder')
         parser.add_argument('output_file')

@@ -1,5 +1,6 @@
 instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured
 
+<<<<<<< HEAD
 instance_004.lp,0.007712841033935547,False,0.0042111873626708984,False,1.4334917068481445,False
 instance_007.lp,0.008288145065307617,False,0.004658699035644531,False,1.4624793529510498,False
 instance_010.lp,0.010519742965698242,False,0.005259513854980469,False,1.6177163124084473,False
@@ -33,3 +34,30 @@ instance_091.lp,0.9001045227050781,False,1.0145354270935059,False,18.01789426803
 instance_094.lp,0.9922139644622803,False,1.0948600769042969,False,18.945394277572632,False
 instance_097.lp,1.048363447189331,False,1.1820147037506104,False,19.004780292510986,False
 instance_100.lp,1.2998921871185303,False,1.3440728187561035,False,20.907270431518555,False
+=======
+instance_004.lp,0,False,0,False,1.3932836055755615,False
+instance_007.lp,0,False,0,False,1.556560754776001,False
+instance_010.lp,0,False,0,False,1.5603268146514893,False
+instance_013.lp,0,False,0,False,1.6957685947418213,False
+instance_016.lp,0,False,0,False,1.7515435218811035,False
+instance_019.lp,0,False,0,False,1.907715082168579,False
+instance_022.lp,0,False,0,False,2.2413666248321533,False
+instance_025.lp,0,False,0,False,2.5615038871765137,False
+instance_028.lp,0,False,0,False,2.977092981338501,False
+instance_031.lp,0,False,0,False,3.13543701171875,False
+instance_034.lp,0,False,0,False,3.3842413425445557,False
+instance_037.lp,0,False,0,False,3.836164951324463,False
+instance_040.lp,0,False,0,False,4.595498323440552,False
+instance_043.lp,0,False,0,False,5.235767364501953,False
+instance_046.lp,0,False,0,False,5.861127853393555,False
+instance_049.lp,0,False,0,False,5.846799373626709,False
+instance_052.lp,0,False,0,False,6.7815845012664795,False
+instance_055.lp,0,False,0,False,7.343692302703857,False
+instance_058.lp,0,False,0,False,8.150233745574951,False
+instance_061.lp,0,False,0,False,8.40628695487976,False
+instance_064.lp,0,False,0,False,9.000115394592285,False
+instance_067.lp,0,False,0,False,9.586078643798828,False
+instance_070.lp,0,False,0,False,10.518807649612427,False
+instance_073.lp,0,False,0,False,11.032578229904175,False
+instance_076.lp,0,False,0,False,11.867559909820557,False
+>>>>>>> 00a323cd22c5756b87f6b99596e4a5ca09e6382d

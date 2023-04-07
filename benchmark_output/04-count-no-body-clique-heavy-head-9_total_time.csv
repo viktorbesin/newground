@@ -1,5 +1,4 @@
 instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured
-
 instance_004.lp,0.018153667449951172,False,0.012851715087890625,False,2.152421236038208,False
 instance_007.lp,0.01799917221069336,False,0.014434576034545898,False,69.86853742599487,False
 instance_010.lp,0.049161434173583984,False,0.05548810958862305,False,877.5765097141266,False

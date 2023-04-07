@@ -1,5 +1,6 @@
 instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-size,newground-timeout-occured
 
+<<<<<<< HEAD
 instance_004.lp,0.25390625,False,0.2158203125,False,3.0693359375,False
 instance_007.lp,1.3046875,False,1.0107421875,False,69.9296875,False
 instance_010.lp,67.14453125,False,43.0244140625,False,157.8779296875,False
@@ -24,3 +25,7 @@ instance_064.lp,0,True,0,True,0,True
 instance_067.lp,0,True,0,True,0,True
 instance_070.lp,0,True,0,True,0,True
 instance_073.lp,0,True,0,True,0,True
+=======
+instance_004.lp,0,False,0,False,3.0693359375,False
+instance_007.lp,0,False,0,False,69.9296875,False
+>>>>>>> 00a323cd22c5756b87f6b99596e4a5ca09e6382d

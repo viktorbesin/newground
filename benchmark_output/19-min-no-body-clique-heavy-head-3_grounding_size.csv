@@ -1,5 +1,6 @@
 instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-size,newground-timeout-occured
 
+<<<<<<< HEAD
 instance_004.lp,0.287109375,False,0.22265625,False,1.0693359375,False
 instance_007.lp,2.166015625,False,1.7744140625,False,4.0478515625,False
 instance_010.lp,5.634765625,False,4.6240234375,False,8.2294921875,False
@@ -33,3 +34,30 @@ instance_091.lp,4807.7412109375,False,4264.7822265625,False,731.4306640625,False
 instance_094.lp,5502.884765625,False,4886.7431640625,False,786.87109375,False
 instance_097.lp,5944.3623046875,False,5280.1376953125,False,849.681640625,False
 instance_100.lp,6816.587890625,False,6056.0439453125,False,926.4384765625,False
+=======
+instance_004.lp,0,False,0,False,1.0693359375,False
+instance_007.lp,0,False,0,False,4.0478515625,False
+instance_010.lp,0,False,0,False,8.2294921875,False
+instance_013.lp,0,False,0,False,14.2939453125,False
+instance_016.lp,0,False,0,False,20.5302734375,False
+instance_019.lp,0,False,0,False,28.0556640625,False
+instance_022.lp,0,False,0,False,39.56640625,False
+instance_025.lp,0,False,0,False,50.3447265625,False
+instance_028.lp,0,False,0,False,64.2802734375,False
+instance_031.lp,0,False,0,False,81.7099609375,False
+instance_034.lp,0,False,0,False,97.5859375,False
+instance_037.lp,0,False,0,False,116.8623046875,False
+instance_040.lp,0,False,0,False,136.634765625,False
+instance_043.lp,0,False,0,False,163.0302734375,False
+instance_046.lp,0,False,0,False,187.07421875,False
+instance_049.lp,0,False,0,False,211.8173828125,False
+instance_052.lp,0,False,0,False,239.921875,False
+instance_055.lp,0,False,0,False,266.615234375,False
+instance_058.lp,0,False,0,False,301.46484375,False
+instance_061.lp,0,False,0,False,330.79296875,False
+instance_064.lp,0,False,0,False,365.1865234375,False
+instance_067.lp,0,False,0,False,395.1298828125,False
+instance_070.lp,0,False,0,False,435.0302734375,False
+instance_073.lp,0,False,0,False,469.1142578125,False
+instance_076.lp,0,False,0,False,510.095703125,False
+>>>>>>> 00a323cd22c5756b87f6b99596e4a5ca09e6382d

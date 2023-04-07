@@ -1,5 +1,6 @@
 instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured
 
+<<<<<<< HEAD
 instance_004.lp,0.010466575622558594,False,0.0038869380950927734,False,1.9491055011749268,False
 instance_007.lp,0.010683059692382812,False,0.0052950382232666016,False,2.396925210952759,False
 instance_010.lp,0.03299236297607422,False,0.045810699462890625,False,2.776665210723877,False
@@ -24,3 +25,18 @@ instance_064.lp,0.0005280971527099609,True,0.0006194114685058594,True,0.00046658
 instance_067.lp,0.0006301403045654297,True,0.0004379749298095703,True,0.0006670951843261719,True
 instance_070.lp,0.0011756420135498047,True,0.0007359981536865234,True,0.0008289813995361328,True
 instance_073.lp,0.0010304450988769531,True,0.0007367134094238281,True,0.00095367431640625,True
+=======
+instance_004.lp,0,False,0,False,1.8930706977844238,False
+instance_007.lp,0,False,0,False,2.448740243911743,False
+instance_010.lp,0,False,0,False,2.8642492294311523,False
+instance_013.lp,0,False,0,False,3.72540283203125,False
+instance_016.lp,0,False,0,False,4.357498407363892,False
+instance_019.lp,0,False,0,False,5.867643594741821,False
+instance_022.lp,0,False,0,False,7.5849432945251465,False
+instance_025.lp,0,False,0,False,9.468042135238647,False
+instance_028.lp,0,False,0,False,11.310490369796753,False
+instance_031.lp,0,False,0,False,13.13768720626831,False
+instance_034.lp,0,False,0,False,15.167312145233154,False
+instance_037.lp,0,False,0,False,17.94879722595215,False
+instance_040.lp,0,False,0,False,21.08679699897766,False
+>>>>>>> 00a323cd22c5756b87f6b99596e4a5ca09e6382d
