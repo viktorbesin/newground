@@ -35,9 +35,9 @@ class Benchmark:
         self.python_command = "./python3"
 
         # Strategies ->  {replace,rewrite,rewrite-no-body}
-        self.rewriting_strategy = "--aggregate-strategy=rewrite-no-body"
+        #self.rewriting_strategy = "--aggregate-strategy=rewrite-no-body"
         #self.rewriting_strategy = "--aggregate-strategy=rewrite"
-        #self.rewriting_strategy = "--aggregate-strategy=replace"
+        self.rewriting_strategy = "--aggregate-strategy=replace"
 
 
     def on_model(self, m, output, hashes):
@@ -280,7 +280,7 @@ class Benchmark:
                     p = subprocess.Popen([self.clingo_command,"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
                     output = p.communicate(input = output, timeout = (timeout - idlv_duration))[0]
 
-                    if p.returncode != 10:
+                    if p.returncode != 10 and p.returncode != 20:
                         idlv_out_of_time = True
                         idlv_duration = 1800
 
@@ -369,7 +369,7 @@ class Benchmark:
                     p = subprocess.Popen([self.clingo_command,"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
                     output = p.communicate(input = output, timeout = (timeout - gringo_duration))[0]
 
-                    if p.returncode != 10:
+                    if p.returncode != 10 and p.returncode != 20:
                         clingo_out_of_time = True
                         gringo_duration = 1800
 
@@ -512,7 +512,7 @@ class Benchmark:
                     print(int(p.returncode) == 0)
 
 
-                    if p.returncode != 10: # Clingo return code for everything fine
+                    if p.returncode != 10 and p.returncode != 20: # Clingo return code for everything fine
                         newground_out_of_time = True
                         newground_duration = 1800
 

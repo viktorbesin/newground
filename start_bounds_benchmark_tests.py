@@ -1,3 +1,4 @@
+#!/home/thinklex/programs/python3.11.3/bin/python3
 import os
 import sys
 import argparse
@@ -15,11 +16,19 @@ from start_benchmark_tests import Benchmark
 
 class BoundsBenchmark:
 
+    def __init__(self):
+        # Strategies ->  {replace,rewrite,rewrite-no-body}
+        self.rewriting_strategy = "--aggregate-strategy=rewrite-no-body"
+        #self.rewriting_strategy = "--aggregate-strategy=rewrite"
+        #self.rewriting_strategy = "--aggregate-strategy=replace"
+
+
+
     def parse(self, timeout = None): 
 
-        clingo_mockup = False
+        clingo_mockup = True
         newground_mockup = False
-        idlv_mockup = False
+        idlv_mockup = True
 
 
         benchmark_helper = Benchmark()
@@ -58,7 +67,7 @@ class BoundsBenchmark:
         encoding_first = "c(1) :- "
         encoding_second = "<= #count{A: f(A,B), f(B,C), f(C,D), f(D,E), f(E,F), f(F,G), f(G,H), f(H,I), f(I,A), A != B, A != C, A != D, A != E, A != F, A != G, A != H, A != I, B != C, B != D, B != E, B != F, B != G, B != H, B != I, C != D, C != E, C != F, C != G, C != H, C != I, D != E, D != F, D != G, D != H, D != I, E != F, E != G, E != H, E != I, F != G, F != H, F != I, G != H, G != I, H != I}."
 
-        for lower_bound in range(2,50,3):
+        for lower_bound in range(2,1000,3):
 
             encoding_file_contents = f"{encoding_first} {lower_bound} {encoding_second}"
             print(encoding_file_contents)

@@ -1,0 +1,10 @@
+manAssignsScore(1,1,0).
+manAssignsScore(1,2,0).
+womanAssignsScore(1,3,0).
+womanAssignsScore(2,1,0).
+manAssignsScore(2,2,0).
+manAssignsScore(3,1,0).
+womanAssignsScore(3,1,0).
+manAssignsScore(3,2,0).
+manAssignsScore(3,3,0).
+womanAssignsScore(3,3,0).
