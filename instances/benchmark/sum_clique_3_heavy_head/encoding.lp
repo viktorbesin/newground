@@ -1,4 +1,4 @@
 
-c(1) :- 2 <= #sum{A,B,C: f(A,B), f(B,C), A != B, A != C, B != C}.
+c(1) :- 2 <= #sum{A,B,C,D: f(A,B), f(B,C), f(C,D), A != B, A != C, A != D, B != C, B != D, C != D}.
 :- c(1).
 
