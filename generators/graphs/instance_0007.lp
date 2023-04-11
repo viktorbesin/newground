@@ -1,0 +1,1 @@
+vertex(1).vertex(2).vertex(3).vertex(4).vertex(5).vertex(6).edge(1,1).edge(1,2).edge(1,4).edge(1,5).edge(2,1).edge(2,4).edge(2,5).edge(3,2).edge(3,4).edge(3,5).edge(4,3).edge(4,4).edge(4,5).edge(4,6).edge(5,1).edge(5,2).edge(5,6).edge(6,2).
