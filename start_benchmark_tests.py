@@ -66,7 +66,7 @@ class Benchmark:
         input_path = args.input_folder
         output_filename = args.output_file
 
-        instance_pattern = re.compile("^instance_[0-9][0-9][0-9]\.lp$")
+        instance_pattern = re.compile("^instance_[0-9]{1,4}\.lp$")
 
         instance_files = []
 
@@ -222,7 +222,7 @@ class Benchmark:
         output = None
 
         if timeout == None:
-            p = subprocess.Popen(["./idlv.bin", f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+            p = subprocess.Popen([self.idlv_command, f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
             output = p.communicate()[0]
             output = output.decode().strip().encode()
 
@@ -234,7 +234,7 @@ class Benchmark:
 
         else:
             try:
-                p = subprocess.Popen(["./idlv.bin", f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+                p = subprocess.Popen([self.idlv_command, f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
                 output = p.communicate( timeout = timeout)[0]
                 output = output.decode().strip().encode()
 
