@@ -6,7 +6,7 @@ Note that the prototype mentioned in the paper does not include Aggregates. The 
 
 ## Requirements
 * clingo 
-* clingo's Python module > *v5.6*
+* clingo's Python module >= *v5.6*
 * clingox
 * networkx
 * future-fstrings (for compatibility with older versions)
