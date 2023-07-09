@@ -9,11 +9,10 @@ import clingo
 
 from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
 from clingo.control import Control
-from pprint import pprint
+
 from clingox.program import Program, ProgramObserver, Remapping
 
 import networkx as nx
-import matplotlib.pyplot as plt
 
 from .comparison_tools import ComparisonTools
 from .aggregate_transformer import AggregateMode
@@ -514,7 +513,8 @@ class MainTransformer(Transformer):
                         left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
                         right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
                         unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
-                        interpretation = f"{','.join(interpretation_list)}, not {unfound_comparison}"
+                        #interpretation = f"{','.join(interpretation_list)}, not {unfound_comparison}"
+                        interpretation = f"{','.join(interpretation_list)}"
                     else:
                         interpretation = f"{','.join(interpretation_list)}"
 
@@ -627,7 +627,10 @@ class MainTransformer(Transformer):
                 for value in values:
                     self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{variable}({value}).")
 
-            self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+            if len(domains) > 0:
+                self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+            else:
+                self.printer.custom_print(f"{{{head}}}.")
 
         else:
             
@@ -734,14 +737,6 @@ class MainTransformer(Transformer):
                     #print(head)
                     head_interpretation = f"{head.name}"
 
-                    """
-                    print(h_args)
-                    print(combination)
-
-                    if head_interpretation == "count_ag0_left_1":
-                        quit()
-                    """
-
                     #head_tuple_list = [c[index] for index in range(len(c))]
 
                     if len(head_tuple_list) > 0:
@@ -762,7 +757,11 @@ class MainTransformer(Transformer):
                     domains = []
                     for variable in h_vars:
                         domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
-                    self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+
+                    if len(domains) > 0:
+                        self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+                    else:
+                        self.printer.custom_print(f"{{{head}}}.")
 
 
 
@@ -939,16 +938,25 @@ class MainTransformer(Transformer):
                     if len(unfound_body_list) > 0:
                         unfound_body = f" {','.join(unfound_body_list)}"
                         unfound_rule = f"{unfound_atom} :- {unfound_body}"
+                        unfound_rule += "."
+
+                        """
                         if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                             unfound_rule += f", not {unfound_comparison}."
                         else:
                             unfound_rule += "."
+                        """
+
                     else:
                         unfound_rule = f"{unfound_atom}"
+                        unfound_rule += "."
+
+                        """
                         if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
                             unfound_rule += f" :- not {unfound_comparison}."
                         else:
                             unfound_rule += "."
+                        """
 
                     self.printer.custom_print(unfound_rule)
 

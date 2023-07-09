@@ -11,6 +11,8 @@ import clingo
 from newground.newground import Newground
 from newground.default_output_printer import DefaultOutputPrinter
 
+from start_benchmark_tests import Benchmark
+
 class CustomOutputPrinter(DefaultOutputPrinter):
 
     def __init__(self):
@@ -80,8 +82,20 @@ class PrimitiveBenchmark:
 
 
 
-    def start(self, instance_file_contents, encoding_file_contents, verbose = True, one_directional_equivalence = True):
+    def start(self, instance_file_contents, encoding_file_contents, config, verbose = True, one_directional_equivalence = True):
 
+        #gringo_clingo_timeout_occured, gringo_clingo_duration, gringo_duration, gringo_grounding_file_size  = Benchmark.clingo_benchmark(instance_file_contents, encoding_file_contents, config, 1800)
+        idlv_clingo_timeout_occured, idlv_clingo_duration, idlv_duration, idlv_grounding_file_size = Benchmark.idlv_benchmark(instance_file_contents, encoding_file_contents, config, 1800)
+        newground_idlv_clingo_timeout_occured, newground_idlv_clingo_duration, newground_idlv_duration, newground_idlv_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, 1800, grounder = "IDLV")
+        newground_gringo_clingo_timeout_occured, newground_gringo_clingo_duration, newground_gringo_duration, newground_gringo_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, 1800, grounder = "GRINGO")
+ 
+        print(f"[INFO] - <<<<<<<<<<>>>>>>>>>>")
+        print(f"[INFO] - Newground-IDLV needed {newground_idlv_clingo_duration} seconds!")
+        print(f"[INFO] - Newground-GRINGO needed {newground_gringo_clingo_duration} seconds!")
+        #print(f"[INFO] - Clingo needed {gringo_clingo_duration} seconds!")       
+        print(f"[INFO] - IDLV needed {idlv_clingo_duration} seconds!")       
+
+        """
         temp_file = tempfile.NamedTemporaryFile()
     
         with open(temp_file.name, "w") as f:
@@ -90,7 +104,7 @@ class PrimitiveBenchmark:
         clingo_start_time = time.time()   
 
 
-        subprocess.run(["clingo",f"{temp_file.name}"])       
+        subprocess.run(["./clingo",f"{temp_file.name}"])       
 
         clingo_end_time = time.time()   
         clingo_duration = clingo_end_time - clingo_start_time
@@ -123,7 +137,7 @@ class PrimitiveBenchmark:
 
         newground_start_time = time.time()   
 
-        subprocess.run(["clingo",f"{temp_file.name}"])       
+        subprocess.run(["./clingo",f"{temp_file.name}"])       
 
         newground_end_time = time.time()   
         newground_duration_1 = newground_end_time - newground_start_time
@@ -134,12 +148,26 @@ class PrimitiveBenchmark:
         print(f"[INFO] - <<<<<<<<<<>>>>>>>>>>")
         print(f"[INFO] - Newground needed {newground_total_duration} seconds!")
         print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
+        """
 
 
 if __name__ == "__main__":
+
+    config = {}
+    config["clingo_command"] = "./clingo"
+    config["gringo_command"] = "./gringo"
+    config["idlv_command"] = "./idlv"
+    config["python_command"] = "./python3"
+
+    # Strategies ->  {replace,rewrite,rewrite-no-body}
+    config["rewriting_strategy"] = "--aggregate-strategy=rewrite-no-body"
+    #config["rewriting_strategy"] = "--aggregate-strategy=rewrite"
+    #config["rewriting_strategy"] = "--aggregate-strategy=replace"
+
+
     checker = PrimitiveBenchmark()
     (instance, encoding) = checker.parse()
-    checker.start(instance, encoding, verbose = True)
+    checker.start(instance, encoding, config, verbose = True)
 
 
 
