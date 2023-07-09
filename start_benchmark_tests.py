@@ -79,18 +79,16 @@ class Benchmark:
         grounding_size_output_filename = f"{output_filename}_grounding_size.csv"
 
         with open(total_time_output_filename, "w") as output_file:
-            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured\n"
+            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-idlv-duration,newground-idlv-timeout-occured,newground-gringo-duration,newground-gringo-timeout-occured"
             output_file.write(write_string)
 
         with open(grounding_time_output_filename, "w") as output_file:
-            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured\n"
+            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-idlv-duration,newground-idlv-timeout-occured,newground-gringo-duration,newground-gringo-timeout-occured"
             output_file.write(write_string)
 
         with open(grounding_size_output_filename, "w") as output_file:
-            write_string = "instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-size,newground-timeout-occured\n"
+            write_string = "instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-idlv-size,newground-idlv-timeout-occured,newground-gringo-size,newground-gringo-timeout-occured"
             output_file.write(write_string)
-
-
 
         for instance_file in instance_files:
             print("")
