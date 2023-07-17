@@ -7,6 +7,7 @@ def generate_permutation(t_len, frac, seed):
 
     t_permutation = [x for x in range(1, 1 + t_len)]
     p_permutation = [x for x in range(1, 1 + int(t_len/frac))]
+    #p_permutation = [x for x in range(1, 10)]
 
     t_indices = t_permutation.copy()
     random.shuffle(t_permutation)
@@ -24,10 +25,12 @@ def generate_permutation(t_len, frac, seed):
 
     output_prg = output_prg + f"patternlength({len(p_indices)}).\n"
 
+    for index in range(1, len(p_indices) + 1):
+        output_prg = output_prg + f"kval({index}).\n"
+
+
     output_prg = output_prg + """
 % ENCODING ADDITIONAL PART
-kval(1).
-kval(N+1) :- kval(N), N < L, patternlength(L). 
 1 <= { subt(K,I,E) : t(I,E) } <= 1 :- kval(K), patternlength(L).
 :- subt(K1,I1,_), subt(K2,I2,_), K1<K2, I1 >= I2.
 
@@ -39,10 +42,10 @@ solution(K,E) :- subt(K,_,E).
 
 if __name__ == '__main__':
 
-    frac = 3
+    frac = 5
     seed = 11904657
 
-    for length in range(10,250):
+    for length in range(75,300, 3):
         output_prg = generate_permutation(length, frac,  seed)
 
         if length < 100:
