@@ -17,3 +17,16 @@ def gen_marriage(mx, prob):
 
     return output
 
+if __name__ == '__main__':
+    mx = int(sys.argv[1])
+    prob = int(sys.argv[2])
+
+    output = gen_marriage(mx, prob)
+
+    write_string = ""
+    for string in output:
+        write_string += f"{string}\n"
+
+
+    print(write_string)
+

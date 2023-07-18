@@ -1,12 +1,19 @@
-for i in `seq 100 10 200` 
+rm -r instances
+mkdir instances
+
+mkdir instances
+for i in `seq -w 005 5 100`
 do
-	for j in `seq 5 5 100`
+	echo "density $i"
+	mkdir instances/graph_density_${i}
+	for j in `seq -w 010 10 200` 
 	do
-		echo "size $i, prob $j"
-		if [ -f "instances/marriage_graphs/random_${i}_${j}.lp" ]; then
-			echo "file exists"
-		else
-			python3 genMarriage.py $i $j > instances/marriage_graphs/random_${i}_${j}.lp
-		fi
+		echo "size $j, density $i"
+			../../python3 genMarriage.py $j $i > instances/graph_density_${i}/instance_${j}.lp
 	done
+
+	cp additional_instance.lp instances/graph_density_${i}/additional_instance.lp
+	cp encoding.lp instances/graph_density_${i}/encoding.lp
 done
+
+
