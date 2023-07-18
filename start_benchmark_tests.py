@@ -14,7 +14,7 @@ import argparse
 import resource
 
 def limit_virtual_memory():
-    max_virtual_memory = 1024 * 1024 * 1024 * 8 # 8GB
+    max_virtual_memory = 1024 * 1024 * 1024 * 32 # 32GB
 
     # TUPLE -> (soft limit, hard limit)
     resource.setrlimit(resource.RLIMIT_AS, (max_virtual_memory, max_virtual_memory))
@@ -43,11 +43,13 @@ class Benchmark:
     def parse(self, config, timeout = None):
         parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
 
-        # If set to false -> Benchmark -> otherwise use mokcup (i.e. skip)
+        # If set to false -> Benchmark -> otherwise use mockup (i.e. skip)
         clingo_mockup = False
-        idlv_mockup = False
-        newground_idlv_mockup = False
+        idlv_mockup = True
+        newground_idlv_mockup = True
         newground_gringo_mockup = False
+
+        ground_and_solve = False
 
         parser.add_argument('input_folder')
         parser.add_argument('output_file')
@@ -101,7 +103,7 @@ class Benchmark:
 
             print("GRINGO")
             if not clingo_mockup:
-                gringo_clingo_timeout_occured, gringo_clingo_duration, gringo_duration, gringo_grounding_file_size  = Benchmark.clingo_benchmark(instance_file_contents, encoding_file_contents, config, timeout)
+                gringo_clingo_timeout_occured, gringo_clingo_duration, gringo_duration, gringo_grounding_file_size  = Benchmark.clingo_benchmark(instance_file_contents, encoding_file_contents, config, timeout,ground_and_solve = ground_and_solve)
             else:
                 gringo_clingo_timeout_occured = True
                 gringo_clingo_duration = 1800
@@ -110,7 +112,7 @@ class Benchmark:
 
             print("IDLV")
             if not idlv_mockup:
-                idlv_clingo_timeout_occured, idlv_clingo_duration, idlv_duration, idlv_grounding_file_size = Benchmark.idlv_benchmark(instance_file_contents, encoding_file_contents, config, timeout)
+                idlv_clingo_timeout_occured, idlv_clingo_duration, idlv_duration, idlv_grounding_file_size = Benchmark.idlv_benchmark(instance_file_contents, encoding_file_contents, config, timeout,ground_and_solve = ground_and_solve)
             else:
                 idlv_clingo_timeout_occured = True
                 idlv_clingo_duration = 1800
@@ -119,7 +121,7 @@ class Benchmark:
 
             print("NEWGROUND-IDLV")
             if not newground_idlv_mockup:
-                newground_idlv_clingo_timeout_occured, newground_idlv_clingo_duration, newground_idlv_duration, newground_idlv_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout, grounder = "IDLV")
+                newground_idlv_clingo_timeout_occured, newground_idlv_clingo_duration, newground_idlv_duration, newground_idlv_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout, grounder = "IDLV",ground_and_solve = ground_and_solve)
             else:
                 newground_idlv_clingo_timeout_occured = True
                 newground_idlv_clingo_duration = 1800
@@ -128,7 +130,7 @@ class Benchmark:
 
             print("NEWGROUND-GRINGO")
             if not newground_gringo_mockup:
-                newground_gringo_clingo_timeout_occured, newground_gringo_clingo_duration, newground_gringo_duration, newground_gringo_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout, grounder = "GRINGO")
+                newground_gringo_clingo_timeout_occured, newground_gringo_clingo_duration, newground_gringo_duration, newground_gringo_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout, grounder = "GRINGO",ground_and_solve = ground_and_solve)
             else:
                 newground_gringo_clingo_timeout_occured = True
                 newground_gringo_clingo_duration = 1800
@@ -179,7 +181,7 @@ class Benchmark:
                 newground_gringo_mockup = True
 
     @classmethod
-    def idlv_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None):
+    def idlv_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, ground_and_solve = True):
 
         idlv_out_of_time = False
         temp_file = tempfile.NamedTemporaryFile(mode="w+")
@@ -224,7 +226,7 @@ class Benchmark:
         clingo_start_time = time.time()
 
 
-        if idlv_out_of_time == False and output != None and idlv_duration < timeout:
+        if idlv_out_of_time == False and output != None and idlv_duration < timeout and ground_and_solve:
 
             grounding_file_size_bytes = len(output)
             grounding_file_size_kb = grounding_file_size_bytes / 1024
@@ -268,7 +270,7 @@ class Benchmark:
         return (idlv_out_of_time, idlv_clingo_duration, idlv_duration, grounding_file_size_kb)
            
     @classmethod
-    def clingo_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None):
+    def clingo_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, ground_and_solve = True):
 
         clingo_out_of_time = False
         temp_file = tempfile.NamedTemporaryFile("w+")
@@ -315,7 +317,7 @@ class Benchmark:
 
         clingo_start_time = time.time()
 
-        if clingo_out_of_time == False and output != None and gringo_duration < timeout:
+        if clingo_out_of_time == False and output != None and gringo_duration < timeout and ground_and_solve:
 
             grounding_file_size = len(output)
             grounding_file_size_kb = grounding_file_size / 1024
@@ -357,7 +359,7 @@ class Benchmark:
         return (clingo_out_of_time, gringo_clingo_duration, gringo_duration, grounding_file_size_kb)
 
     @classmethod
-    def newground_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, grounder = "IDLV"):
+    def newground_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, grounder = "IDLV", ground_and_solve = True):
 
         temp_file = tempfile.NamedTemporaryFile("w+")
 
@@ -459,7 +461,7 @@ class Benchmark:
 
         clingo_start_time = time.time()
 
-        if newground_out_of_time == False and output != None and newground_duration < timeout:
+        if newground_out_of_time == False and output != None and newground_duration < timeout and ground_and_solve:
 
             grounding_file_size_bytes = len(output)
             grounding_file_size_kb = grounding_file_size_bytes / 1024
@@ -504,7 +506,7 @@ if __name__ == "__main__":
     config = {}
     config["clingo_command"] = "./clingo"
     config["gringo_command"] = "./gringo"
-    config["idlv_command"] = "./idlv"
+    config["idlv_command"] = "./idlv.bin"
     config["python_command"] = "./python3"
 
     # Strategies ->  {replace,rewrite,rewrite-no-body}
