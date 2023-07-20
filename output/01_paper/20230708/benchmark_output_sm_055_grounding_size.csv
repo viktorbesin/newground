@@ -1,0 +1,3 @@
+instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-idlv-size,newground-idlv-timeout-occured,newground-gringo-size,newground-gringo-timeout-occured
+instance_010.lp,16395.21484375,False,8456.9091796875,False,576.65625,False,649.611328125,False
+instance_020.lp,3511323.9501953125,False,1662245.978515625,False,2098.9521484375,False,2330.3759765625,False

@@ -1,0 +1,9 @@
+instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-idlv-size,newground-idlv-timeout-occured,newground-gringo-size,newground-gringo-timeout-occured
+instance_010.lp,5.2265625,False,5.0009765625,False,105.78515625,False,101.5068359375,False
+instance_013.lp,8.5830078125,False,8.2939453125,False,210.0888671875,False,203.232421875,False
+instance_016.lp,15.611328125,False,14.5048828125,False,327.8916015625,False,322.287109375,False
+instance_019.lp,211944.43359375,False,198121.3310546875,False,475.833984375,False,475.7626953125,False
+instance_022.lp,1017966.6298828125,False,951572.3818359375,False,642.427734375,False,647.203125,False
+instance_025.lp,6036975.564453125,False,5643238.4609375,False,857.45703125,False,850.521484375,False
+instance_028.lp,3801896.2578125,False,3553926.4873046875,False,1112.671875,False,1042.521484375,False
+instance_031.lp,0,True,0,True,1395.908203125,False,1327.1962890625,False

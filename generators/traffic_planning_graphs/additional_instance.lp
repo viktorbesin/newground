@@ -10,6 +10,7 @@ rch(X) :- rch(Y), f(X,Y).
 % Graph must be connected
 :- f(X,Y), not rch(X).
 
+
 % No two distributor nodes must be adjacent
 :- distributor(A), distributor(B), f(A,B), A != B.
 % No two distributor nodes must have a distance between them of 2
