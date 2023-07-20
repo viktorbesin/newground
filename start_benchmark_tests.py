@@ -4,7 +4,6 @@ import sys
 import io
 
 import time
-import re
 
 import subprocess
 
@@ -40,16 +39,8 @@ class Benchmark:
 
         hashes[(hash(tuple(output[cur_pos])))] = cur_pos
 
-    def parse(self, config, timeout = None):
+    def parse(self, config, timeout = 1800, clingo_mockup = False, idlv_mockup = False, newground_idlv_mockup = False, newground_gringo_mockup = False, ground_and_solve = True, run_all_examples = False):
         parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
-
-        # If set to false -> Benchmark -> otherwise use mockup (i.e. skip)
-        clingo_mockup = False
-        idlv_mockup = True
-        newground_idlv_mockup = True
-        newground_gringo_mockup = False
-
-        ground_and_solve = False
 
         parser.add_argument('input_folder')
         parser.add_argument('output_file')
@@ -58,13 +49,11 @@ class Benchmark:
         input_path = args.input_folder
         output_filename = args.output_file
 
-        instance_pattern = re.compile("^instance_[0-9]{1,4}\.lp$")
-
         instance_files = []
 
         for f in os.scandir(input_path):
             if f.is_file():
-                if instance_pattern.match(str(f.name)):
+                if not "encoding" in str(f.name) and not "additional_instance" in str(f.name):
                     instance_files.append(str(f.name))
 
         instance_files.sort()
@@ -92,6 +81,8 @@ class Benchmark:
             write_string = "instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-idlv-size,newground-idlv-timeout-occured,newground-gringo-size,newground-gringo-timeout-occured"
             output_file.write(write_string)
 
+        # ------------------------ START BENCHMARK HERE -------------------------
+
         for instance_file in instance_files:
             print("")
             print(f">>>> Now solving: {instance_file}")
@@ -103,40 +94,42 @@ class Benchmark:
 
             print("GRINGO")
             if not clingo_mockup:
-                gringo_clingo_timeout_occured, gringo_clingo_duration, gringo_duration, gringo_grounding_file_size  = Benchmark.clingo_benchmark(instance_file_contents, encoding_file_contents, config, timeout,ground_and_solve = ground_and_solve)
+                gringo_clingo_timeout_occured, gringo_clingo_duration, gringo_duration, gringo_grounding_file_size  = Benchmark.clingo_benchmark(instance_file_contents, encoding_file_contents, config, timeout = timeout, ground_and_solve = ground_and_solve)
             else:
                 gringo_clingo_timeout_occured = True
-                gringo_clingo_duration = 1800
-                gringo_duration = 1800
+                gringo_clingo_duration = timeout
+                gringo_duration = timeout
                 gringo_grounding_file_size = 0
 
             print("IDLV")
             if not idlv_mockup:
-                idlv_clingo_timeout_occured, idlv_clingo_duration, idlv_duration, idlv_grounding_file_size = Benchmark.idlv_benchmark(instance_file_contents, encoding_file_contents, config, timeout,ground_and_solve = ground_and_solve)
+                idlv_clingo_timeout_occured, idlv_clingo_duration, idlv_duration, idlv_grounding_file_size = Benchmark.idlv_benchmark(instance_file_contents, encoding_file_contents, config, timeout = timeout, ground_and_solve = ground_and_solve)
             else:
                 idlv_clingo_timeout_occured = True
-                idlv_clingo_duration = 1800
-                idlv_duration = 1800
+                idlv_clingo_duration = timeout
+                idlv_duration = timeout
                 idlv_grounding_file_size = 0
 
             print("NEWGROUND-IDLV")
             if not newground_idlv_mockup:
-                newground_idlv_clingo_timeout_occured, newground_idlv_clingo_duration, newground_idlv_duration, newground_idlv_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout, grounder = "IDLV",ground_and_solve = ground_and_solve)
+                newground_idlv_clingo_timeout_occured, newground_idlv_clingo_duration, newground_idlv_duration, newground_idlv_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout = timeout, grounder = "IDLV",ground_and_solve = ground_and_solve)
             else:
                 newground_idlv_clingo_timeout_occured = True
-                newground_idlv_clingo_duration = 1800
-                newground_idlv_duration = 1800
+                newground_idlv_clingo_duration = timeout
+                newground_idlv_duration = timeout
                 newground_idlv_grounding_file_size = 0
 
             print("NEWGROUND-GRINGO")
             if not newground_gringo_mockup:
-                newground_gringo_clingo_timeout_occured, newground_gringo_clingo_duration, newground_gringo_duration, newground_gringo_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout, grounder = "GRINGO",ground_and_solve = ground_and_solve)
+                newground_gringo_clingo_timeout_occured, newground_gringo_clingo_duration, newground_gringo_duration, newground_gringo_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, timeout = timeout, grounder = "GRINGO",ground_and_solve = ground_and_solve)
             else:
                 newground_gringo_clingo_timeout_occured = True
-                newground_gringo_clingo_duration = 1800
-                newground_gringo_duration = 1800
+                newground_gringo_clingo_duration = timeout
+                newground_gringo_duration = timeout
                 newground_gringo_grounding_file_size = 0
-                
+               
+
+            # Print current console info:
             if gringo_clingo_timeout_occured:
                 print(f"[INFO] - Clingo timed out ({gringo_clingo_duration})!")
             else:
@@ -157,10 +150,9 @@ class Benchmark:
             else:
                 print(f"[INFO] - Newground-GRINGO needed {newground_gringo_clingo_duration} seconds!")
 
-
+            # Add info to .csv files
             with open(total_time_output_filename, "a") as output_file:
                 output_file.write(f"\n{instance_file},{gringo_clingo_duration},{gringo_clingo_timeout_occured},{idlv_clingo_duration},{idlv_clingo_timeout_occured},{newground_idlv_clingo_duration},{newground_idlv_clingo_timeout_occured},{newground_gringo_clingo_duration},{newground_gringo_clingo_timeout_occured}")
-
 
             with open(grounding_time_output_filename, "a") as output_file:
                 output_file.write(f"\n{instance_file},{gringo_duration},{gringo_clingo_timeout_occured},{idlv_duration},{idlv_clingo_timeout_occured},{newground_idlv_duration},{newground_idlv_clingo_timeout_occured},{newground_gringo_duration},{newground_gringo_clingo_timeout_occured}")
@@ -168,20 +160,24 @@ class Benchmark:
             with open(grounding_size_output_filename, "a") as output_file:
                 output_file.write(f"\n{instance_file},{gringo_grounding_file_size},{gringo_clingo_timeout_occured},{idlv_grounding_file_size},{idlv_clingo_timeout_occured},{newground_idlv_grounding_file_size},{newground_idlv_clingo_timeout_occured},{newground_gringo_grounding_file_size},{newground_gringo_clingo_timeout_occured}")
 
-            if gringo_clingo_timeout_occured == True or gringo_clingo_duration >= 1800:
-                clingo_mockup = True
+            # Speed up benchmarks if specified to do so
+            if not run_all_examples:
+                if gringo_clingo_timeout_occured == True or gringo_clingo_duration >= timeout:
+                    clingo_mockup = True
 
-            if idlv_clingo_timeout_occured == True or idlv_clingo_duration >= 1800:
-                idlv_mockup = True
+                if idlv_clingo_timeout_occured == True or idlv_clingo_duration >= timeout:
+                    idlv_mockup = True
 
-            if newground_idlv_clingo_timeout_occured == True or newground_idlv_clingo_duration >= 1800:
-                newground_idlv_mockup = True
+                if newground_idlv_clingo_timeout_occured == True or newground_idlv_clingo_duration >= timeout:
+                    newground_idlv_mockup = True
 
-            if newground_gringo_clingo_timeout_occured == True or newground_gringo_clingo_duration >= 1800:
-                newground_gringo_mockup = True
+                if newground_gringo_clingo_timeout_occured == True or newground_gringo_clingo_duration >= timeout:
+                    newground_gringo_mockup = True
+
+
 
     @classmethod
-    def idlv_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, ground_and_solve = True):
+    def idlv_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = 1800, ground_and_solve = True):
 
         idlv_out_of_time = False
         temp_file = tempfile.NamedTemporaryFile(mode="w+")
@@ -191,78 +187,52 @@ class Benchmark:
 
         idlv_start_time = time.time()   
 
-        output = None
+        temp_grounding_file = tempfile.NamedTemporaryFile(mode="w+")
+        temp_grounding_file_fd = open(temp_grounding_file.name, "w")
 
-        if timeout == None:
-            p = subprocess.Popen([config["idlv_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            output = p.communicate()[0]
-            output = output.decode().strip().encode()
+        try:
+            p = subprocess.Popen([config["idlv_command"], f"{temp_file.name}"], stdout=temp_grounding_file_fd, preexec_fn=limit_virtual_memory)       
+            p.communicate( timeout = timeout)[0]
+
+            idlv_duration = time.time() - idlv_start_time
 
             if p.returncode != 0:
                 idlv_out_of_time = True
-                idlv_duration = 1800
+                idlv_duration = timeout
 
-        else:
+
+
+        except Exception as ex:
+            print(ex)
+            idlv_out_of_time = True
+            idlv_duration = timeout
+
+
+
+        temp_grounding_file_fd.flush()
+        temp_grounding_file_fd.close()
+        grounding_file_size_bytes = os.path.getsize(temp_grounding_file.name)
+        grounding_file_size_kb = grounding_file_size_bytes / 1024
+
+        temp_grounding_file_fd = open(temp_grounding_file.name, "r")
+
+        clingo_start_time = time.time()
+
+        if idlv_out_of_time == False and idlv_duration < timeout and ground_and_solve:
+
             try:
-                p = subprocess.Popen([config["idlv_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                output = p.communicate( timeout = timeout)[0]
-                output = output.decode().strip().encode()
+                p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=temp_grounding_file_fd, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
 
-                #print(output)
-                idlv_duration = time.time() - idlv_start_time
+                output = p.communicate(timeout = (timeout - idlv_duration))[0]
 
-                if p.returncode != 0:
+                if p.returncode != 10 and p.returncode != 20:
                     idlv_out_of_time = True
-                    idlv_duration = 1800
-
-
+                    idlv_duration = timeout
+                #print(output.decode().strip())
 
             except Exception as ex:
                 print(ex)
                 idlv_out_of_time = True
-                idlv_duration = 1800
-
-
-        clingo_start_time = time.time()
-
-
-        if idlv_out_of_time == False and output != None and idlv_duration < timeout and ground_and_solve:
-
-            grounding_file_size_bytes = len(output)
-            grounding_file_size_kb = grounding_file_size_bytes / 1024
-
-
-
-            if timeout == None:
-                p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-
-                output = p.communicate(input = output)
-
-                if p.returncode != 0:
-                    idlv_out_of_time = True
-                    idlv_duration = 1800
-
-
-                #print(output.decode().strip())
-
-            else:
-                try:
-                    p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
-                    output = p.communicate(input = output, timeout = (timeout - idlv_duration))[0]
-
-                    if p.returncode != 10 and p.returncode != 20:
-                        idlv_out_of_time = True
-                        idlv_duration = 1800
-
-
-
-                    #print(output.decode().strip())
-
-                except Exception as ex:
-                    print(ex)
-                    idlv_out_of_time = True
-        else:
-            grounding_file_size_kb = 0
 
         clingo_end_time = time.time()   
         idlv_clingo_duration = clingo_end_time - clingo_start_time + idlv_duration
@@ -270,7 +240,7 @@ class Benchmark:
         return (idlv_out_of_time, idlv_clingo_duration, idlv_duration, grounding_file_size_kb)
            
     @classmethod
-    def clingo_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, ground_and_solve = True):
+    def clingo_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = 1800, ground_and_solve = True):
 
         clingo_out_of_time = False
         temp_file = tempfile.NamedTemporaryFile("w+")
@@ -280,78 +250,48 @@ class Benchmark:
 
         gringo_start_time = time.time()   
 
-        output = None
-        if timeout == None:
-            p = subprocess.Popen([config["gringo_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            output = p.communicate()[0]
-            output = output.decode().strip().encode()
+        temp_grounding_file = tempfile.NamedTemporaryFile(mode="w+")
+        temp_grounding_file_fd = open(temp_grounding_file.name, "w")
+
+        try:
+            p = subprocess.Popen([config["gringo_command"], f"{temp_file.name}"], stdout=temp_grounding_file_fd, preexec_fn=limit_virtual_memory)       
+            p.communicate( timeout = timeout)[0]
 
             gringo_duration = time.time() - gringo_start_time
 
             if p.returncode != 0:
                 clingo_out_of_time = True
-                gringo_duration = 1800
+                gringo_duration = timeout
+
+        except Exception as ex:
+            print(ex)
+            clingo_out_of_time = True
+            gringo_duration = timeout
 
 
 
-        else:
-            try:
-                p = subprocess.Popen([config["gringo_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                output = p.communicate( timeout = timeout)[0]
-                output = output.decode().strip().encode()
+        temp_grounding_file_fd.flush()
+        temp_grounding_file_fd.close()
+        grounding_file_size_bytes = os.path.getsize(temp_grounding_file.name)
+        grounding_file_size_kb = grounding_file_size_bytes / 1024
 
-                gringo_duration = time.time() - gringo_start_time
-
-                if p.returncode != 0:
-                    clingo_out_of_time = True
-                    gringo_duration = 1800
-
-
-
-
-            except Exception as ex:
-                print(ex)
-                clingo_out_of_time = True
-                gringo_duration = 1800
-
+        temp_grounding_file_fd = open(temp_grounding_file.name, "r")
 
         clingo_start_time = time.time()
 
-        if clingo_out_of_time == False and output != None and gringo_duration < timeout and ground_and_solve:
+        if clingo_out_of_time == False and gringo_duration < timeout and ground_and_solve:
+            try:
+                p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=temp_grounding_file_fd, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+                output = p.communicate(timeout = (timeout - gringo_duration))[0]
 
-            grounding_file_size = len(output)
-            grounding_file_size_kb = grounding_file_size / 1024
-
-
-
-            if timeout == None:
-                p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-
-                output = p.communicate(input = output)[0]
-                if p.returncode != 0:
+                if p.returncode != 10 and p.returncode != 20:
                     clingo_out_of_time = True
-                    gringo_duration = 1800
+                    gringo_duration = timeout
 
-
-
-                
-            else:
-                try:
-                    p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                    output = p.communicate(input = output, timeout = (timeout - gringo_duration))[0]
-
-                    if p.returncode != 10 and p.returncode != 20:
-                        clingo_out_of_time = True
-                        gringo_duration = 1800
-
-
-
-                    #print(output.decode().strip())
-                except Exception as ex:
-                    print(ex)
-                    clingo_out_of_time = True
-        else:
-            grounding_file_size_kb = 0
+                #print(output.decode().strip())
+            except Exception as ex:
+                print(ex)
+                clingo_out_of_time = True
 
         clingo_end_time = time.time()   
         gringo_clingo_duration = clingo_end_time - clingo_start_time + gringo_duration
@@ -359,7 +299,7 @@ class Benchmark:
         return (clingo_out_of_time, gringo_clingo_duration, gringo_duration, grounding_file_size_kb)
 
     @classmethod
-    def newground_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = None, grounder = "IDLV", ground_and_solve = True):
+    def newground_benchmark(cls, instance_file_contents, encoding_file_contents, config, timeout = 1800, grounder = "IDLV", ground_and_solve = True):
 
         temp_file = tempfile.NamedTemporaryFile("w+")
 
@@ -368,133 +308,89 @@ class Benchmark:
         with open(temp_file.name, "w") as f:
             f.write(total_contents)
 
+        temp_file_2 = tempfile.NamedTemporaryFile("w+")
+        temp_file_2_fd = open(temp_file_2.name, "w")
+
         newground_out_of_time = False
 
         newground_start_time = time.time()   
 
-        output = None
-        if timeout == None:
-            p = subprocess.Popen([config["python_command"], "start_newground.py", config["rewriting_strategy"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+        try: 
+            p = subprocess.Popen([config["python_command"], "start_newground.py", config["rewriting_strategy"],  f"{temp_file.name}"], stdout=temp_file_2_fd, preexec_fn=limit_virtual_memory)       
 
-            output = p.communicate()[0]
-            output = output.decode().strip()
+            p.communicate(timeout = timeout)
 
             newground_duration = time.time() - newground_start_time
- 
+
             if p.returncode != 0:
                 newground_out_of_time = True
-                newground_duration = 1800
-
-          
-        else:
-            try:
-                p = subprocess.Popen([config["python_command"], "start_newground.py", config["rewriting_strategy"],  f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-
-                output = p.communicate(timeout = timeout)[0]
-                output = output.decode().strip()
-
-                newground_duration = time.time() - newground_start_time
-
-                if p.returncode != 0:
-                    newground_out_of_time = True
-                    newground_duration = 1800
+                newground_duration = timeout
 
 
 
-            except Exception as ex:
-                print(ex)
-                newground_out_of_time = True
-                newground_duration = 1800
+        except Exception as ex:
+            print(ex)
+            newground_out_of_time = True
+            newground_duration = timeout
+
+        temp_file_2_fd.close()
+        temp_file_2_fd = open(temp_file_2.name, "r")
+
+        temp_grounding_file = tempfile.NamedTemporaryFile(mode="w+")
+        temp_grounding_file_fd = open(temp_grounding_file.name, "w")
 
 
         gringo_start = time.time()
 
-        if newground_out_of_time == False and output != None and newground_duration < timeout:
+        if newground_out_of_time == False and newground_duration < timeout:
 
-            temp_file_idlv = tempfile.NamedTemporaryFile(mode="w+")
-      
-            if grounder == "IDLV":
-                with open(temp_file_idlv.name, "w") as f:
-                    f.write(output)
-
-
-            if timeout == None:
-
+            try:
                 if grounder == "IDLV":
-                    p = subprocess.Popen([config["idlv_command"], f"{temp_file_idlv.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                    output = p.communicate()[0]
-                elif grounder == "GRINGO":
-                    p = subprocess.Popen([config["gringo_command"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                    output = p.communicate(input = output.encode())[0]
+                    p = subprocess.Popen([config["idlv_command"], f"{temp_file_2.name}"], stdout=temp_grounding_file_fd, preexec_fn=limit_virtual_memory)       
+                    p.communicate( timeout = (timeout - newground_duration))
 
-                output = output.decode().strip().encode()
-               
+                elif grounder == "GRINGO":
+
+                    p = subprocess.Popen([config["gringo_command"]], stdout=temp_grounding_file_fd, stdin=temp_file_2_fd, preexec_fn=limit_virtual_memory)       
+                    p.communicate(timeout = (timeout - newground_duration))
+
                 newground_duration += (time.time() - gringo_start)
 
                 if p.returncode != 0:
                     newground_out_of_time = True
-                    newground_duration = 1800
+                    newground_duration = timeout
+
+            except Exception as ex:
+                print(ex)
+                newground_out_of_time = True
+                newground_duration = timeout
 
 
-            else:
-                try:
-                    if grounder == "IDLV":
-                        p = subprocess.Popen([config["idlv_command"], f"{temp_file_idlv.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                        output = p.communicate( timeout = timeout)[0]
-                    elif grounder == "GRINGO":
-                        p = subprocess.Popen([config["gringo_command"]], stdout=subprocess.PIPE, stdin=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-                        output = p.communicate(input = output.encode(), timeout = (timeout - newground_duration))[0]
+        temp_grounding_file_fd.flush()
+        temp_grounding_file_fd.close()
+        grounding_file_size_bytes = os.path.getsize(temp_grounding_file.name)
+        grounding_file_size_kb = grounding_file_size_bytes / 1024
 
-                    output.decode().strip().encode()
-
-                    newground_duration += (time.time() - gringo_start)
-
-                    if p.returncode != 0:
-                        newground_out_of_time = True
-                        newground_duration = 1800
-
-                except Exception as ex:
-                    print(ex)
-                    newground_out_of_time = True
-                    newground_duration = 1800
-
+        temp_grounding_file_fd = open(temp_grounding_file.name, "r")
 
         clingo_start_time = time.time()
 
-        if newground_out_of_time == False and output != None and newground_duration < timeout and ground_and_solve:
+        if newground_out_of_time == False and newground_duration < timeout and ground_and_solve:
+            try:
+                p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=temp_grounding_file_fd, stdout = subprocess.PIPE, preexec_fn=limit_virtual_memory) 
 
-            grounding_file_size_bytes = len(output)
-            grounding_file_size_kb = grounding_file_size_bytes / 1024
+                output = p.communicate(timeout = (timeout - newground_duration))[0]
 
-            if timeout == None:
-                p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout = subprocess.PIPE, preexec_fn=limit_virtual_memory)
 
-                output = p.communicate(input = output)
-
-                if p.returncode != 0:
+                if p.returncode != 10 and p.returncode != 20: # Clingo return code for everything fine
                     newground_out_of_time = True
-                    newground_duration = 1800
+                    newground_duration = timeout
 
+                #print(output.decode().strip())
 
-            else:
-                try:
-                    p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout = subprocess.PIPE, preexec_fn=limit_virtual_memory) 
-
-                    output = p.communicate(input = output, timeout = (timeout - newground_duration))[0]
-
-
-                    if p.returncode != 10 and p.returncode != 20: # Clingo return code for everything fine
-                        newground_out_of_time = True
-                        newground_duration = 1800
-
-
-                    #print(output.decode().strip())
-
-                except Exception as ex:
-                    print(ex)
-                    newground_out_of_time = True
-        else:
-            grounding_file_size_kb = 0
+            except Exception as ex:
+                print(ex)
+                newground_out_of_time = True
 
         clingo_end_time = time.time()   
         newground_clingo_duration = clingo_end_time - clingo_start_time + newground_duration
@@ -517,7 +413,19 @@ if __name__ == "__main__":
     checker = Benchmark()
 
     timeout = 1800
-    checker.parse(config, timeout = timeout)
+
+    clingo_mockup = False
+    idlv_mockup = False
+    newground_idlv_mockup = False
+    newground_gringo_mockup = False
+
+    ground_and_solve = True
+    run_all_examples = True
+
+
+    checker.parse(config, timeout = timeout, clingo_mockup = clingo_mockup, idlv_mockup = idlv_mockup, newground_idlv_mockup = newground_idlv_mockup, newground_gringo_mockup = newground_gringo_mockup, ground_and_solve = ground_and_solve)
+
+
 
 
 
