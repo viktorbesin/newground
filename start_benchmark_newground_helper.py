@@ -23,19 +23,17 @@ def limit_virtual_memory():
     # TUPLE -> (soft limit, hard limit)
     resource.setrlimit(resource.RLIMIT_AS, (max_virtual_memory, max_virtual_memory))
 
-instance_file_contents = StartBenchmarkUtils.decode_argument(sys.argv[1])
-encoding_file_contents = StartBenchmarkUtils.decode_argument(sys.argv[2])
-config = StartBenchmarkUtils.decode_argument(sys.argv[3])
-timeout = StartBenchmarkUtils.decode_argument(sys.argv[4])
-ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[5])
-grounder = StartBenchmarkUtils.decode_argument(sys.argv[6])
+config = StartBenchmarkUtils.decode_argument(sys.argv[1])
+timeout = StartBenchmarkUtils.decode_argument(sys.argv[2])
+ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[3])
+grounder = StartBenchmarkUtils.decode_argument(sys.argv[4])
+
+input_code = sys.stdin.read()
 
 temp_file = tempfile.NamedTemporaryFile("w+")
 
-total_contents = f"{instance_file_contents}\n#program rules.\n{encoding_file_contents}"
-
 with open(temp_file.name, "w") as f:
-    f.write(total_contents)
+    f.write(input_code)
 
 newground_out_of_time = False
 

@@ -15,6 +15,8 @@ import argparse
 
 import resource
 
+from sys import stdin
+
 from start_benchmark_utils import StartBenchmarkUtils
 
 def limit_virtual_memory():
@@ -23,19 +25,19 @@ def limit_virtual_memory():
     # TUPLE -> (soft limit, hard limit)
     resource.setrlimit(resource.RLIMIT_AS, (max_virtual_memory, max_virtual_memory))
 
-instance_file_contents = StartBenchmarkUtils.decode_argument(sys.argv[1])
-encoding_file_contents = StartBenchmarkUtils.decode_argument(sys.argv[2])
-config = StartBenchmarkUtils.decode_argument(sys.argv[3])
-timeout = StartBenchmarkUtils.decode_argument(sys.argv[4])
-ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[5])
-grounder = StartBenchmarkUtils.decode_argument(sys.argv[6])
+config = StartBenchmarkUtils.decode_argument(sys.argv[1])
+timeout = StartBenchmarkUtils.decode_argument(sys.argv[2])
+ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[3])
+grounder = StartBenchmarkUtils.decode_argument(sys.argv[4])
 
+input_code = sys.stdin.read()
 
 clingo_out_of_time = False
 temp_file = tempfile.NamedTemporaryFile("w+")
 
 with open(temp_file.name, "w") as f:
-    f.write(instance_file_contents + encoding_file_contents)
+    f.write(input_code)
+    #f.write(instance_file_contents + encoding_file_contents)
 
 gringo_start_time = time.time()   
 

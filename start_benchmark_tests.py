@@ -99,13 +99,17 @@ class Benchmark:
 
             benchmarks = {}
             benchmarks["GRINGO"] = {"mockup":clingo_mockup,
-                    "helper":"start_benchmark_gringo_helper.py"} 
+                    "helper":"start_benchmark_gringo_helper.py",
+                    "program_input": (instance_file_contents + encoding_file_contents).encode()}
             benchmarks["IDLV"] = {"mockup":idlv_mockup,
-                    "helper":"start_benchmark_idlv_helper.py"}
+                    "helper":"start_benchmark_idlv_helper.py",
+                    "program_input": (instance_file_contents + encoding_file_contents).encode()}
             benchmarks["NEWGROUND-IDLV"] = {"mockup":newground_idlv_mockup,
-                    "helper":"start_benchmark_newground_helper.py"}
+                    "helper":"start_benchmark_newground_helper.py",
+                    "program_input": (instance_file_contents + "\n#program rules.\n" + encoding_file_contents).encode()}
             benchmarks["NEWGROUND-GRINGO"] = {"mockup":newground_gringo_mockup,
-                    "helper":"start_benchmark_newground_helper.py"}
+                    "helper":"start_benchmark_newground_helper.py",
+                    "program_input": (instance_file_contents + "\n#program rules.\n" + encoding_file_contents).encode()}
 
             total_time_string = f"\n{instance_file},"
             grounding_time_string = f"\n{instance_file},"
@@ -118,7 +122,7 @@ class Benchmark:
                 strategy_dict = benchmarks[strategy]
 
                 if not strategy_dict["mockup"]:
-                    timeout_occurred, total_duration, grounding_duration, grounding_file_size  = Benchmark.benchmark_caller(instance_file_contents, encoding_file_contents, config, strategy_dict["helper"], strategy, timeout = timeout, ground_and_solve = ground_and_solve)
+                    timeout_occurred, total_duration, grounding_duration, grounding_file_size  = Benchmark.benchmark_caller(strategy_dict["program_input"], config, strategy_dict["helper"], strategy, timeout = timeout, ground_and_solve = ground_and_solve)
                 else:
                     timeout_occurred = True
                     total_duration = timeout
@@ -157,19 +161,20 @@ class Benchmark:
 
 
     @classmethod
-    def benchmark_caller(cls, instance_file_contents, encoding_file_contents, config, helper_script, strategy, timeout = 1800, ground_and_solve = True):
+    def benchmark_caller(cls, program_input, config, helper_script, strategy, timeout = 1800, ground_and_solve = True):
 
-        to_encode_list = [instance_file_contents, encoding_file_contents, config, timeout, ground_and_solve, strategy]
+        to_encode_list = [config, timeout, ground_and_solve, strategy]
 
         encoded_list = [f"{StartBenchmarkUtils.encode_argument(argument)}" for argument in to_encode_list]
 
         arguments = [config["python_command"], helper_script] + encoded_list
 
         ret_vals = (True, timeout, timeout, sys.maxsize)
+    
 
         try:
-            p = subprocess.Popen(arguments, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            ret_vals_encoded = p.communicate(timeout = timeout)[0]
+            p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+            ret_vals_encoded = p.communicate(input = program_input, timeout = timeout)[0]
             ret_vals = StartBenchmarkUtils.decode_argument(ret_vals_encoded.decode())
 
 
@@ -199,7 +204,7 @@ if __name__ == "__main__":
 
     timeout = 1800
 
-    clingo_mockup = False
+    gringo_mockup = False
     idlv_mockup = False
     newground_idlv_mockup = False
     newground_gringo_mockup = False
@@ -208,7 +213,7 @@ if __name__ == "__main__":
     run_all_examples = True
 
 
-    checker.parse(config, timeout = timeout, clingo_mockup = clingo_mockup, idlv_mockup = idlv_mockup, newground_idlv_mockup = newground_idlv_mockup, newground_gringo_mockup = newground_gringo_mockup, ground_and_solve = ground_and_solve, run_all_examples = run_all_examples)
+    checker.parse(config, timeout = timeout, clingo_mockup = gringo_mockup, idlv_mockup = idlv_mockup, newground_idlv_mockup = newground_idlv_mockup, newground_gringo_mockup = newground_gringo_mockup, ground_and_solve = ground_and_solve, run_all_examples = run_all_examples)
 
 
 
