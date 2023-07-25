@@ -1,0 +1,5 @@
+instance,gringo-duration,gringo-timeout-occurred,idlv-duration,idlv-timeout-occured,newground-idlv-duration,newground-idlv-timeout-occured,newground-gringo-duration,newground-gringo-timeout-occured
+blablibaume.asp,0.02725839614868164,False,0.02356266975402832,False,1.1680529117584229,False,1.1627514362335205,False
+instance_010.lp,0.023700952529907227,False,0.02321004867553711,False,1.1691434383392334,False,1.1764705181121826,False
+instance_013.lp,0.028238534927368164,False,0.023200273513793945,False,3.2569165229797363,False,3.3281521797180176,False
+instance_016.lp,0.027737140655517578,False,0.024953603744506836,False,4.858082294464111,False,4.914160490036011,False
