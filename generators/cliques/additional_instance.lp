@@ -11,7 +11,7 @@ rch(X) :- rch(Y), f(X,Y).
 :- f(X,Y), not rch(X).
 
 % Replace method -> TODO
-c(X) :- X = #count{A: clique(A)}.
+%c(X) :- X = #count{A: clique(A)}.
 
 % Rewriting
 %c(1) :- 5 <= #count{A: f(A,B), f(A,C), f(A,D), ..., A != B, A != C, A != D, B != C, B != D, C != D}.

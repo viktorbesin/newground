@@ -139,13 +139,13 @@ class Benchmark:
                     print(f"[INFO] - {strategy} needed {total_duration} seconds!")
 
                 total_time_string += f"{total_duration},{timeout_occurred}"
-                grounding_time_string = f"\n{grounding_duration},{timeout_occurred}"
-                grounding_size_string = f"\n{grounding_file_size},{timeout_occurred}"
+                grounding_time_string += f"{grounding_duration},{timeout_occurred}"
+                grounding_size_string += f"{grounding_file_size},{timeout_occurred}"
 
                 if counter < 3:
                     total_time_string += ","
-                    grounding_time_string = ","
-                    grounding_size_string = ","
+                    grounding_time_string += ","
+                    grounding_size_string += ","
 
                 counter += 1
 
@@ -174,8 +174,9 @@ class Benchmark:
 
         try:
             p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            ret_vals_encoded = p.communicate(input = program_input, timeout = timeout)[0]
+            ret_vals_encoded = p.communicate(input = program_input, timeout = timeout + 1)[0]
             ret_vals = StartBenchmarkUtils.decode_argument(ret_vals_encoded.decode())
+            print(ret_vals)
 
 
             if p.returncode != 0:

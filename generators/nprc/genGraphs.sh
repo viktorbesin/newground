@@ -1,11 +1,20 @@
-rm -r instances
-mkdir instances
+mkdir density_benchmarks
 
-for j in `seq -w 0330 2 350` 
+for d in `seq -w 010 10 100`
 do
-	echo "size $j"
-		../../python3 genOldGraph.py $j 100 > instances/instance_${j}.lp
-done
+	mkdir density_benchmarks/${d}_density
 
-cp additional_instance.lp instances/additional_instance.lp
-cp encoding.lp instances/encoding.lp
+	for j in `seq -w 0020 40 300` 
+	do
+		echo "size $j"
+			../../python3 genOldGraph.py $j $d > density_benchmarks/${d}_density/instance_${j}.lp
+	done
+	for j in `seq -w 0310 10 450` 
+	do
+		echo "size $j"
+			../../python3 genOldGraph.py $j $d > density_benchmarks/${d}_density/instance_${j}.lp
+	done
+
+	cp additional_instance.lp density_benchmarks/${d}_density/additional_instance.lp
+	cp encoding.lp density_benchmarks/${d}_density/encoding.lp
+done
