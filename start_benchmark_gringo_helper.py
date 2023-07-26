@@ -47,20 +47,22 @@ with open(temp_file.name, "w") as f:
 
 gringo_start_time = time.time()   
 
+grounder_process_p = subprocess.Popen([config["gringo_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+
+solver_process_p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
 try:
-    p = subprocess.Popen([config["gringo_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-    grounder_output = p.communicate( timeout = timeout)[0]
+    grounder_output = grounder_process_p.communicate( timeout = timeout)[0]
     gringo_duration = time.time() - gringo_start_time
 
     grounder_output = grounder_output.decode().strip().encode()
 
-    if p.returncode != 0:
+    if grounder_process_p.returncode != 0:
         clingo_out_of_time = True
         gringo_duration = timeout
 
 except TimeoutExpired:
-    p.kill()
-    grounder_output, failure_errors = p.communicate()
+    grounder_process_p.kill()
+    grounder_output, failure_errors = grounder_process_p.communicate()
 
     gringo_duration = timeout
     clingo_out_of_time = True
@@ -78,19 +80,18 @@ clingo_start_time = time.time()
 
 if grounder_output != None and clingo_out_of_time == False and gringo_duration < timeout and ground_and_solve:
     try:
-        p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-        solver_output = p.communicate(timeout = (timeout - gringo_duration),input = grounder_output)[0]
+        solver_output = solver_process_p.communicate(timeout = (timeout - gringo_duration),input = grounder_output)[0]
 
         clingo_end_time = time.time()   
         gringo_clingo_duration = clingo_end_time - clingo_start_time + gringo_duration
 
-        if p.returncode != 10 and p.returncode != 20:
+        if solver_process_p.returncode != 10 and solver_process_p.returncode != 20:
             clingo_out_of_time = True
             gringo_clingo_duration = timeout
 
     except TimeoutExpired:
-        p.kill()
-        solver_output, errs = p.communicate()
+        solver_process_p.kill()
+        solver_output, errs = solver_process_p.communicate()
 
         clingo_out_of_time = True
         gringo_clingo_duration = timeout

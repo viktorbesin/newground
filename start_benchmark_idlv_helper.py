@@ -44,22 +44,23 @@ temp_file = tempfile.NamedTemporaryFile(mode="w+")
 with open(temp_file.name, "w") as f:
     f.write(input_code)
 
+grounder_process_p = subprocess.Popen([config["idlv_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+solver_process_p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
 idlv_start_time = time.time()   
 
 try:
-    p = subprocess.Popen([config["idlv_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-    grounder_output = p.communicate( timeout = timeout)[0]
+    grounder_output = grounder_process_p.communicate( timeout = timeout)[0]
     idlv_duration = time.time() - idlv_start_time
 
     grounder_output = grounder_output.decode().strip().encode()
 
-    if p.returncode != 0:
+    if grounder_process_p.returncode != 0:
         idlv_out_of_time = True
         idlv_duration = timeout
 
 except TimeoutExpired:
-    p.kill()
-    grounder_output, failure_errors = p.communicate()
+    grounder_process_p.kill()
+    grounder_output, failure_errors = grounder_process_p.communicate()
 
     idlv_out_of_time = True
     idlv_duration = timeout
@@ -78,20 +79,18 @@ clingo_start_time = time.time()
 if grounder_output != None and idlv_out_of_time == False and idlv_duration < timeout and ground_and_solve:
 
     try:
-        p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
-
-        solver_output = p.communicate(input = grounder_output, timeout = (timeout - idlv_duration))[0]
+        solver_output = solver_process_p.communicate(input = grounder_output, timeout = (timeout - idlv_duration))[0]
 
         clingo_end_time = time.time()   
         idlv_clingo_duration = clingo_end_time - clingo_start_time + idlv_duration
 
-        if p.returncode != 10 and p.returncode != 20:
+        if solver_process_p.returncode != 10 and solver_process_p.returncode != 20:
             idlv_out_of_time = True
             idlv_clingo_duration = timeout
 
     except TimeoutExpired:
-        p.kill()
-        solver_output, failure_errors = p.communicate()
+        solver_process_p.kill()
+        solver_output, failure_errors = solver_process_p.communicate()
 
         idlv_out_of_time = True
         idlv_clingo_duration = timeout

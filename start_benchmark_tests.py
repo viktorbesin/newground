@@ -169,21 +169,29 @@ class Benchmark:
 
         arguments = [config["python_command"], helper_script] + encoded_list
 
-        ret_vals = (True, timeout, timeout, sys.maxsize)
-    
+        ret_vals = None 
 
         try:
-            p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            ret_vals_encoded = p.communicate(input = program_input, timeout = timeout + 1)[0]
+            p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+            ret_vals_encoded = p.communicate(input = program_input, timeout = int(timeout*1.1))[0]
             ret_vals = StartBenchmarkUtils.decode_argument(ret_vals_encoded.decode())
-            print(ret_vals)
 
 
             if p.returncode != 0:
                 print(f">>>>> Other return code than 0 in helper: {p.returncode}")
 
         except Exception as ex:
+            try:
+                p.kill()
+            except Exception as e:
+                pass
+
             print(ex)
+
+        if ret_vals is None or not isinstance(ret_vals, tuple):
+            ret_vals = (True, timeout, timeout, sys.maxsize)
+
+        print(ret_vals)
 
         return ret_vals
 

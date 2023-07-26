@@ -45,23 +45,31 @@ newground_clingo_duration = timeout
 
 grounding_file_size_kb = 0
 
+newground_process_p = subprocess.Popen([config["python_command"], "start_newground.py", config["rewriting_strategy"],  f"{temp_file.name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+
+if grounder == "NEWGROUND-IDLV":
+    grounder_process_p = subprocess.Popen([config["idlv_command"], f"--stdin"], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+elif grounder == "NEWGROUND-GRINGO":
+    grounder_process_p = subprocess.Popen([config["gringo_command"]], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+
+solver_process_p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout = subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
+
 newground_start_time = time.time()   
 
 try: 
-    p = subprocess.Popen([config["python_command"], "start_newground.py", config["rewriting_strategy"],  f"{temp_file.name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-    newground_output = p.communicate( timeout = timeout)[0]
+    newground_output = newground_process_p.communicate( timeout = timeout)[0]
     newground_duration = time.time() - newground_start_time
 
     newground_output = newground_output.decode().strip().encode()
 
-    if p.returncode != 0:
+    if newground_process_p.returncode != 0:
         #print("return code != 0")
         newground_out_of_time = True
         newground_duration = timeout
 
 except TimeoutExpired:
-    p.kill()
-    newground_output, failure_errors = p.communicate()
+    newground_process_p.kill()
+    newground_output, failure_errors = newground_process_p.communicate()
 
     newground_out_of_time = True
     newground_duration = timeout
@@ -79,25 +87,20 @@ grounder_start = time.time()
 
 if newground_output != None and newground_out_of_time == False and newground_duration < timeout:
     try:
-        if grounder == "NEWGROUND-IDLV":
-            p = subprocess.Popen([config["idlv_command"], f"--stdin"], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
 
-        elif grounder == "NEWGROUND-GRINGO":
-            p = subprocess.Popen([config["gringo_command"]], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-
-        second_grounder_output = p.communicate(input = newground_output, timeout = timeout)[0]
+        second_grounder_output = grounder_process_p.communicate(input = newground_output, timeout = timeout)[0]
         newground_duration = (time.time() - grounder_start) + newground_duration
 
         second_grounder_output = second_grounder_output.decode().strip().encode()
 
-        if p.returncode != 0:
+        if grounder_process_p.returncode != 0:
             #print("other bad things")
             newground_out_of_time = True
             newground_duration = timeout
 
     except TimeoutExpired:
-        p.kill()
-        second_grounder_output, failure_errors = p.communicate()
+        grounder_process_p.kill()
+        second_grounder_output, failure_errors = grounder_process_p.communicate()
 
         newground_out_of_time = True
         newground_duration = timeout
@@ -117,13 +120,12 @@ if newground_output != None and newground_out_of_time == False and newground_dur
     if second_grounder_output != None and newground_out_of_time == False and newground_duration < timeout and ground_and_solve:
 
         try:
-            p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout = subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
 
-            solver_output = p.communicate(input = second_grounder_output, timeout = (timeout - newground_duration))[0]
+            solver_output = solver_process_p.communicate(input = second_grounder_output, timeout = (timeout - newground_duration))[0]
             clingo_end_time = time.time()   
             newground_clingo_duration = clingo_end_time - solver_start_time + newground_duration
 
-            if p.returncode != 10 and p.returncode != 20: # Clingo return code for everything fine
+            if solver_process_p.returncode != 10 and solver_process_p.returncode != 20: # Clingo return code for everything fine
                 #print("clingo bad things")
                 newground_out_of_time = True
                 newground_clingo_duration = timeout
@@ -131,8 +133,8 @@ if newground_output != None and newground_out_of_time == False and newground_dur
             #print(solver_output.decode().strip())
 
         except TimeoutExpired:
-            p.kill()
-            solver_output, errs = p.communicate()
+            solver_process_p.kill()
+            solver_output, errs = solver_process_p.communicate()
             clingo_end_time = time.time()   
 
             newground_out_of_time = True
