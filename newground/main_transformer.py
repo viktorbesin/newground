@@ -1,7 +1,6 @@
 import os 
 import sys
 import re
-import time
 
 import itertools
 import argparse
@@ -109,16 +108,11 @@ class MainTransformer(Transformer):
     def visit_Rule(self, node):
 
         if not self.rules:
-            start_time = time.time()
             self._reset_after_rule()
             if not self.ground:
                 self._outputNodeFormatConform(node)
 
             self.current_rule_position += 1
-
-            end_time = time.time()
-            #print(f"[INFO] ----> rule duration time: {end_time - start_time}")
-
 
             return node
 
@@ -128,13 +122,8 @@ class MainTransformer(Transformer):
 
             return node # In this mode do nothing here
 
-        start_time = time.time()
-
         self.visit_children(node)
 
-
-        end_time = time.time()
-        #print(f"[INFO] ----> rule (beginning) duration time: {end_time - start_time} (rule: {str(node)})")
 
         # if so: handle grounding
         if self.ng:
@@ -145,21 +134,12 @@ class MainTransformer(Transformer):
             else:
                 head = None
 
-            start_time = time.time()
-
 
             self._generate_sat_part(head)
-
-            end_time = time.time()
-            #print(f"[INFO] ------> SAT TIME: {end_time - start_time}")
-            start_time = time.time()
 
             # FOUND NEW
             if head is not None:
                 self._generate_foundedness_part(head)
-
-            end_time = time.time()
-            #print(f"[INFO] ------> FOUNDEDNESS TIME: {end_time - start_time}")
 
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -368,6 +348,8 @@ class MainTransformer(Transformer):
 
             if node.head.ast_type == clingo.ast.ASTType.Aggregate:
                 head_string = f"{str(node.head)}"
+            elif node.head.ast_type == clingo.ast.ASTType.Disjunction:
+                head_string = "|".join([str(elem) for elem in node.head.elements])
             else:
                 head_string = f"{str(node.head).replace(';', ',')}"
 
@@ -390,24 +372,11 @@ class MainTransformer(Transformer):
     def _generate_sat_part(self, head):
 
 
-        start_time = time.time()
-
         self._generate_sat_variable_possibilities()
-
-        end_time = time.time()
-        #print(f"[INFO] --------> SAT GENERATE POSSIBILITIES TIME {end_time - start_time}")
-        start_time = time.time()
 
         covered_subsets = self._generate_sat_comparisons()
 
-        end_time = time.time()
-        #print(f"[INFO] --------> SAT COMPARISONS TIME {end_time - start_time}")
-        start_time = time.time()
-
         self._generate_sat_functions(head, covered_subsets)
-
-        end_time = time.time()
-        #print(f"[INFO] --------> SAT FUNCTIONS TIME {end_time - start_time}")
 
 
     def _generate_sat_variable_possibilities(self):
@@ -462,9 +431,6 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            if self.count == True and self.aggregate_mode == AggregateMode.REWRITING: # Special efficiency mode for count aggregate
-                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(right)
-
             for c in combinations:
 
                 variable_assignments = {}
@@ -480,43 +446,21 @@ class MainTransformer(Transformer):
                     if variable in vars:
                         interpretation_list.append(f"r{self.current_rule_position}_{variable}({variable_assignments[variable]})")
 
-                # This is the most expensive (compuationally) part of the entire program...
-                if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                    left_eval = ComparisonTools.evaluate_operation(left, variable_assignments)
-                    right_eval = ComparisonTools.evaluate_operation(right, variable_assignments)
+                left_eval = ComparisonTools.evaluate_operation(left, variable_assignments)
+                right_eval = ComparisonTools.evaluate_operation(right, variable_assignments)
 
-                    sint = self.ignore_exception(ValueError)(int)
-                    left_eval = sint(left_eval)
-                    right_eval = sint(right_eval)
+                sint = self.ignore_exception(ValueError)(int)
+                left_eval = sint(left_eval)
+                right_eval = sint(right_eval)
 
-                    safe_checks = left_eval != None and right_eval != None
-                    evaluation = safe_checks and not ComparisonTools.compareTerms(comparison_operator, int(left_eval), int(right_eval))
-                else: # Aggregate COUNT Efficiency mode
-
-                    evaluation = True
-
-                    for variable_tuple in count_aggregate_vars:
-                        first = variable_tuple[0]
-                        second = variable_tuple[1]
-
-                        first_assigned = variable_assignments[first]
-                        second_assigned = variable_assignments[second]
-
-                        if first_assigned != second_assigned:
-                            evaluation = False
-                            break
-
-                    safe_checks = True
-
+                safe_checks = left_eval != None and right_eval != None
+                evaluation = safe_checks and not ComparisonTools.compareTerms(comparison_operator, int(left_eval), int(right_eval))
+                
                 if not safe_checks or evaluation:
-                    if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                        left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
-                        right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
-                        unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
-                        #interpretation = f"{','.join(interpretation_list)}, not {unfound_comparison}"
-                        interpretation = f"{','.join(interpretation_list)}"
-                    else:
-                        interpretation = f"{','.join(interpretation_list)}"
+                    left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
+                    right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
+                    unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
+                    interpretation = f"{','.join(interpretation_list)}"
 
                     sat_atom = f"sat_r{self.current_rule_position}"
 
@@ -603,9 +547,6 @@ class MainTransformer(Transformer):
 
     def _generate_foundedness_part(self, head):
 
-
-        start_time = time.time()
-
         # head
         h_args_len = len(head.arguments)
         h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
@@ -669,31 +610,12 @@ class MainTransformer(Transformer):
                 for v2 in f_vars:
                     g.add_edge(v1, v2) 
 
-        end_time = time.time()
-        #print(f"[INFO] --------> UNFOUNDEDNESS INTRO PART TIME: {end_time - start_time}")
-
-        start_time = time.time()
-        
-
  
         self._generate_foundedness_head(head, rem, g, g_r, h_vars, h_args)
 
-        end_time = time.time()
-        #print(f"[INFO] --------> UNFOUNDEDNESS HEAD PART TIME: {end_time - start_time}")
-
-        start_time = time.time()
-
-
         covered_subsets = self._generate_foundedness_comparisons(head, rem, h_vars, h_args, g)
 
-        end_time = time.time()
-        #print(f"[INFO] --------> UNFOUNDEDNESS COMPARISON PART TIME: {end_time - start_time}")
-
-
-        start_time = time.time()
         self._generate_foundedness_functions(head, rem, h_vars, h_args, g, covered_subsets)
-        end_time = time.time()
-        #print(f"[INFO] --------> UNFOUNDEDNESS FUNCTION PART TIME: {end_time - start_time}")
 
 
     def _generate_foundedness_head(self, head, rem, g, g_r, h_vars, h_args):
@@ -797,15 +719,6 @@ class MainTransformer(Transformer):
         # ---------------------------------------------
         # The next section is about the handling of the comparison operators (foundedness)
 
-        duration_0 = 0
-        duration_1 = 0
-        duration_2 = 0
-        duration_3 = 0
-        duration_4 = 0
-        duration_5 = 0
-
-
-
         covered_subsets = {}
         # for every cmp operator
         for f in self.cur_comp:
@@ -836,21 +749,8 @@ class MainTransformer(Transformer):
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            if self.count == True and self.aggregate_mode == AggregateMode.REWRITING: # Special efficiency mode for count aggregate
-                count_aggregate_vars = ComparisonTools.aggregate_count_special_variable_getter(right)
-                if str(head) not in self.unfounded_rules: # Only possible for count special case
-                    self.unfounded_rules[str(head)] = {}
-
-                if str(self.current_rule_position) not in self.unfounded_rules[str(head)]: # Only possible for count special case
-                    self.unfounded_rules[str(head)][str(self.current_rule_position)] = []
-
-
-                unfounded_head_list = self.unfounded_rules[str(head)][str(self.current_rule_position)]
-
             #print(f"[INFO] -------> NUMBER OF COMBINATIONS: {len(combinations)}")
             for combination in combinations:
-
-                start_time = time.time()
 
                 variable_assignments = {}
 
@@ -874,56 +774,21 @@ class MainTransformer(Transformer):
                     else: # Static
                         body_combination[f_arg] = f_arg 
 
-                end_time = time.time()
-                duration_0 += (end_time - start_time)
-                start_time = time.time()
+                left_eval = ComparisonTools.evaluate_operation(left, variable_assignments)
+                right_eval = ComparisonTools.evaluate_operation(right, variable_assignments)
 
-                start_time_4 = time.time()
+                sint = self.ignore_exception(ValueError)(int)
+                left_eval = sint(left_eval)
+                right_eval = sint(right_eval)
 
-                # This is the most expensive (compuationally) part of the entire program...
-                if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                    left_eval = ComparisonTools.evaluate_operation(left, variable_assignments)
-                    right_eval = ComparisonTools.evaluate_operation(right, variable_assignments)
-
-                    sint = self.ignore_exception(ValueError)(int)
-                    left_eval = sint(left_eval)
-                    right_eval = sint(right_eval)
-
-                    safe_checks = left_eval != None and right_eval != None
-                    evaluation = safe_checks and not ComparisonTools.compareTerms(comparison_operator, int(left_eval), int(right_eval))
-                else: # Aggregate COUNT Efficiency mode
-
-                    evaluation = True
-
-                    for variable_tuple in count_aggregate_vars:
-                        first = variable_tuple[0]
-                        second = variable_tuple[1]
-
-                        first_assigned = variable_assignments[first]
-                        second_assigned = variable_assignments[second]
-
-                        if first_assigned != second_assigned:
-                            evaluation = False
-                            break
-
-                    safe_checks = True
-
-                end_time_4 = time.time()
-                duration_4 += (end_time_4 - start_time_4)
-                start_time_5 = time.time()
-                end_time_5 = time.time()
-                duration_5 += (end_time_5 - start_time_5)
-
-                end_time = time.time()
-                duration_1 += (end_time - start_time)
-                start_time = time.time()
-
+                safe_checks = left_eval != None and right_eval != None
+                evaluation = safe_checks and not ComparisonTools.compareTerms(comparison_operator, int(left_eval), int(right_eval))
+            
                 if not safe_checks or evaluation:
 
-                    if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                        left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
-                        right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
-                        unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
+                    left_instantiation = ComparisonTools.instantiate_operation(left, variable_assignments)
+                    right_instantiation = ComparisonTools.instantiate_operation(right, variable_assignments)
+                    unfound_comparison = ComparisonTools.comparison_handlings(comparison_operator, left_instantiation, right_instantiation)
 
                     unfound_body_list = []
 
@@ -940,23 +805,9 @@ class MainTransformer(Transformer):
                         unfound_rule = f"{unfound_atom} :- {unfound_body}"
                         unfound_rule += "."
 
-                        """
-                        if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                            unfound_rule += f", not {unfound_comparison}."
-                        else:
-                            unfound_rule += "."
-                        """
-
                     else:
                         unfound_rule = f"{unfound_atom}"
                         unfound_rule += "."
-
-                        """
-                        if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                            unfound_rule += f" :- not {unfound_comparison}."
-                        else:
-                            unfound_rule += "."
-                        """
 
                     self.printer.custom_print(unfound_rule)
 
@@ -965,39 +816,27 @@ class MainTransformer(Transformer):
 
                     covered_subsets[unfound_atom].append(unfound_body_list)
 
-                end_time = time.time()
-                duration_2 += (end_time - start_time)
-                start_time = time.time()
+                dom_list_2 = []
+                for arg in h_args:
+                    if arg in h_vars and arg not in head_combination: 
+                        values = self._get_domain_values_from_rule_variable(self.current_rule_position, arg) 
+                        dom_list_2.append(values)
+                    elif arg in h_vars and arg in head_combination:
+                        dom_list_2.append([head_combination[arg]])
+                    else:
+                        dom_list_2.append([arg])
 
-                if self.count == False or self.aggregate_mode != AggregateMode.REWRITING:
-                    dom_list_2 = []
-                    for arg in h_args:
-                        if arg in h_vars and arg not in head_combination: 
-                            values = self._get_domain_values_from_rule_variable(self.current_rule_position, arg) 
-                            dom_list_2.append(values)
-                        elif arg in h_vars and arg in head_combination:
-                            dom_list_2.append([head_combination[arg]])
-                        else:
-                            dom_list_2.append([arg])
+                combinations_2 = [p for p in itertools.product(*dom_list_2)]
 
-                    combinations_2 = [p for p in itertools.product(*dom_list_2)]
+                for combination_2 in combinations_2:
 
-                    for combination_2 in combinations_2:
+                    if len(head_combination_list_2) > 0:
+                        head_string = f"{head.name}({','.join(list(combination_2))})"
+                    else:
+                        head_string = f"{head.name}"
 
-                        if len(head_combination_list_2) > 0:
-                            head_string = f"{head.name}({','.join(list(combination_2))})"
-                        else:
-                            head_string = f"{head.name}"
-
-                        #print(f"{head_string}/{unfound_atom}")
-                        self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
-                else:  # For count aggregate
-                    unfounded_head_list.append(unfound_atom)
-
-                end_time = time.time()
-                duration_3 += (end_time - start_time)
-
-        #print(f"[INFO] ----------> DURATION 0: {duration_0}, 1: {duration_1} (with p4: {duration_4}, p5: {duration_5}), 2: {duration_2}, 3: {duration_3}")
+                    #print(f"{head_string}/{unfound_atom}")
+                    self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
         return covered_subsets
 
@@ -1026,8 +865,6 @@ class MainTransformer(Transformer):
 
                 for combination in combinations:
 
-                    start_time = time.time()
-                   
                     head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                     # ---------

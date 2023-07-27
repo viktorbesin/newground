@@ -1,7 +1,6 @@
-import time
-import clingo
+from enum import Enum
 
-from clingo.ast import Transformer, Variable, parse_string, ProgramBuilder
+from clingo.ast import parse_string, ProgramBuilder
 
 from clingo.control import Control
 
@@ -10,46 +9,49 @@ from .term_transformer import TermTransformer
 from .domain_transformer import DomainTransformer
 from .main_transformer import MainTransformer
 
+class NormalStrategy(Enum):
+    ASSUME_TIGHT = 1
+    AUXILIARY = 2
+    ORDERED_DERIVATION = 3
+
 class Newground:
 
-    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_strategy = AggregateMode.REPLACE):
+    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.REPLACE, normal_mode = NormalStrategy.ASSUME_TIGHT):
         self.no_show = no_show
         self.ground_guess = ground_guess
         self.ground = ground
         self.output_printer = output_printer
 
-        self.aggregate_mode = aggregate_strategy
+        self.aggregate_mode = aggregate_mode
+        self.normal_mode = normal_mode
 
         self.rules = False
 
     def start(self, contents):
 
-        start_time = time.time()
+        aggregate_transformer_output_program = self.start_aggregate_transformer(contents)
 
+        domain, safe_variables, term_transformer = self.start_domain_inference(aggregate_transformer_output_program)
+
+        self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer)
+
+        
+
+    def start_aggregate_transformer(self, contents):
+ 
         aggregate_transformer = AggregateTransformer(self.aggregate_mode)
         parse_string(contents, lambda stm: aggregate_transformer(stm))
-
-        end_time = time.time()
-        #print(f"[INFO] --> Newground aggregate_transformer_duration: {end_time - start_time}")
 
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
 
-        #print(program_string)
-        #print("<<<<>>>>")
-        #print("<<<<>>>>")
-        #quit()
-
-        combined_inputs = program_string
-
         if self.ground:
             self.output_printer.custom_print(contents)
 
-        start_time = time.time()
+        return program_string
 
-
-
-
+    def start_domain_inference(self, combined_inputs):
+        
         term_transformer = TermTransformer(self.output_printer, self.no_show)
         parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
@@ -57,12 +59,6 @@ class Newground:
         domain = term_transformer.domain
 
         comparisons = term_transformer.comparison_operators_variables
-
-        end_time = time.time()
-        #print(f"[INFO] --> Newground term_transformer_duration: {end_time - start_time}")
-
-
-        start_time = time.time()
 
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
@@ -81,23 +77,19 @@ class Newground:
             new_domain_hash = hash(str(domain))
 
 
-        end_time = time.time()
-        #print(f"[INFO] --> Newground domain_transformer_duration: {end_time - start_time}")
+        return (domain, safe_variables, term_transformer)
+       
 
-
-        start_time = time.time()
-
+    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer):
 
         ctl = Control()
         with ProgramBuilder(ctl) as bld:
-            transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts, term_transformer.ng_heads, term_transformer.shows, self.ground_guess, self.ground, self.output_printer, domain, safe_variables, self.aggregate_mode)
+            transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts,
+                                          term_transformer.ng_heads, term_transformer.shows,
+                                          self.ground_guess, self.ground, self.output_printer,
+                                          domain, safe_variables, self.aggregate_mode)
 
-            parse_string(combined_inputs, lambda stm: bld.add(transformer(stm)))
-
-            end_time = time.time()
-            #print(f"[INFO] --> Newground main_transformer_duration: {end_time - start_time}")
-
-
+            parse_string(aggregate_transformer_output_program, lambda stm: bld.add(transformer(stm)))
 
             if len(transformer.non_ground_rules.keys()) > 0:
                 parse_string(":- not sat.", lambda stm: bld.add(stm))

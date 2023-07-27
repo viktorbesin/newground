@@ -4,6 +4,7 @@ import argparse
 from .newground import Newground
 from .default_output_printer import DefaultOutputPrinter
 from .aggregate_transformer import AggregateMode
+from .newground import NormalStrategy
 
 def main():
     parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
@@ -13,6 +14,7 @@ def main():
     parser.add_argument('--ground', action='store_true',
                         help='Output program fully grounded. ')
     parser.add_argument('--aggregate-strategy', default='replace', choices=['replace','rewrite','rewrite-no-body'])
+    parser.add_argument('--normal-strategy', default='assume-tight', choices=['assume-tight','auxiliary','ordered-derivation'])
     parser.add_argument('files', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
 
@@ -38,11 +40,19 @@ def main():
     elif args.aggregate_strategy == 'rewrite-no-body':
         aggregate_strategy = AggregateMode.REWRITING_NO_BODY
 
+    normal_strategy = None
+    if args.normal_strategy == 'assume-tight':
+        normal_strategy = NormalStrategy.ASSUME_TIGHT
+    elif args.normal_strategy == 'auxiliary':
+        normal_strategy = NormalStrategy.AUXILIARY
+    elif args.normal_strategy == 'ordered-derivation':
+        normal_strategy = NormalStrategy.ORDERED_DERIVATION
+
     contents = ""
     for f in args.files:
         contents += f.read()
 
-    newground = Newground(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter(), aggregate_strategy = aggregate_strategy)
+    newground = Newground(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter(), aggregate_mode = aggregate_strategy, normal_mode = normal_strategy)
     newground.start(contents)
 
 
