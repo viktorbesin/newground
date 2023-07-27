@@ -348,6 +348,8 @@ class MainTransformer(Transformer):
 
             if node.head.ast_type == clingo.ast.ASTType.Aggregate:
                 head_string = f"{str(node.head)}"
+            elif node.head.ast_type == clingo.ast.ASTType.Disjunction:
+                head_string = "|".join([str(elem) for elem in node.head.elements])
             else:
                 head_string = f"{str(node.head).replace(';', ',')}"
 

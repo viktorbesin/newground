@@ -913,6 +913,13 @@ class AggregateTransformer(Transformer):
 
         if not self.cur_has_aggregate or not self.rules:
             body_rep = ""
+
+            if node.head.ast_type == clingo.ast.ASTType.Disjunction:
+                new_head = "|".join([str(elem) for elem in node.head.elements])
+            else:
+                new_head = str(node.head)
+
+
             for body_element_index in range(len(node.body)):
                 body_elem = node.body[body_element_index]
                 if body_element_index < len(node.body) - 1:
@@ -921,9 +928,9 @@ class AggregateTransformer(Transformer):
                     body_rep += f"{str(body_elem)}"
 
             if len(node.body) > 0:
-                self.new_prg.append(f"{str(node.head)} :- {body_rep}.")
+                self.new_prg.append(f"{new_head} :- {body_rep}.")
             else:    
-                self.new_prg.append(f"{str(node.head)}.")
+                self.new_prg.append(f"{new_head}.")
 
         else:
             head = str(node.head)
