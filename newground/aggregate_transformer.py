@@ -68,12 +68,208 @@ class AggregateTransformer(Transformer):
         self.cur_function = None
 
         return node
+    
+    def visit_Rule(self, node):
+
+        self.cur_head = node.head
+
+        self.visit_children(node)
+
+        if not self.cur_has_aggregate or not self.rules:
+            body_rep = ""
+
+            if node.head.ast_type == clingo.ast.ASTType.Disjunction:
+                new_head = "|".join([str(elem) for elem in node.head.elements])
+            else:
+                new_head = str(node.head)
+
+
+            for body_element_index in range(len(node.body)):
+                body_elem = node.body[body_element_index]
+                if body_element_index < len(node.body) - 1:
+                    body_rep += f"{str(body_elem)},"
+                else:
+                    body_rep += f"{str(body_elem)}"
+
+            if len(node.body) > 0:
+                self.new_prg.append(f"{new_head} :- {body_rep}.")
+            else:    
+                self.new_prg.append(f"{new_head}.")
+
+        else:
+            head = str(node.head)
+            remaining_body = []
+
+            for body_item in node.body:
+                if body_item.atom.ast_type != clingo.ast.ASTType.BodyAggregate:
+                    remaining_body.append(str(body_item))
+
+            for aggregate_index in range(len(self.cur_aggregates)):
+                aggregate = self.cur_aggregates[aggregate_index]
+                str_type = aggregate["function"][1]
+                remaining_body += self._add_aggregate_helper_rules(aggregate_index)
+
+            remaining_body_string = ','.join(remaining_body)
+            new_rule = f"{head} :- {remaining_body_string}."
+            self.new_prg.append(new_rule)
+            self.new_prg.append(f"#program rules.")
+
+        self.reset_temporary_variables() # MUST BE LAST
+        return node
+
+    def visit_BodyAggregate(self, node):
+
+        self.cur_has_aggregate = True
+
+        aggregate_dict = {}
+        aggregate_dict["left_guard"] = node.left_guard
+        aggregate_dict["right_guard"] = node.right_guard
+
+        if node.function == 0:
+            function = (0,"count")
+        elif node.function == 1:
+            function = (1,"sum")
+        elif node.function == 2:
+            function = (2, "sumplus")
+        elif node.function == 3:
+            function = (3, "min")
+        elif node.function == 4:
+            function = (4, "max")
+        else:
+            print(node.function)
+            assert(False) # Not Implemented
+
+        aggregate_dict["function"] = function
+
+        aggregate_dict["id"] = self.aggregate_count
+        self.aggregate_count += 1
+
+        aggregate_dict["elements"] = []
+
+        for element in node.elements:
+            self.visit_BodyAggregateElement(element, aggregate_dict = aggregate_dict)
+        
+        self.cur_aggregates.append(aggregate_dict)
+
+        return node
+        
+
+    def visit_BodyAggregateElement(self, node, aggregate_dict = None):
+
+        if aggregate_dict:
+
+            element_dict = {}
+
+            term_strings = []
+            for term in node.terms:
+                term_strings.append(str(term))
+
+            element_dict["terms"] = term_strings
+
+            element_dict["condition_variables"] = []
+
+            condition_strings = []
+            for condition in node.condition:
+
+                if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
+                    for argument in condition.atom.symbol.arguments:
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            if str(argument) not in element_dict["condition_variables"]:
+                                element_dict["condition_variables"].append(str(argument))
+                elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
+
+                    comparison = condition.atom
+
+                    left = comparison.term
+                    assert(len(comparison.guards) <= 1)
+                    right = comparison.guards[0].term
+                    comparison_operator = comparison.guards[0].comparison
+
+                    left_arguments = ComparisonTools.get_arguments_from_operation(left)
+                    for argument in left_arguments:
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            if str(argument) not in element_dict["condition_variables"]:
+                                element_dict["condition_variables"].append(str(argument))
+
+                    right_arguments = ComparisonTools.get_arguments_from_operation(right)
+                    for argument in right_arguments:
+                        if argument.ast_type == clingo.ast.ASTType.Variable:
+                            if str(argument) not in element_dict["condition_variables"]:
+                                element_dict["condition_variables"].append(str(argument))
+
+                else:
+                    print(condition)
+                    print(condition.ast_type)
+                    assert(False)
+
+
+                if self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+                    if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
+                        cur_dict = {}
+                        cur_dict["all"] = str(condition)
+                        cur_dict["name"] = str(condition.atom.symbol.name) 
+                        cur_dict["arguments"] = []
+
+
+                        for argument in condition.atom.symbol.arguments:
+                            if argument.ast_type == clingo.ast.ASTType.Variable:
+                                variable_argument = {}
+                                variable_argument["variable"] = str(argument)
+                                
+                                cur_dict["arguments"].append(variable_argument)
+
+                            elif argument.ast_type == clingo.ast.ASTType.SymbolicTerm:
+                                term_argument = {}
+                                term_argument["term"] = str(argument)
+                                
+                                cur_dict["arguments"].append(term_argument)
+
+                            else:
+                                print(argument)
+                                print(argument.ast_type)
+                                print("NOT IMPLEMENTED")
+                                assert(False) # Not implemented
+
+                        condition_strings.append(cur_dict)
+                    elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
+                        cur_dict = {}
+                        cur_dict["all"] = str(condition)
+                        cur_dict["comparison"] = condition.atom
+
+                        condition_strings.append(cur_dict)
+
+                    else:
+                        print(condition)
+                        print(condition.ast_type)
+                        assert(False)
+
+                else:
+                    condition_strings.append(str(condition))
+
+            element_dict["condition"] = condition_strings
+
+            aggregate_dict["elements"].append(element_dict) 
+
+        return node
+
+    def visit_Variable(self, node):
+
+        if str(self.cur_function) == str(self.cur_head):
+            return node
+
+        if str(node) not in self.cur_variable_dependencies:
+            self.cur_variable_dependencies[str(node)] = []
+
+        self.cur_variable_dependencies[str(node)].append(self.cur_function)
+
+        return node
+
+
+
 
     def _add_aggregate_helper_rules(self, aggregate_index):
         aggregate = self.cur_aggregates[aggregate_index]
         str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
-
 
         # Get all variables into a list that occur in all elements of the aggregate
         all_aggregate_variables = []
@@ -86,159 +282,172 @@ class AggregateTransformer(Transformer):
 
         variables_dependencies_aggregate = []
 
-
         for variable in all_aggregate_variables:
             if variable in self.cur_variable_dependencies:
                 variables_dependencies_aggregate.append(variable)
 
-
         remaining_body = []
         if self.aggregate_mode == AggregateMode.REWRITING:
 
+            self.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, remaining_body)
 
-            if str_type == "sum":
-
-                remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
-
-                if aggregate["left_guard"]:
-                    guard = aggregate["left_guard"]
-                    remaining_body.append(f"{guard.term} {ComparisonTools.getCompOperator(guard.comparison)} S{aggregate_index}")
-                if aggregate["right_guard"]:
-                    guard = aggregate["right_guard"]
-                    remaining_body.append(f"S{aggregate_index} {ComparisonTools.getCompOperator(guard.comparison)} {guard.term}")
-
-                self._add_sum_aggregate_rules(aggregate_index)
-            elif str_type == "count":
-
-
-                count_name_ending = ""
-                if len(variables_dependencies_aggregate) == 0:
-                    count_name_ending += "(1)"
-                else:
-                    count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
-
-                # self.cur_variable_dependencies 
-                if aggregate["left_guard"]:
-                    guard = aggregate["left_guard"]
-                    left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
-                    remaining_body.append(left_name)
-                if aggregate["right_guard"]:
-                    guard = aggregate["right_guard"]
-                    right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
-                    remaining_body.append(right_name)
-
-                self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
-            elif str_type == "min":
-                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._min_operator_functions, self._min_remaining_body_functions)
-            elif str_type == "max":
-
-                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._max_operator_functions, self._max_remaining_body_functions)
-            else: 
-                assert(False) # Not Implemented
         elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and (str_type == "count" or str_type == "max" or str_type == "min"):
 
-            if str_type == "count":
-
-                count_name_ending = ""
-                if len(variables_dependencies_aggregate) == 0:
-                    count_name_ending += "(1)"
-                else:
-                    count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
-
-
-                if aggregate["left_guard"]:
-                    guard = aggregate["left_guard"]
-                    left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
-                    remaining_body.append(left_name)
-                if aggregate["right_guard"]:
-                    guard = aggregate["right_guard"]
-                    right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
-                    remaining_body.append(right_name)
-
-                self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
-            elif str_type == "min":
-                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._min_operator_functions, self._min_remaining_body_functions)
-            elif str_type == "max":
-                remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._max_operator_functions, self._max_remaining_body_functions)
-
+            self.rewriting_no_body_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, remaining_body)
 
         elif self.aggregate_mode == AggregateMode.REPLACE:
 
-            aggregate = self.cur_aggregates[aggregate_index]
-            elements = aggregate["elements"]
-
-            str_type = aggregate["function"][1]
-            str_id = aggregate["id"] 
-
-            element_dependent_variables_list = []
-
-            for element_index in range(len(elements)):
-                element = elements[element_index]
-                element_dependent_variables = []
-
-                for variable in element["condition_variables"]:
-                    if variable in variables_dependencies_aggregate:
-                        element_dependent_variables.append(variable)
-
-                element_dependent_variables_list.append(element_dependent_variables)
-
-                terms = element["terms"]
-
-                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-
-                terms_string = f"{','.join(terms + element_dependent_variables)}"
-
-                element_body = f"{element_predicate_name}({terms_string})"
-                body_string = f"{element_body} :- {','.join(element['condition'])}."
-
-                self.new_prg.append(body_string)
-
-            new_elements = []
-
-            for element_index in range(len(elements)):
-                element = aggregate["elements"][element_index]
-
-                element_dependent_variables = element_dependent_variables_list[element_index]
-                terms = element["terms"]
-
-                element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
-
-                terms_string = f"{','.join(terms + element_dependent_variables)}"
-
-                element_body = f"{element_predicate_name}({terms_string})"
-
-                new_element = f"{','.join(element['terms'])} : {element_body}"
-
-                new_elements.append(new_element)
-
-            new_aggregate = f""
-
-            if aggregate["left_guard"]:
-                left_guard = aggregate["left_guard"]
-                left_guard_term = str(left_guard.term)
-
-                operator = ComparisonTools.getCompOperator(left_guard.comparison)
-
-                new_aggregate += f"{left_guard_term} {operator} "
-
-            new_aggregate += f"#{str_type}{{{';'.join(new_elements)}}}"
-
-            if aggregate["right_guard"]:
-                right_guard = aggregate["right_guard"]
-                right_guard_term = str(right_guard.term)
-
-                operator = ComparisonTools.getCompOperator(right_guard.comparison)
-
-                new_aggregate += f" {operator} {right_guard_term}"
-
-            self.new_prg.append("#program no_rules.")
-            remaining_body.append(new_aggregate)
+            self.replace_aggregate_strategy(aggregate_index, variables_dependencies_aggregate, remaining_body)
 
         else:
             print(f"Aggregate mode {self.aggregate_mode} not implemented!")
             assert(False)
 
         return remaining_body
+    
+    def rewriting_aggregate_strategy(self, aggregate_index, aggregate, variables_dependencies_aggregate, remaining_body):
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+        if str_type == "sum":
+
+            remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
+
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                remaining_body.append(f"{guard.term} {ComparisonTools.getCompOperator(guard.comparison)} S{aggregate_index}")
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                remaining_body.append(f"S{aggregate_index} {ComparisonTools.getCompOperator(guard.comparison)} {guard.term}")
+
+            self._add_sum_aggregate_rules(aggregate_index)
+        elif str_type == "count":
+
+
+            count_name_ending = ""
+            if len(variables_dependencies_aggregate) == 0:
+                count_name_ending += "(1)"
+            else:
+                count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
+
+            # self.cur_variable_dependencies 
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
+                remaining_body.append(left_name)
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
+                remaining_body.append(right_name)
+
+            self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
+        elif str_type == "min":
+            remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._min_operator_functions, self._min_remaining_body_functions)
+        elif str_type == "max":
+
+            remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._max_operator_functions, self._max_remaining_body_functions)
+        else: 
+            assert(False) # Not Implemented
+
+    def rewriting_no_body_aggregate_strategy(self, aggregate_index, aggregate, variables_dependencies_aggregate, remaining_body):
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+        if str_type == "count":
+            count_name_ending = ""
+            if len(variables_dependencies_aggregate) == 0:
+                count_name_ending += "(1)"
+            else:
+                count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
+
+
+            if aggregate["left_guard"]:
+                guard = aggregate["left_guard"]
+                left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
+                remaining_body.append(left_name)
+            if aggregate["right_guard"]:
+                guard = aggregate["right_guard"]
+                right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
+                remaining_body.append(right_name)
+
+            self._add_count_aggregate_rules(aggregate_index,variables_dependencies_aggregate)
+        elif str_type == "min":
+            remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._min_operator_functions, self._min_remaining_body_functions)
+        elif str_type == "max":
+            remaining_body += self._add_min_max_aggregate_rules(aggregate_index, variables_dependencies_aggregate, self._max_operator_functions, self._max_remaining_body_functions)
+
+    def replace_aggregate_strategy(self, aggregate_index, variables_dependencies_aggregate, remaining_body):
+        aggregate = self.cur_aggregates[aggregate_index]
+        elements = aggregate["elements"]
+
+        str_type = aggregate["function"][1]
+        str_id = aggregate["id"] 
+
+        element_dependent_variables_list = []
+
+        for element_index in range(len(elements)):
+            element = elements[element_index]
+            element_dependent_variables = []
+
+            for variable in element["condition_variables"]:
+                if variable in variables_dependencies_aggregate:
+                    element_dependent_variables.append(variable)
+
+            element_dependent_variables_list.append(element_dependent_variables)
+
+            terms = element["terms"]
+
+            element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+
+            terms_string = f"{','.join(terms + element_dependent_variables)}"
+
+            element_body = f"{element_predicate_name}({terms_string})"
+            body_string = f"{element_body} :- {','.join(element['condition'])}."
+
+            self.new_prg.append(body_string)
+
+        new_elements = []
+
+        for element_index in range(len(elements)):
+            element = aggregate["elements"][element_index]
+
+            element_dependent_variables = element_dependent_variables_list[element_index]
+            terms = element["terms"]
+
+            element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
+
+            terms_string = f"{','.join(terms + element_dependent_variables)}"
+
+            element_body = f"{element_predicate_name}({terms_string})"
+
+            new_element = f"{','.join(element['terms'])} : {element_body}"
+
+            new_elements.append(new_element)
+
+        new_aggregate = f""
+
+        if aggregate["left_guard"]:
+            left_guard = aggregate["left_guard"]
+            left_guard_term = str(left_guard.term)
+
+            operator = ComparisonTools.getCompOperator(left_guard.comparison)
+
+            new_aggregate += f"{left_guard_term} {operator} "
+
+        new_aggregate += f"#{str_type}{{{';'.join(new_elements)}}}"
+
+        if aggregate["right_guard"]:
+            right_guard = aggregate["right_guard"]
+            right_guard_term = str(right_guard.term)
+
+            operator = ComparisonTools.getCompOperator(right_guard.comparison)
+
+            new_aggregate += f" {operator} {right_guard_term}"
+
+        self.new_prg.append("#program no_rules.")
+        remaining_body.append(new_aggregate)
 
     #--------------------------------------------------------------------------------------------------------
     #------------------------------------ MIN-MAX-PART ------------------------------------------------------
@@ -896,210 +1105,6 @@ class AggregateTransformer(Transformer):
             # first
             rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1_def_terms}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1_def_terms})."
             self.new_prg.append(rule_string)
-
-    #--------------------------------------------------------------------------------------------------------
-    #------------------------------------ TRANSFORMER-PART --------------------------------------------------
-    #--------------------------------------------------------------------------------------------------------
-                      
-
-    def visit_Rule(self, node):
-
-        self.cur_head = node.head
-
-        self.visit_children(node)
-
-
-
-
-        if not self.cur_has_aggregate or not self.rules:
-            body_rep = ""
-
-            if node.head.ast_type == clingo.ast.ASTType.Disjunction:
-                new_head = "|".join([str(elem) for elem in node.head.elements])
-            else:
-                new_head = str(node.head)
-
-
-            for body_element_index in range(len(node.body)):
-                body_elem = node.body[body_element_index]
-                if body_element_index < len(node.body) - 1:
-                    body_rep += f"{str(body_elem)},"
-                else:
-                    body_rep += f"{str(body_elem)}"
-
-            if len(node.body) > 0:
-                self.new_prg.append(f"{new_head} :- {body_rep}.")
-            else:    
-                self.new_prg.append(f"{new_head}.")
-
-        else:
-            head = str(node.head)
-            remaining_body = []
-
-            for body_item in node.body:
-                if body_item.atom.ast_type != clingo.ast.ASTType.BodyAggregate:
-                    remaining_body.append(str(body_item))
-
-            for aggregate_index in range(len(self.cur_aggregates)):
-                aggregate = self.cur_aggregates[aggregate_index]
-                str_type = aggregate["function"][1]
-                remaining_body += self._add_aggregate_helper_rules(aggregate_index)
-
-            remaining_body_string = ','.join(remaining_body)
-            new_rule = f"{head} :- {remaining_body_string}."
-            self.new_prg.append(new_rule)
-            self.new_prg.append(f"#program rules.")
-
-        self.reset_temporary_variables() # MUST BE LAST
-        return node
-
-    def visit_BodyAggregate(self, node):
-
-        self.cur_has_aggregate = True
-
-        aggregate_dict = {}
-        aggregate_dict["left_guard"] = node.left_guard
-        aggregate_dict["right_guard"] = node.right_guard
-
-        if node.function == 0:
-            function = (0,"count")
-        elif node.function == 1:
-            function = (1,"sum")
-        elif node.function == 2:
-            function = (2, "sumplus")
-        elif node.function == 3:
-            function = (3, "min")
-        elif node.function == 4:
-            function = (4, "max")
-        else:
-            print(node.function)
-            assert(False) # Not Implemented
-
-        aggregate_dict["function"] = function
-
-        aggregate_dict["id"] = self.aggregate_count
-        self.aggregate_count += 1
-
-        aggregate_dict["elements"] = []
-
-        for element in node.elements:
-            self.visit_BodyAggregateElement(element, aggregate_dict = aggregate_dict)
-        
-        self.cur_aggregates.append(aggregate_dict)
-
-        return node
-        
-
-    def visit_BodyAggregateElement(self, node, aggregate_dict = None):
-
-        if aggregate_dict:
-
-            element_dict = {}
-
-            term_strings = []
-            for term in node.terms:
-                term_strings.append(str(term))
-
-            element_dict["terms"] = term_strings
-
-            element_dict["condition_variables"] = []
-
-            condition_strings = []
-            for condition in node.condition:
-
-                if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
-                    for argument in condition.atom.symbol.arguments:
-                        if argument.ast_type == clingo.ast.ASTType.Variable:
-                            if str(argument) not in element_dict["condition_variables"]:
-                                element_dict["condition_variables"].append(str(argument))
-                elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
-
-                    comparison = condition.atom
-
-                    left = comparison.term
-                    assert(len(comparison.guards) <= 1)
-                    right = comparison.guards[0].term
-                    comparison_operator = comparison.guards[0].comparison
-
-                    left_arguments = ComparisonTools.get_arguments_from_operation(left)
-                    for argument in left_arguments:
-                        if argument.ast_type == clingo.ast.ASTType.Variable:
-                            if str(argument) not in element_dict["condition_variables"]:
-                                element_dict["condition_variables"].append(str(argument))
-
-                    right_arguments = ComparisonTools.get_arguments_from_operation(right)
-                    for argument in right_arguments:
-                        if argument.ast_type == clingo.ast.ASTType.Variable:
-                            if str(argument) not in element_dict["condition_variables"]:
-                                element_dict["condition_variables"].append(str(argument))
-
-                else:
-                    print(condition)
-                    print(condition.ast_type)
-                    assert(False)
-
-
-                if self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
-                    if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
-                        cur_dict = {}
-                        cur_dict["all"] = str(condition)
-                        cur_dict["name"] = str(condition.atom.symbol.name) 
-                        cur_dict["arguments"] = []
-
-
-                        for argument in condition.atom.symbol.arguments:
-                            if argument.ast_type == clingo.ast.ASTType.Variable:
-                                variable_argument = {}
-                                variable_argument["variable"] = str(argument)
-                                
-                                cur_dict["arguments"].append(variable_argument)
-
-                            elif argument.ast_type == clingo.ast.ASTType.SymbolicTerm:
-                                term_argument = {}
-                                term_argument["term"] = str(argument)
-                                
-                                cur_dict["arguments"].append(term_argument)
-
-                            else:
-                                print(argument)
-                                print(argument.ast_type)
-                                print("NOT IMPLEMENTED")
-                                assert(False) # Not implemented
-
-                        condition_strings.append(cur_dict)
-                    elif hasattr(condition, "atom") and condition.atom.ast_type == clingo.ast.ASTType.Comparison:
-                        cur_dict = {}
-                        cur_dict["all"] = str(condition)
-                        cur_dict["comparison"] = condition.atom
-
-                        condition_strings.append(cur_dict)
-
-                    else:
-                        print(condition)
-                        print(condition.ast_type)
-                        assert(False)
-                    
-
-                else:
-                    condition_strings.append(str(condition))
-
-            element_dict["condition"] = condition_strings
-
-            aggregate_dict["elements"].append(element_dict) 
-
-        return node
-
-    def visit_Variable(self, node):
-
-        if str(self.cur_function) == str(self.cur_head):
-            return node
-
-        if str(node) not in self.cur_variable_dependencies:
-            self.cur_variable_dependencies[str(node)] = []
-
-        self.cur_variable_dependencies[str(node)].append(self.cur_function)
-
-        return node
 
     def check_string_is_int(self, string):
         try:
