@@ -7,6 +7,8 @@ import clingo
 from newground.newground import Newground
 from newground.default_output_printer import DefaultOutputPrinter
 
+from newground.aggregate_strategies.aggregate_mode import AggregateMode
+
 def block_print():
     sys.stdout = open(os.devnull, 'w')
     sys.stderr = open(os.devnull, 'w')
@@ -82,52 +84,57 @@ class EquivChecker:
             one_directional_equivalence: If True, then only the direction clingo -> newground is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the newground result as well (but therefore it could be, that newground has more answersets)
         """
 
-    
-        ctl = clingo.Control()
-        ctl.configuration.solve.models = 0
-        ctl.add('base',[], instance_file_contents + encoding_file_contents)
-        ctl.ground([('base',[])], context=Context())
-        ctl.solve(on_model=lambda m: self.on_model(m, self.clingo_output, self.clingo_hashes))
-        
-        no_show = False
-        ground_guess = False
-        ground = False
-
-        total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
-
-        custom_printer = CustomOutputPrinter()
-       
-
-        newground = Newground(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer)
-        newground.start(total_content)
-
-        ctl2 = clingo.Control()
-        ctl2.configuration.solve.models = 0
-        ctl2.add('base',[], custom_printer.get_string())
-        ctl2.ground([('base',[])], context=Context())
-        ctl2.solve(on_model=lambda m: self.on_model(m, self.newground_output, self.newground_hashes))
+        aggregate_modes = [("REPLACE",AggregateMode.REPLACE),("REWRITING",AggregateMode.REWRITING),("REWRITING_NO_BODY",AggregateMode.REWRITING_NO_BODY)]
 
         works = True
 
-        if not one_directional_equivalence and len(self.clingo_output) != len(self.newground_output):
-            works = False
-        else:
-            for clingo_key in self.clingo_hashes.keys():
-                if clingo_key not in self.newground_hashes:
-                    works = False
-                    if verbose:
-                        print(f"Could not find corresponding stable model in newground for hash {clingo_key}")
-                        print(f"This corresponds to the answer set: ")
-                        print(self.clingo_output[self.clingo_hashes[clingo_key]])
+        for aggregate_mode in aggregate_modes:
 
-            for newground_key in self.newground_hashes.keys():
-                if newground_key not in self.clingo_hashes:
-                    works = False
-                    if verbose:
-                        print(f"Could not find corresponding stable model in clingo for hash {newground_key}")
-                        print(f"This corresponds to the answer set: ")
-                        print(self.newground_output[self.newground_hashes[newground_key]])
+            print(f"[INFO] Checking current test with aggregate strategy: {aggregate_mode[0]}")
+        
+            ctl = clingo.Control()
+            ctl.configuration.solve.models = 0
+            ctl.add('base',[], instance_file_contents + encoding_file_contents)
+            ctl.ground([('base',[])], context=Context())
+            ctl.solve(on_model=lambda m: self.on_model(m, self.clingo_output, self.clingo_hashes))
+            
+            no_show = False
+            ground_guess = False
+            ground = False
 
+            total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
+
+            custom_printer = CustomOutputPrinter()
+           
+
+            newground = Newground(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer, aggregate_mode = aggregate_mode[1])
+            newground.start(total_content)
+
+            ctl2 = clingo.Control()
+            ctl2.configuration.solve.models = 0
+            ctl2.add('base',[], custom_printer.get_string())
+            ctl2.ground([('base',[])], context=Context())
+            ctl2.solve(on_model=lambda m: self.on_model(m, self.newground_output, self.newground_hashes))
+
+
+            if not one_directional_equivalence and len(self.clingo_output) != len(self.newground_output):
+                works = False
+            else:
+                for clingo_key in self.clingo_hashes.keys():
+                    if clingo_key not in self.newground_hashes:
+                        works = False
+                        if verbose:
+                            print(f"[ERROR] Used Aggregate Mode: {aggregate_mode[0]} - Could not find corresponding stable model in newground for hash {clingo_key}")
+                            print(f"[ERROR] This corresponds to the answer set: ")
+                            print(self.clingo_output[self.clingo_hashes[clingo_key]])
+
+                for newground_key in self.newground_hashes.keys():
+                    if newground_key not in self.clingo_hashes:
+                        works = False
+                        if verbose:
+                            print(f"[ERROR] Used Aggregate Mode: {aggregate_mode[0]} - Could not find corresponding stable model in clingo for hash {newground_key}")
+                            print(f"[ERROR] This corresponds to the answer set: ")
+                            print(self.newground_output[self.newground_hashes[newground_key]])
 
 
         if not works:
