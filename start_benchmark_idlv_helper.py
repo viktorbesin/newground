@@ -5,6 +5,7 @@ import pickle
 
 import os
 import io
+import re
 
 import time
 
@@ -28,6 +29,7 @@ config = StartBenchmarkUtils.decode_argument(sys.argv[1])
 timeout = StartBenchmarkUtils.decode_argument(sys.argv[2])
 ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[3])
 grounder = StartBenchmarkUtils.decode_argument(sys.argv[4])
+optimization_benchmarks = StartBenchmarkUtils.decode_argument(sys.argv[5])
 
 input_code = sys.stdin.read()
 
@@ -44,8 +46,16 @@ temp_file = tempfile.NamedTemporaryFile(mode="w+")
 with open(temp_file.name, "w") as f:
     f.write(input_code)
 
-grounder_process_p = subprocess.Popen([config["idlv_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-solver_process_p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
+if optimization_benchmarks == False:
+    grounder_args = [config["idlv_command"], "--output=0", f"{temp_file.name}"]
+    solver_args = [config["clingo_command"], "--mode=clasp"]
+else:
+    grounder_args = [config["idlv_command"], "--output=1", f"{temp_file.name}"]
+    solver_args = [config["clingo_command"]]
+
+grounder_process_p = subprocess.Popen(grounder_args, stdout=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+solver_process_p = subprocess.Popen(solver_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
+
 idlv_start_time = time.time()   
 
 try:
@@ -66,7 +76,6 @@ except TimeoutExpired:
     idlv_duration = timeout
 
 except Exception as ex:
-    #print(ex)
     idlv_out_of_time = True
     idlv_duration = timeout
 
@@ -78,13 +87,18 @@ clingo_start_time = time.time()
 
 if grounder_output != None and idlv_out_of_time == False and idlv_duration < timeout and ground_and_solve:
 
+    if optimization_benchmarks:
+        grounder_output = (re.sub(r"Aux", r"aux", grounder_output.decode())).encode()
+    
+    clingo_start_time = time.time() #Restart solver start time as potential regex duration is too long
+
     try:
         solver_output = solver_process_p.communicate(input = grounder_output, timeout = (timeout - idlv_duration))[0]
-
+        
         clingo_end_time = time.time()   
         idlv_clingo_duration = clingo_end_time - clingo_start_time + idlv_duration
 
-        if solver_process_p.returncode != 10 and solver_process_p.returncode != 20:
+        if solver_process_p.returncode != 10 and solver_process_p.returncode != 20 and solver_process_p.returncode != 30:
             idlv_out_of_time = True
             idlv_clingo_duration = timeout
 
@@ -96,7 +110,6 @@ if grounder_output != None and idlv_out_of_time == False and idlv_duration < tim
         idlv_clingo_duration = timeout
 
     except Exception as ex:
-        #print(ex)
         idlv_out_of_time = True
         idlv_clingo_duration = timeout
 else:

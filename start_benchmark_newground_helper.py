@@ -5,6 +5,7 @@ import pickle
 
 import os
 import io
+import re
 
 import time
 
@@ -24,12 +25,30 @@ def limit_virtual_memory():
     # TUPLE -> (soft limit, hard limit)
     resource.setrlimit(resource.RLIMIT_AS, (max_virtual_memory, max_virtual_memory))
 
-config = StartBenchmarkUtils.decode_argument(sys.argv[1])
-timeout = StartBenchmarkUtils.decode_argument(sys.argv[2])
-ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[3])
-grounder = StartBenchmarkUtils.decode_argument(sys.argv[4])
+mockup = False
 
-input_code = sys.stdin.read()
+if mockup == False:
+    config = StartBenchmarkUtils.decode_argument(sys.argv[1])
+    timeout = StartBenchmarkUtils.decode_argument(sys.argv[2])
+    ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[3])
+    grounder = StartBenchmarkUtils.decode_argument(sys.argv[4])
+    optimization_benchmarks = StartBenchmarkUtils.decode_argument(sys.argv[5])
+
+    input_code = sys.stdin.read()
+else:
+    config = {}
+    config["clingo_command"] = "./clingo"
+    config["gringo_command"] = "./gringo"
+    config["idlv_command"] = "./idlv.bin"
+    config["python_command"] = "./python3"
+    config["rewriting_strategy"] = "--aggregate-strategy=replace"
+
+    timeout = 1800
+    ground_and_solve = True
+    grounder = "NEWGROUND-GRINGO"
+    optimization_benchmarks = True
+
+    input_code = "bliblablaume"
 
 temp_file = tempfile.NamedTemporaryFile("w+")
 
@@ -45,25 +64,38 @@ newground_clingo_duration = timeout
 
 grounding_file_size_kb = 0
 
-newground_process_p = subprocess.Popen([config["python_command"], "start_newground.py", config["rewriting_strategy"],  f"{temp_file.name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+newground_args = [config["python_command"], "start_newground.py", config["rewriting_strategy"],  f"{temp_file.name}"]
 
-if grounder == "NEWGROUND-IDLV":
-    grounder_process_p = subprocess.Popen([config["idlv_command"], f"--stdin"], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-elif grounder == "NEWGROUND-GRINGO":
-    grounder_process_p = subprocess.Popen([config["gringo_command"]], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+if optimization_benchmarks == False:
+    if grounder == "NEWGROUND-IDLV":
+        grounder_args = [config["idlv_command"], f"--stdin"]
+    elif grounder == "NEWGROUND-GRINGO":
+        grounder_args = [config["gringo_command"]]
 
-solver_process_p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout = subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
+    solver_args = [config["clingo_command"], "--mode=clasp"]
+else:
+    if grounder == "NEWGROUND-IDLV":
+        grounder_args = [config["idlv_command"], f"--stdin", "--output=1"]
+    elif grounder == "NEWGROUND-GRINGO":
+        grounder_args = [config["gringo_command"]]
+
+    solver_args = [config["clingo_command"]]
+
+
+newground_process_p = subprocess.Popen(newground_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+
+grounder_process_p = subprocess.Popen(grounder_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)   
+solver_process_p = subprocess.Popen(solver_args, stdin=subprocess.PIPE, stdout = subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory) 
 
 newground_start_time = time.time()   
 
 try: 
     newground_output = newground_process_p.communicate( timeout = timeout)[0]
     newground_duration = time.time() - newground_start_time
-
+        
     newground_output = newground_output.decode().strip().encode()
 
     if newground_process_p.returncode != 0:
-        #print("return code != 0")
         newground_out_of_time = True
         newground_duration = timeout
 
@@ -75,7 +107,6 @@ except TimeoutExpired:
     newground_duration = timeout
 
 except Exception as ex:
-    #print(StartBenchmarkUtils.encode_argument(str(ex)))
     newground_out_of_time = True
     newground_duration = timeout
 
@@ -90,11 +121,11 @@ if newground_output != None and newground_out_of_time == False and newground_dur
 
         second_grounder_output = grounder_process_p.communicate(input = newground_output, timeout = timeout)[0]
         newground_duration = (time.time() - grounder_start) + newground_duration
+        
 
         second_grounder_output = second_grounder_output.decode().strip().encode()
 
         if grounder_process_p.returncode != 0:
-            #print("other bad things")
             newground_out_of_time = True
             newground_duration = timeout
 
@@ -102,12 +133,12 @@ if newground_output != None and newground_out_of_time == False and newground_dur
         grounder_process_p.kill()
         second_grounder_output, failure_errors = grounder_process_p.communicate()
 
+
         newground_out_of_time = True
         newground_duration = timeout
 
 
     except Exception as ex:
-        #print(ex)
         newground_out_of_time = True
         newground_duration = timeout
 
@@ -119,18 +150,23 @@ if newground_output != None and newground_out_of_time == False and newground_dur
 
     if second_grounder_output != None and newground_out_of_time == False and newground_duration < timeout and ground_and_solve:
 
+        if optimization_benchmarks:
+            second_grounder_output = (re.sub(r"Aux", r"aux", second_grounder_output.decode())).encode()
+        
+        solver_start_time = time.time() #Restart solver start time as potential regex duration is too long
+
         try:
 
             solver_output = solver_process_p.communicate(input = second_grounder_output, timeout = (timeout - newground_duration))[0]
+
+
             clingo_end_time = time.time()   
             newground_clingo_duration = clingo_end_time - solver_start_time + newground_duration
 
-            if solver_process_p.returncode != 10 and solver_process_p.returncode != 20: # Clingo return code for everything fine
-                #print("clingo bad things")
+            if solver_process_p.returncode != 10 and solver_process_p.returncode != 20 and solver_process_p.returncode != 30:
                 newground_out_of_time = True
                 newground_clingo_duration = timeout
 
-            #print(solver_output.decode().strip())
 
         except TimeoutExpired:
             solver_process_p.kill()
@@ -141,7 +177,6 @@ if newground_output != None and newground_out_of_time == False and newground_dur
             newground_clingo_duration = timeout
 
         except Exception as ex:
-            #print(ex)
             newground_out_of_time = True
             newground_clingo_duration = timeout
     else:

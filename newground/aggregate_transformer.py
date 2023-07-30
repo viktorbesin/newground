@@ -55,6 +55,10 @@ class AggregateTransformer(Transformer):
 
         return node
 
+    def visit_Minimize(self, node):
+        self.new_prg.append(f"{str(node)}")
+
+        return node
 
     def visit_Function(self, node):
 
