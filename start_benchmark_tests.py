@@ -44,7 +44,7 @@ class Benchmark:
 
         hashes[(hash(tuple(output[cur_pos])))] = cur_pos
 
-    def parse(self, config, timeout = 1800, clingo_mockup = False, idlv_mockup = False, newground_idlv_mockup = False, newground_gringo_mockup = False, ground_and_solve = True, run_all_examples = False):
+    def parse(self, config, timeout = 1800, clingo_mockup = False, idlv_mockup = False, newground_idlv_mockup = False, newground_gringo_mockup = False, ground_and_solve = True, run_all_examples = False, optimization_benchmarks = False):
         parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
 
         parser.add_argument('input_folder')
@@ -100,7 +100,7 @@ class Benchmark:
             benchmarks = {}
             benchmarks["GRINGO"] = {"mockup":clingo_mockup,
                     "helper":"start_benchmark_gringo_helper.py",
-                    "program_input": (instance_file_contents + encoding_file_contents).encode()}
+                    "program_input": (instance_file_contents + encoding_file_contents).encode()} 
             benchmarks["IDLV"] = {"mockup":idlv_mockup,
                     "helper":"start_benchmark_idlv_helper.py",
                     "program_input": (instance_file_contents + encoding_file_contents).encode()}
@@ -122,7 +122,7 @@ class Benchmark:
                 strategy_dict = benchmarks[strategy]
 
                 if not strategy_dict["mockup"]:
-                    timeout_occurred, total_duration, grounding_duration, grounding_file_size  = Benchmark.benchmark_caller(strategy_dict["program_input"], config, strategy_dict["helper"], strategy, timeout = timeout, ground_and_solve = ground_and_solve)
+                    timeout_occurred, total_duration, grounding_duration, grounding_file_size  = Benchmark.benchmark_caller(strategy_dict["program_input"], config, strategy_dict["helper"], strategy, timeout = timeout, ground_and_solve = ground_and_solve, optimization_benchmarks = optimization_benchmarks)
                 else:
                     timeout_occurred = True
                     total_duration = timeout
@@ -161,9 +161,9 @@ class Benchmark:
 
 
     @classmethod
-    def benchmark_caller(cls, program_input, config, helper_script, strategy, timeout = 1800, ground_and_solve = True):
+    def benchmark_caller(cls, program_input, config, helper_script, strategy, timeout = 1800, ground_and_solve = True, optimization_benchmarks = False):
 
-        to_encode_list = [config, timeout, ground_and_solve, strategy]
+        to_encode_list = [config, timeout, ground_and_solve, strategy, optimization_benchmarks]
 
         encoded_list = [f"{StartBenchmarkUtils.encode_argument(argument)}" for argument in to_encode_list]
 
@@ -173,9 +173,8 @@ class Benchmark:
 
         try:
             p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            ret_vals_encoded = p.communicate(input = program_input, timeout = int(timeout*1.1))[0]
+            (ret_vals_encoded, error_vals_encoded) = p.communicate(input = program_input, timeout = int(timeout*1.1))
             ret_vals = StartBenchmarkUtils.decode_argument(ret_vals_encoded.decode())
-
 
             if p.returncode != 0:
                 print(f">>>>> Other return code than 0 in helper: {p.returncode}")
@@ -205,13 +204,15 @@ if __name__ == "__main__":
     config["python_command"] = "./python3"
 
     # Strategies ->  {replace,rewrite,rewrite-no-body}
-    config["rewriting_strategy"] = "--aggregate-strategy=rewrite-no-body"
+    #config["rewriting_strategy"] = "--aggregate-strategy=rewrite-no-body"
     #config["rewriting_strategy"] = "--aggregate-strategy=rewrite"
-    #config["rewriting_strategy"] = "--aggregate-strategy=replace"
+    config["rewriting_strategy"] = "--aggregate-strategy=replace"
 
     checker = Benchmark()
 
     timeout = 1800
+
+    optimization_benchmarks = True
 
     gringo_mockup = False
     idlv_mockup = False
@@ -222,7 +223,7 @@ if __name__ == "__main__":
     run_all_examples = True
 
 
-    checker.parse(config, timeout = timeout, clingo_mockup = gringo_mockup, idlv_mockup = idlv_mockup, newground_idlv_mockup = newground_idlv_mockup, newground_gringo_mockup = newground_gringo_mockup, ground_and_solve = ground_and_solve, run_all_examples = run_all_examples)
+    checker.parse(config, timeout = timeout, clingo_mockup = gringo_mockup, idlv_mockup = idlv_mockup, newground_idlv_mockup = newground_idlv_mockup, newground_gringo_mockup = newground_gringo_mockup, ground_and_solve = ground_and_solve, run_all_examples = run_all_examples, optimization_benchmarks = True)
 
 
 

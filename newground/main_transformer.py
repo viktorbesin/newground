@@ -105,6 +105,12 @@ class MainTransformer(Transformer):
 
         return list(total_domain)
 
+    def visit_Minimize(self, node):
+        self.printer.custom_print(f"{str(node)}")
+
+        return node
+
+
     def visit_Rule(self, node):
 
         if not self.rules:

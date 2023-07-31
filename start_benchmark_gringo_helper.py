@@ -30,6 +30,7 @@ config = StartBenchmarkUtils.decode_argument(sys.argv[1])
 timeout = StartBenchmarkUtils.decode_argument(sys.argv[2])
 ground_and_solve = StartBenchmarkUtils.decode_argument(sys.argv[3])
 grounder = StartBenchmarkUtils.decode_argument(sys.argv[4])
+optimization_benchmarks = StartBenchmarkUtils.decode_argument(sys.argv[5])
 
 input_code = sys.stdin.read()
 
@@ -47,9 +48,17 @@ with open(temp_file.name, "w") as f:
 
 gringo_start_time = time.time()   
 
-grounder_process_p = subprocess.Popen([config["gringo_command"], f"{temp_file.name}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
 
-solver_process_p = subprocess.Popen([config["clingo_command"],"--mode=clasp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+if optimization_benchmarks == False:
+    grounder_args = [config["gringo_command"], f"{temp_file.name}"]
+    solver_args = [config["clingo_command"], "--mode=clasp"]
+else:
+    grounder_args = [config["gringo_command"], "--text", f"{temp_file.name}"]
+    solver_args = [config["clingo_command"]]
+
+grounder_process_p = subprocess.Popen(grounder_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)   
+solver_process_p = subprocess.Popen(solver_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
+
 try:
     grounder_output = grounder_process_p.communicate( timeout = timeout)[0]
     gringo_duration = time.time() - gringo_start_time
@@ -68,7 +77,6 @@ except TimeoutExpired:
     clingo_out_of_time = True
 
 except Exception as ex:
-    #print(ex)
     clingo_out_of_time = True
     gringo_duration = timeout
 
@@ -78,14 +86,15 @@ if grounder_output != None:
 
 clingo_start_time = time.time()
 
+
 if grounder_output != None and clingo_out_of_time == False and gringo_duration < timeout and ground_and_solve:
     try:
-        solver_output = solver_process_p.communicate(timeout = (timeout - gringo_duration),input = grounder_output)[0]
+        (solver_output, solver_error) = solver_process_p.communicate(timeout = (timeout - gringo_duration),input = grounder_output)
 
         clingo_end_time = time.time()   
         gringo_clingo_duration = clingo_end_time - clingo_start_time + gringo_duration
 
-        if solver_process_p.returncode != 10 and solver_process_p.returncode != 20:
+        if solver_process_p.returncode != 10 and solver_process_p.returncode != 20 and solver_process_p.returncode != 30:
             clingo_out_of_time = True
             gringo_clingo_duration = timeout
 
