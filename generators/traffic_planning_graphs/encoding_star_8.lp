@@ -1,0 +1,5 @@
+
+:- 2 <= #count{A : f(A,B), f(A,C), f(A,D), f(A,E), f(A,F), f(A,G), f(A,H), f(A,I), A != B, A != C, A != D, A != E, A != F, A != G, A != H, A != I, B != C, B != D, B != E, B != F, B != G, B != H, B != I, C != D, C != E, C != F, C != G, C != H, C != I, D != E, D != F, D != G, D != H, D != I, E != F, E != G, E != H, E != I, F != G, F != H, F != I, G != H, G != I, H != I}.
+
+
+
