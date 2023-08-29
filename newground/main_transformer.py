@@ -18,7 +18,7 @@ from .aggregate_transformer import AggregateMode
 
 
 class MainTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode):
+    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components):
         self.rules = False
         self.count = False
         self.sum = False
@@ -56,6 +56,8 @@ class MainTransformer(Transformer):
 
         self.unfounded_rules = {}
         self.current_rule_position = 0
+
+        self.rule_strongly_restricted_components = rule_strongly_restricted_components
 
     def _reset_after_rule(self):
         self.cur_var = []
@@ -127,6 +129,8 @@ class MainTransformer(Transformer):
                 self._outputNodeFormatConform(node)
 
             return node # In this mode do nothing here
+        
+        self.current_rule = node
 
         self.visit_children(node)
 
@@ -557,6 +561,15 @@ class MainTransformer(Transformer):
                 self.printer.custom_print(f"{sat_atom} :- {body_interpretation}{sat_predicate}.")
 
     def _guess_head(self, head):
+
+        if self.current_rule in self.rule_strongly_restricted_components:
+
+            string_preds = ",".join([str(predicate) for predicate in self.rule_strongly_restricted_components[self.current_rule]])
+
+            additional_arguments = f" :- {string_preds}."
+        else:
+            additional_arguments = "."
+
         new_head_name = head.name + "'"
         new_arguments = ",".join([str(argument) for argument in head.arguments])
 
@@ -600,9 +613,9 @@ class MainTransformer(Transformer):
                     self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{variable}({value}).")
 
             if len(domains) > 0:
-                self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}}.")
+                self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}} {additional_arguments}")
             else:
-                self.printer.custom_print(f"{{{new_head}}}.")
+                self.printer.custom_print(f"{{{new_head}}} {additional_arguments}")
 
             self.printer.custom_print(f"{str(head)} :- {new_head}.")
           

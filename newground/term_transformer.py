@@ -4,6 +4,8 @@ import re
 
 import argparse
 
+from networkx import DiGraph
+
 import clingo
 from clingo.ast import Transformer, Variable, parse_string
 
@@ -33,12 +35,102 @@ class TermTransformer(Transformer):
         self.current_function_position = 0
 
         self.current_rule_position = 0
+        self.current_rule = None
+
+        self.dependency_graph = DiGraph()
+        self.dependency_graph_node_rule_lookup = {}
+        self.dependency_graph_rule_node_lookup = {}
+        self.dependency_graph_node_counter = 0
+        self.current_head_predicate_names = []
+        self.dependency_graph_node_rule_bodies_lookup = {}
+
+        self._node_signum = None
+
+        self.in_body = False
+        self.in_head = False
+
+    def dependency_graph_update(self, predicate, rule):
+        """
+        Add node/predicate to dependency graph.
+        """
+
+        predicate_name = predicate.name
+
+        if self._node_signum == 1:
+            # Only looking at positive cycles (node_signum 1 -> not)
+            return
+
+        if predicate_name not in self.dependency_graph_rule_node_lookup:
+            self.dependency_graph_rule_node_lookup[predicate_name] = self.dependency_graph_node_counter
+            self.dependency_graph_node_rule_lookup[self.dependency_graph_node_counter] = [rule]
+
+            self.dependency_graph.add_node(self.dependency_graph_node_counter)
+
+            if self.in_body:
+                self.dependency_graph_node_rule_bodies_lookup[self.dependency_graph_node_counter] = {}
+                self.dependency_graph_node_rule_bodies_lookup[self.dependency_graph_node_counter][rule] = [predicate]
+
+                for head_predicate_name in self.current_head_predicate_names:
+                    #TODO -> Could FAIL!
+                    if head_predicate_name not in self.dependency_graph_rule_node_lookup:
+                        self.dependency_graph_rule_node_lookup[head_predicate_name] = self.dependency_graph_node_counter
+                        self.dependency_graph_node_rule_lookup[self.dependency_graph_node_counter] = [rule]
+
+                        self.dependency_graph.add_node(self.dependency_graph_node_counter)
+                        self.dependency_graph_node_counter += 1
+
+                    head_counter = self.dependency_graph_rule_node_lookup[head_predicate_name]
+                    if not self.dependency_graph.has_edge(self.dependency_graph_node_counter, head_counter):
+                        self.dependency_graph.add_edge(self.dependency_graph_node_counter, head_counter)
+            
+            self.dependency_graph_node_counter += 1
+        else:
+            node_counter = self.dependency_graph_rule_node_lookup[predicate_name]
+
+            if rule not in self.dependency_graph_node_rule_lookup[node_counter]:
+                self.dependency_graph_node_rule_lookup[node_counter].append(rule)
+
+            if self.in_body:
+                if node_counter not in self.dependency_graph_node_rule_bodies_lookup:
+                    self.dependency_graph_node_rule_bodies_lookup[node_counter] = {}
+
+                if rule not in self.dependency_graph_node_rule_bodies_lookup[node_counter]:
+                    self.dependency_graph_node_rule_bodies_lookup[node_counter][rule] = []
+
+                if predicate not in self.dependency_graph_node_rule_bodies_lookup[node_counter][rule]:
+                    self.dependency_graph_node_rule_bodies_lookup[node_counter][rule].append(predicate)
+
+                for head_predicate_name in self.current_head_predicate_names:
+
+                    #TODO -> Could FAIL!
+                    if head_predicate_name not in self.dependency_graph_rule_node_lookup:
+                        self.dependency_graph_rule_node_lookup[head_predicate_name] = self.dependency_graph_node_counter
+                        self.dependency_graph_node_rule_lookup[self.dependency_graph_node_counter] = [rule]
+
+                        self.dependency_graph.add_node(self.dependency_graph_node_counter)
+                        self.dependency_graph_node_counter += 1
+
+
+                    head_counter = self.dependency_graph_rule_node_lookup[head_predicate_name]
+                    if not self.dependency_graph.has_edge(node_counter, head_counter):
+                        self.dependency_graph.add_edge(node_counter, head_counter)
 
     def visit_Rule(self, node):
         self.current_head = node.head
         self.current_head_functions.append(str(node.head))
 
-        self.visit_children(node)
+        self.current_rule = node
+
+        if 'head' in node.child_keys:
+            self.in_head = True
+            self.visit_children(node.head)
+            self.in_head = False
+
+        if 'body' in node.child_keys:
+            self.in_body = True 
+            old = getattr(node, 'body')
+            new = self._dispatch(old)
+            self.in_body = False
 
         pred = str(node.head).split('(', 1)[0]
         arguments = re.sub(r'^.*?\(', '', str(node.head))[:-1].split(',')
@@ -64,6 +156,7 @@ class TermTransformer(Transformer):
 
         self.current_rule_position += 1
         self._reset_temporary_rule_variables()
+
         return node
 
     def visit_Aggregate(self, node):
@@ -80,6 +173,8 @@ class TermTransformer(Transformer):
     def _reset_temporary_rule_variables(self):
         self.current_head = None
         self.current_head_functions = []
+        self.current_rule = None
+        self.current_head_predicate_names = []
 
     def _reset_temporary_function_variables(self):
         self.current_function = None
@@ -170,6 +265,12 @@ class TermTransformer(Transformer):
             self.shows[node.name] = {len(node.arguments)}
 
         self.visit_children(node)
+
+        if self.current_rule is not None:
+            self.dependency_graph_update(node, self.current_rule)
+
+        if self.in_head:
+            self.current_head_predicate_names.append(node.name)
 
         self._reset_temporary_function_variables()
 

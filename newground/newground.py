@@ -10,6 +10,9 @@ from .term_transformer import TermTransformer
 from .domain_transformer import DomainTransformer
 from .main_transformer import MainTransformer
 
+import matplotlib as plt
+import networkx as nx
+
 class NormalStrategy(Enum):
     ASSUME_TIGHT = 1
     AUXILIARY = 2
@@ -32,9 +35,9 @@ class Newground:
 
         aggregate_transformer_output_program = self.start_aggregate_transformer(contents)
 
-        domain, safe_variables, term_transformer = self.start_domain_inference(aggregate_transformer_output_program)
+        domain, safe_variables, term_transformer, rule_strongly_connected_comps = self.start_domain_inference(aggregate_transformer_output_program)
 
-        self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer)
+        self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps)
 
     def start_aggregate_transformer(self, contents):
  
@@ -58,6 +61,33 @@ class Newground:
         domain = term_transformer.domain
 
         comparisons = term_transformer.comparison_operators_variables
+    
+        print(term_transformer.dependency_graph)
+
+        strongly_connected_comps = [c for c in sorted(nx.strongly_connected_components(term_transformer.dependency_graph), key=len, reverse=True)]
+
+        rule_strongly_connected_comps = {}
+        for strongly_connected_comp in strongly_connected_comps:
+            if len(strongly_connected_comp) > 1:
+
+                for node in strongly_connected_comp:
+                    for rule in term_transformer.dependency_graph_node_rule_bodies_lookup[node].keys():
+                        if rule not in rule_strongly_connected_comps:
+                            rule_strongly_connected_comps[rule] = []
+
+                        rule_strongly_connected_comps[rule] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
+
+
+        """
+        for strongly_rule in rule_strongly_connected_comps.keys():
+            print(strongly_rule)
+            
+            for bodies in rule_strongly_connected_comps[strongly_rule]:
+                print(bodies)
+        """
+
+        #nx.draw(term_transformer.dependency_graph) 
+        #plt.pyplot.savefig("test.png")
 
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
@@ -75,17 +105,19 @@ class Newground:
 
             new_domain_hash = hash(str(domain))
 
-        return (domain, safe_variables, term_transformer)
+        return (domain, safe_variables, term_transformer, rule_strongly_connected_comps)
        
 
-    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer):
+    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps):
 
         ctl = Control()
         with ProgramBuilder(ctl) as bld:
             transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts,
                                           term_transformer.ng_heads, term_transformer.shows,
                                           self.ground_guess, self.ground, self.output_printer,
-                                          domain, safe_variables, self.aggregate_mode)
+                                          domain, safe_variables, self.aggregate_mode,
+                                          rule_strongly_connected_comps
+                                          )
 
             parse_string(aggregate_transformer_output_program, lambda stm: bld.add(transformer(stm)))
 
