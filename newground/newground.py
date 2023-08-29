@@ -75,7 +75,6 @@ class Newground:
 
             new_domain_hash = hash(str(domain))
 
-
         return (domain, safe_variables, term_transformer)
        
 

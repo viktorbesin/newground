@@ -90,6 +90,10 @@ class DomainTransformer(Transformer):
 
                 for safe_position in safe_positions:
 
+                    if safe_position["signum"] == 1:
+                        # ''not''
+                        continue
+
                     if safe_position["type"] == "function":
                         safe_pos_name = safe_position['name']
                         safe_pos_position = safe_position['position']

@@ -868,9 +868,9 @@ class MainTransformer(Transformer):
                 for combination_2 in combinations_2:
 
                     if len(head_combination_list_2) > 0:
-                        head_string = f"{head.name}({','.join(list(combination_2))})"
+                        head_string = f"{head.name}'({','.join(list(combination_2))})"
                     else:
-                        head_string = f"{head.name}"
+                        head_string = f"{head.name}'"
 
                     #print(f"{head_string}/{unfound_atom}")
                     self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
@@ -991,9 +991,9 @@ class MainTransformer(Transformer):
 
                         
                         if len(list(combination_2)) > 0:
-                            head_string = f"{head.name}({','.join(list(combination_2))})"
+                            head_string = f"{head.name}'({','.join(list(combination_2))})"
                         else:
-                            head_string = f"{head.name}"
+                            head_string = f"{head.name}'"
 
                         self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 

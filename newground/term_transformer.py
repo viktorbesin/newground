@@ -62,7 +62,6 @@ class TermTransformer(Transformer):
             else:
                 self.facts[pred][arity].add(arguments)
 
-
         self.current_rule_position += 1
         self._reset_temporary_rule_variables()
         return node
@@ -131,6 +130,7 @@ class TermTransformer(Transformer):
         to_add_dict["type"] = str(safe_type)
         to_add_dict["name"] = str(identifier)
         to_add_dict["position"] = str(position)
+        to_add_dict["signum"] = self._node_signum
 
         self.safe_variable_rules[rule][str(value)].append(to_add_dict)
 
@@ -153,6 +153,7 @@ class TermTransformer(Transformer):
         to_add_dict["type"] = "term"
         to_add_dict["variables"] = variables
         to_add_dict["operation"] = operation
+        to_add_dict["signum"] = self._node_signum
 
         self.safe_variable_rules[rule][str(value)].append(to_add_dict)
 
@@ -173,17 +174,16 @@ class TermTransformer(Transformer):
         self._reset_temporary_function_variables()
 
         return node
+    
+    def visit_Literal(self, node):
+        self._node_signum = node.sign
+        self.visit_children(node)
+
+        return node
 
     def visit_Comparison(self, node):
 
         self.current_comparison = node
-
-        """
-        print(node)
-        print(node.ast_type)
-        print(node.term)
-        print(node.guards)
-        """
 
         if len(node.guards) >= 2:
             assert(False) # Not implemented (only e.g. A = B implemented, not A = B = C)
