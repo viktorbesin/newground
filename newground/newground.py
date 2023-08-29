@@ -4,7 +4,8 @@ from clingo.ast import parse_string, ProgramBuilder
 
 from clingo.control import Control
 
-from .aggregate_transformer import AggregateTransformer, AggregateMode
+from .aggregate_transformer import AggregateTransformer
+from .aggregate_strategies.aggregate_mode import AggregateMode
 from .term_transformer import TermTransformer
 from .domain_transformer import DomainTransformer
 from .main_transformer import MainTransformer
