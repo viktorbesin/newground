@@ -130,7 +130,6 @@ class MainTransformer(Transformer):
 
         self.visit_children(node)
 
-
         # if so: handle grounding
         if self.ng:
             self.non_ground_rules[self.current_rule_position] = self.current_rule_position
@@ -515,10 +514,16 @@ class MainTransformer(Transformer):
                     else:
                         f_args += f"{v},"
 
-                if len(f_args) > 0:
-                    f_args = f"{f.name}({f_args[:-1]})"
+
+                if f is head:
+                    f_name = f"{f.name}'"
                 else:
-                    f_args = f"{f.name}"
+                    f_name = f"{f.name}"
+
+                if len(f_args) > 0:
+                    f_args = f"{f_name}({f_args[:-1]})"
+                else:
+                    f_args = f"{f_name}"
 
                 if sat_atom in covered_subsets:
                     possible_subsets = covered_subsets[sat_atom]
@@ -551,7 +556,11 @@ class MainTransformer(Transformer):
             
                 self.printer.custom_print(f"{sat_atom} :- {body_interpretation}{sat_predicate}.")
 
-    def _generate_foundedness_part(self, head):
+    def _guess_head(self, head):
+        new_head_name = head.name + "'"
+        new_arguments = ",".join([str(argument) for argument in head.arguments])
+
+        new_head = f"{new_head_name}({new_arguments})"
 
         # head
         h_args_len = len(head.arguments)
@@ -565,8 +574,24 @@ class MainTransformer(Transformer):
                v not in h_vars]  # remaining variables not included in head atom (without facts)
 
         # GUESS head
-        if not self.ground_guess:
+        if self.ground_guess:  
+            dom_list = [self._get_domain_values_from_rule_variable(self.current_rule_position, variable) for variable in h_vars]
+            combinations = [p for p in itertools.product(*dom_list)]
 
+            h_argument_interpretations = [f"({','.join(c[h_vars.index(a)] if a in h_vars else a for a in h_args)})" for c in combinations]
+            h_new_interpretations = [f"{new_head_name}{h_argument_interpretation}" for h_argument_interpretation in h_argument_interpretations]
+
+            if h_args_len > 0:
+                self.printer.custom_print(f"{{{';'.join(h_new_interpretations)}}}.")
+
+                for h_argument_interpretation in h_argument_interpretations:
+                    self.printer.custom_print(f"{head.name}{h_argument_interpretation} :- {new_head_name}{h_argument_interpretation}.")
+
+            else:
+                self.printer.custom_print(f"{{{new_head_name}}}")
+                self.printer.custom_print(f"{head.name} :- {new_head_name}.")
+
+        else:
             domains = []
             for variable in h_vars:
                 domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
@@ -575,18 +600,27 @@ class MainTransformer(Transformer):
                     self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{variable}({value}).")
 
             if len(domains) > 0:
-                self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+                self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}}.")
             else:
-                self.printer.custom_print(f"{{{head}}}.")
+                self.printer.custom_print(f"{{{new_head}}}.")
 
-        else:
-            
-            dom_list = [self._get_domain_values_from_rule_variable(self.current_rule_position, variable) for variable in h_vars]
-            combinations = [p for p in itertools.product(*dom_list)]
-            h_interpretations = [f"{head.name}({','.join(c[h_vars.index(a)] if a in h_vars else a for a in h_args)})" for c in combinations]
-            self.printer.custom_print(f"{{{';'.join(h_interpretations)}}}." if h_args_len > 0 else f"{{{head.name}}}.")
+            self.printer.custom_print(f"{str(head)} :- {new_head}.")
+          
+    def _generate_foundedness_part(self, head):
+
+        # head
+        h_args_len = len(head.arguments)
+        h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+        h_args_nd = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
+        h_vars = list(dict.fromkeys(
+            [a for a in h_args if a in self.cur_var]))  # which have to be grounded per combination
+
+        rem = [v for v in self.cur_var if
+               v not in h_vars]  # remaining variables not included in head atom (without facts)
 
         g_r = {}
+
+        self._guess_head(head)
 
         # path checking
         g = nx.Graph()
@@ -616,7 +650,6 @@ class MainTransformer(Transformer):
                 for v2 in f_vars:
                     g.add_edge(v1, v2) 
 
- 
         self._generate_foundedness_head(head, rem, g, g_r, h_vars, h_args)
 
         covered_subsets = self._generate_foundedness_comparisons(head, rem, h_vars, h_args, g)
@@ -662,10 +695,8 @@ class MainTransformer(Transformer):
                             head_tuple_list.append(h_arg)
 
 
-                    #print(head)
-                    head_interpretation = f"{head.name}"
+                    head_interpretation = f"{head.name}'"
 
-                    #head_tuple_list = [c[index] for index in range(len(c))]
 
                     if len(head_tuple_list) > 0:
                         head_tuple_interpretation = ','.join(head_tuple_list)
@@ -686,12 +717,12 @@ class MainTransformer(Transformer):
                     for variable in h_vars:
                         domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
 
+                    """
                     if len(domains) > 0:
                         self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
                     else:
                         self.printer.custom_print(f"{{{head}}}.")
-
-
+                    """
 
                     rem_tuple_list = [r] + partly_head_tuple_list
                     rem_tuple_interpretation = ','.join(rem_tuple_list)

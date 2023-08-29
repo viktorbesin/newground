@@ -35,8 +35,6 @@ class Newground:
 
         self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer)
 
-        
-
     def start_aggregate_transformer(self, contents):
  
         aggregate_transformer = AggregateTransformer(self.aggregate_mode)
