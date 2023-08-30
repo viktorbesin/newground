@@ -28,10 +28,10 @@ class Benchmark:
 
     def __init__(self):
         self.clingo_output = []
-        self.newground_output = []
+        self.hybrid_grounding_output = []
 
         self.clingo_hashes = {}
-        self.newground_hashes = {} 
+        self.hybrid_grounding_hashes = {} 
 
     def on_model(self, m, output, hashes):
         symbols = m.symbols(shown=True)
@@ -44,8 +44,8 @@ class Benchmark:
 
         hashes[(hash(tuple(output[cur_pos])))] = cur_pos
 
-    def parse(self, config, timeout = 1800, clingo_mockup = False, idlv_mockup = False, newground_idlv_mockup = False, newground_gringo_mockup = False, ground_and_solve = True, run_all_examples = False, optimization_benchmarks = False):
-        parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
+    def parse(self, config, timeout = 1800, clingo_mockup = False, idlv_mockup = False, hybrid_grounding_idlv_mockup = False, hybrid_grounding_gringo_mockup = False, ground_and_solve = True, run_all_examples = False, optimization_benchmarks = False):
+        parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks hybrid_grounding vs. Clingo (total grounding + solving time).')
 
         parser.add_argument('input_folder')
         parser.add_argument('output_file')
@@ -75,15 +75,15 @@ class Benchmark:
         grounding_size_output_filename = f"{output_filename}_grounding_size.csv"
 
         with open(total_time_output_filename, "w") as output_file:
-            write_string = "instance,gringo-duration,gringo-timeout-occurred,idlv-duration,idlv-timeout-occured,newground-idlv-duration,newground-idlv-timeout-occured,newground-gringo-duration,newground-gringo-timeout-occured"
+            write_string = "instance,gringo-duration,gringo-timeout-occurred,idlv-duration,idlv-timeout-occured,hybrid_grounding-idlv-duration,hybrid_grounding-idlv-timeout-occured,hybrid_grounding-gringo-duration,hybrid_grounding-gringo-timeout-occured"
             output_file.write(write_string)
 
         with open(grounding_time_output_filename, "w") as output_file:
-            write_string = "instance,gringo-duration,gringo-timeout-occurred,idlv-duration,idlv-timeout-occured,newground-idlv-duration,newground-idlv-timeout-occured,newground-gringo-duration,newground-gringo-timeout-occured"
+            write_string = "instance,gringo-duration,gringo-timeout-occurred,idlv-duration,idlv-timeout-occured,hybrid_grounding-idlv-duration,hybrid_grounding-idlv-timeout-occured,hybrid_grounding-gringo-duration,hybrid_grounding-gringo-timeout-occured"
             output_file.write(write_string)
 
         with open(grounding_size_output_filename, "w") as output_file:
-            write_string = "instance,gringo-size,gringo-timeout-occurred,idlv-size,idlv-timeout-occured,newground-idlv-size,newground-idlv-timeout-occured,newground-gringo-size,newground-gringo-timeout-occured"
+            write_string = "instance,gringo-size,gringo-timeout-occurred,idlv-size,idlv-timeout-occured,hybrid_grounding-idlv-size,hybrid_grounding-idlv-timeout-occured,hybrid_grounding-gringo-size,hybrid_grounding-gringo-timeout-occured"
             output_file.write(write_string)
 
         # ------------------------ START BENCHMARK HERE -------------------------
@@ -104,11 +104,11 @@ class Benchmark:
             benchmarks["IDLV"] = {"mockup":idlv_mockup,
                     "helper":"start_benchmark_idlv_helper.py",
                     "program_input": (instance_file_contents + encoding_file_contents).encode()}
-            benchmarks["NEWGROUND-IDLV"] = {"mockup":newground_idlv_mockup,
-                    "helper":"start_benchmark_newground_helper.py",
+            benchmarks["hybrid_grounding-IDLV"] = {"mockup":hybrid_grounding_idlv_mockup,
+                    "helper":"start_benchmark_hybrid_grounding_helper.py",
                     "program_input": (instance_file_contents + "\n#program rules.\n" + encoding_file_contents).encode()}
-            benchmarks["NEWGROUND-GRINGO"] = {"mockup":newground_gringo_mockup,
-                    "helper":"start_benchmark_newground_helper.py",
+            benchmarks["hybrid_grounding-GRINGO"] = {"mockup":hybrid_grounding_gringo_mockup,
+                    "helper":"start_benchmark_hybrid_grounding_helper.py",
                     "program_input": (instance_file_contents + "\n#program rules.\n" + encoding_file_contents).encode()}
 
             total_time_string = f"\n{instance_file},"
@@ -216,14 +216,14 @@ if __name__ == "__main__":
 
     gringo_mockup = False
     idlv_mockup = False
-    newground_idlv_mockup = False
-    newground_gringo_mockup = False
+    hybrid_grounding_idlv_mockup = False
+    hybrid_grounding_gringo_mockup = False
 
     ground_and_solve = True
     run_all_examples = True
 
 
-    checker.parse(config, timeout = timeout, clingo_mockup = gringo_mockup, idlv_mockup = idlv_mockup, newground_idlv_mockup = newground_idlv_mockup, newground_gringo_mockup = newground_gringo_mockup, ground_and_solve = ground_and_solve, run_all_examples = run_all_examples, optimization_benchmarks = True)
+    checker.parse(config, timeout = timeout, clingo_mockup = gringo_mockup, idlv_mockup = idlv_mockup, hybrid_grounding_idlv_mockup = hybrid_grounding_idlv_mockup, hybrid_grounding_gringo_mockup = hybrid_grounding_gringo_mockup, ground_and_solve = ground_and_solve, run_all_examples = run_all_examples, optimization_benchmarks = True)
 
 
 

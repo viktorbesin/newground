@@ -18,7 +18,7 @@ class NormalStrategy(Enum):
     AUXILIARY = 2
     ORDERED_DERIVATION = 3
 
-class Newground:
+class HybridGrounding:
 
     def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.REPLACE, normal_mode = NormalStrategy.ASSUME_TIGHT):
         self.no_show = no_show

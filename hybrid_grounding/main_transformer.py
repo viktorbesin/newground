@@ -11,10 +11,9 @@ from clingo.control import Control
 
 from clingox.program import Program, ProgramObserver, Remapping
 
-from .hybrid_grounding.generate_satisfiability_part import GenerateSatisfiabilityPart
-from .hybrid_grounding.generate_foundedness_part import GenerateFoundednessPart
-from .hybrid_grounding.guess_head_part import GuessHeadPart
-
+from .main_transformer_helpers.generate_satisfiability_part import GenerateSatisfiabilityPart
+from .main_transformer_helpers.generate_foundedness_part import GenerateFoundednessPart
+from .main_transformer_helpers.guess_head_part import GuessHeadPart
 
 import networkx as nx
 

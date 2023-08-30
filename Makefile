@@ -1,5 +1,5 @@
 SETUP_FILE = setup.py
-APPLICATION_NAME = newground
+APPLICATION_NAME = hybrid_grounding
 
 
 compile:
@@ -10,6 +10,6 @@ clean:
 	pip uninstall $(APPLICATION_NAME) -y
 
 format:
-	pylint newground
+	pylint hybrid_grounding
 
 

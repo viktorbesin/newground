@@ -1,8 +1,8 @@
-# newground
+# hybrid_grounding
 
 Reduction of **non-ground** logic programs to **disjunctive** logic programs using body-decoupled grounding, extended by Aggregates. This is the prototype, which is mentioned in the paper: Viktor Besin, Markus Hecher, and Stefan Woltran. Body-decoupled grounding via solving: A novel approach on the asp bottleneck. In Lud De Raedt, editor, Proceedings of the Thirty-First International Joint Conference on Artificial Intelligence, IJCAI-22, pages 2546–2552. International Joint Conferences on Artificial Intelligence Organization, 7 2022. Main Track. [LINK](https://www.ijcai.org/proceedings/2022/353).
 
-Note that the prototype mentioned in the paper does not include Aggregates. The extension of Newground by Aggregates is part of a Bachelor's Thesis.
+Note that the prototype mentioned in the paper does not include Aggregates. The extension of hybrid_grounding by Aggregates is part of a Bachelor's Thesis.
 
 ## Requirements
 * clingo 
@@ -17,14 +17,14 @@ The input format is a subset to clingos input format. The subset that works cons
 - Comparisons instead of predicates in the body
 - Aggregates, where the lower/upper bounds are integer constants
 
-Based on the principle of partial reducability, inputs can be divided into parts that shall be part of the reduction. For this reason please use `#program rules.` for (non-ground) program parts that shall be reduced by **newground**. The sub-program `#program insts.` on the other hand can be used for instantiating the program.
+Based on the principle of partial reducability, inputs can be divided into parts that shall be part of the reduction. For this reason please use `#program rules.` for (non-ground) program parts that shall be reduced by **hybrid_grounding**. The sub-program `#program insts.` on the other hand can be used for instantiating the program.
 
 Without explicit domains given the reduction uses the complete set of terms to fill the variables in the grounding process. This process can be reduced by giving a domain for each variable, e.g. `_dom_X(1..5).`, or by `_dom_X(X) :- a(X,_).` in the instatiating-part of the program. This information is then processed automatically and considered in the reduction.
 
 ## Usage (no installation)
 ```
-$ python start_newground.py -h
-usage: newground [files]
+$ python start_hybrid_grounding.py -h
+usage: hybrid_grounding [files]
 
 positional arguments:
   files
@@ -38,13 +38,13 @@ optional arguments:
 ```
 e.g. clingo can then be used to compute the answer-sets
 ```
-$ python start_newground.py [instance] | clingo -n 0 --project
+$ python start_hybrid_grounding.py [instance] | clingo -n 0 --project
 ```
 
 ## Installation
 OPTIONAL: Note, that you do not need to install the package in order to use it! Installation is currently just possible in linux (and possibly MacOS) and just has the benefit to use it in the Linux command line from every location.
 
-One can install newground in Linux in the environment, such that one can execute it through the command line
+One can install hybrid_grounding in Linux in the environment, such that one can execute it through the command line
 
 ```
 $ python setup.py install
@@ -56,20 +56,20 @@ If you have the `make` environment installed, you can use
 $ make
 ```
 
-to install newground and 
+to install hybrid_grounding and 
 
 ```
 $ make clean
 ```
 
-to uninstall newground. 
+to uninstall hybrid_grounding. 
 
 
 ## Usage (with installation)
 
 ```
-$ newground -h
-usage: newground [files]
+$ hybrid_grounding -h
+usage: hybrid_grounding [files]
 
 positional arguments:
   files
@@ -85,7 +85,7 @@ optional arguments:
 ## Uninstall
 
 ```
-$ pip uninstall newground
+$ pip uninstall hybrid_grounding
 ```
 
 # Experiments
@@ -112,7 +112,7 @@ $ python3 start_benchmark_tests.py <BENCHMARK_DIRECTORY> <OUTPUT_FILES_PREFIX>
 
 The benchmark directory (`<BENCHMARK_DIRECTORY>`) must be a directory, where at least the following files are present:
 
-- `encoding.lp` -> Which encodes the problem. For the Newground grounder it holds, that the whole encoding file is prefixed with a `#program rules.`.
+- `encoding.lp` -> Which encodes the problem. For the hybrid_grounding grounder it holds, that the whole encoding file is prefixed with a `#program rules.`.
 - `instance_X.lp` -> Which denotes one instance. Note that all files that match the regex `^instance_[0-9]{1,4}\.lp$` are considered to be a valid instance.
 - `additional_instance.lp` -> Additional parts of the instance, that shall be used for every instance.
 
@@ -155,7 +155,7 @@ $ python3 start_bounds_benchmark_tests.py test-output instances/benchmark/count_
 
 # Regression Tests
 
-A script is provided to execute regression tests (`start_regression_tests.py`), which checks if the output of given programs is the same for Newground and for Clingo. To be more specific, it checks if every answer set that occurs in the output of Newground also occurs in the Answer set of Clingo, and vice versa.
+A script is provided to execute regression tests (`start_regression_tests.py`), which checks if the output of given programs is the same for hybrid_grounding and for Clingo. To be more specific, it checks if every answer set that occurs in the output of hybrid_grounding also occurs in the Answer set of Clingo, and vice versa.
 
 The regression tests can be found in the folder `regression_tests`, where the `regression_tests/test_instances` features all currently implemented regression tests. The executed tests consist of a variety of tests, both with and without Aggregates.
 

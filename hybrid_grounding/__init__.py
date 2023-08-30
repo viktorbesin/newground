@@ -1,13 +1,13 @@
 import sys
 import argparse
 
-from .newground import Newground
+from .hybrid_grounding import HybridGrounding
 from .default_output_printer import DefaultOutputPrinter
 from .aggregate_transformer import AggregateMode
-from .newground import NormalStrategy
+from .hybrid_grounding import NormalStrategy
 
 def main():
-    parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
+    parser = argparse.ArgumentParser(prog='hybrid_grounding', usage='%(prog)s [files]')
     parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
     parser.add_argument('--ground-guess', action='store_true',
                         help='Additionally ground guesses which results in (fully) grounded output. ')
@@ -52,8 +52,8 @@ def main():
     for f in args.files:
         contents += f.read()
 
-    newground = Newground(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter(), aggregate_mode = aggregate_strategy, normal_mode = normal_strategy)
-    newground.start(contents)
+    hybrid_grounding = HybridGrounding(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter(), aggregate_mode = aggregate_strategy, normal_mode = normal_strategy)
+    hybrid_grounding.start(contents)
 
 
 

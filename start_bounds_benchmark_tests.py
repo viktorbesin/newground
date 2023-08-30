@@ -27,13 +27,13 @@ class BoundsBenchmark:
     def parse(self, timeout = None): 
 
         clingo_mockup = True
-        newground_mockup = False
+        hybrid_grounding_mockup = False
         idlv_mockup = True
 
 
         benchmark_helper = Benchmark()
 
-        parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
+        parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks hybrid_grounding vs. Clingo (total grounding + solving time).')
         parser.add_argument("outputfilename")
         parser.add_argument("filenames", nargs="+")
 
@@ -45,15 +45,15 @@ class BoundsBenchmark:
         grounding_size_output_filename = f"{output_filename}_grounding_size.csv"
 
         with open(total_time_output_filename, "w") as output_file:
-            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured\n"
+            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,hybrid_grounding-duration,hybrid_grounding-timeout-occured\n"
             output_file.write(write_string)
 
         with open(grounding_time_output_filename, "w") as output_file:
-            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,newground-duration,newground-timeout-occured\n"
+            write_string = "instance,gringo-duration,gringo-timeout-occured,idlv-duration,idlv-timeout-occured,hybrid_grounding-duration,hybrid_grounding-timeout-occured\n"
             output_file.write(write_string)
 
         with open(grounding_size_output_filename, "w") as output_file:
-            write_string = "instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,newground-size,newground-timeout-occured\n"
+            write_string = "instance,gringo-size,gringo-timeout-occured,idlv-size,idlv-timeout-occured,hybrid_grounding-size,hybrid_grounding-timeout-occured\n"
             output_file.write(write_string)
 
         instance_file_contents = ""
@@ -90,14 +90,14 @@ class BoundsBenchmark:
                 idlv_duration = 0
                 idlv_grounding_file_size = 0
 
-            print("NEWGROUND")
-            if not newground_mockup:
-                newground_clingo_timeout_occured, newground_clingo_duration, newground_duration, newground_grounding_file_size = benchmark_helper.newground_benchmark(instance_file_contents, encoding_file_contents, timeout)
+            print("hybrid_grounding")
+            if not hybrid_grounding_mockup:
+                hybrid_grounding_clingo_timeout_occured, hybrid_grounding_clingo_duration, hybrid_grounding_duration, hybrid_grounding_grounding_file_size = benchmark_helper.hybrid_grounding_benchmark(instance_file_contents, encoding_file_contents, timeout)
             else:
-                newground_clingo_timeout_occured = False
-                newground_clingo_duration = 0
-                newground_duration = 0
-                newground_grounding_file_size = 0
+                hybrid_grounding_clingo_timeout_occured = False
+                hybrid_grounding_clingo_duration = 0
+                hybrid_grounding_duration = 0
+                hybrid_grounding_grounding_file_size = 0
 
         
             """
@@ -117,22 +117,22 @@ class BoundsBenchmark:
             else:
                 print(f"[INFO] - IDlv needed {idlv_clingo_duration} seconds!")
 
-            if newground_clingo_timeout_occured:
-                print(f"[INFO] - Newground timed out ({newground_clingo_duration})!")
+            if hybrid_grounding_clingo_timeout_occured:
+                print(f"[INFO] - hybrid_grounding timed out ({hybrid_grounding_clingo_duration})!")
             else:
-                print(f"[INFO] - Newground needed {newground_clingo_duration} seconds!")
+                print(f"[INFO] - hybrid_grounding needed {hybrid_grounding_clingo_duration} seconds!")
 
 
 
             with open(total_time_output_filename, "a") as output_file:
-                output_file.write(f"\n{lower_bound},{gringo_clingo_duration},{gringo_clingo_timeout_occured},{idlv_clingo_duration},{idlv_clingo_timeout_occured},{newground_clingo_duration},{newground_clingo_timeout_occured}")
+                output_file.write(f"\n{lower_bound},{gringo_clingo_duration},{gringo_clingo_timeout_occured},{idlv_clingo_duration},{idlv_clingo_timeout_occured},{hybrid_grounding_clingo_duration},{hybrid_grounding_clingo_timeout_occured}")
 
 
             with open(grounding_time_output_filename, "a") as output_file:
-                output_file.write(f"\n{lower_bound},{gringo_duration},{gringo_clingo_timeout_occured},{idlv_duration},{idlv_clingo_timeout_occured},{newground_duration},{newground_clingo_timeout_occured}")
+                output_file.write(f"\n{lower_bound},{gringo_duration},{gringo_clingo_timeout_occured},{idlv_duration},{idlv_clingo_timeout_occured},{hybrid_grounding_duration},{hybrid_grounding_clingo_timeout_occured}")
 
             with open(grounding_size_output_filename, "a") as output_file:
-                output_file.write(f"\n{lower_bound},{gringo_grounding_file_size},{gringo_clingo_timeout_occured},{idlv_grounding_file_size},{idlv_clingo_timeout_occured},{newground_grounding_file_size},{newground_clingo_timeout_occured}")
+                output_file.write(f"\n{lower_bound},{gringo_grounding_file_size},{gringo_clingo_timeout_occured},{idlv_grounding_file_size},{idlv_clingo_timeout_occured},{hybrid_grounding_grounding_file_size},{hybrid_grounding_clingo_timeout_occured}")
 
 
 
