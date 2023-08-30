@@ -111,58 +111,62 @@ class Newground:
     def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps):
 
         ctl = Control()
-        with ProgramBuilder(ctl) as bld:
-            transformer = MainTransformer(bld, term_transformer.terms, term_transformer.facts,
+        with ProgramBuilder(ctl) as program_builder:
+            transformer = MainTransformer(program_builder, term_transformer.terms, term_transformer.facts,
                                           term_transformer.ng_heads, term_transformer.shows,
                                           self.ground_guess, self.ground, self.output_printer,
                                           domain, safe_variables, self.aggregate_mode,
                                           rule_strongly_connected_comps
                                           )
 
-            parse_string(aggregate_transformer_output_program, lambda stm: bld.add(transformer(stm)))
+            parse_string(aggregate_transformer_output_program, lambda stm: program_builder.add(transformer(stm)))
 
             if len(transformer.non_ground_rules.keys()) > 0:
-                parse_string(":- not sat.", lambda stm: bld.add(stm))
-                self.output_printer.custom_print(":- not sat.")
+                self.global_main_transformations(program_builder, transformer, term_transformer)
 
-                sat_strings = []
-                non_ground_rules = transformer.non_ground_rules
-                for non_ground_rule_key in non_ground_rules.keys():
-                    sat_strings.append(f"sat_r{non_ground_rule_key}")
 
-    
-                self.output_printer.custom_print(f"sat :- {','.join(sat_strings)}.")
+    def global_main_transformations(self, program_builder, transformer, term_transformer):
+        parse_string(":- not sat.", lambda stm: program_builder.add(stm))
+        self.output_printer.custom_print(":- not sat.")
 
-                for key in transformer.unfounded_rules.keys():
+        sat_strings = []
+        non_ground_rules = transformer.non_ground_rules
+        for non_ground_rule_key in non_ground_rules.keys():
+            sat_strings.append(f"sat_r{non_ground_rule_key}")
 
-                    unfounded_rules_heads = transformer.unfounded_rules[key]
 
-                    sum_strings = []
+        self.output_printer.custom_print(f"sat :- {','.join(sat_strings)}.")
 
-                    for rule_key in unfounded_rules_heads.keys():
+        for key in transformer.unfounded_rules.keys():
 
-                        unfounded_rules_list = unfounded_rules_heads[rule_key]
-                        unfounded_rules_list = list(set(unfounded_rules_list)) # Remove duplicates
+            unfounded_rules_heads = transformer.unfounded_rules[key]
 
-                        sum_list = []
-                        for index in range(len(unfounded_rules_list)):
-                            unfounded_rule = unfounded_rules_list[index]
-                            sum_list.append(f"1,{index} : {unfounded_rule}")
+            sum_strings = []
 
-                        sum_strings.append(f"#sum{{{'; '.join(sum_list)}}} >=1 ")
+            for rule_key in unfounded_rules_heads.keys():
 
-                    
-                    self.output_printer.custom_print(f":- {key}, {','.join(sum_strings)}.")
-                
-                if not self.ground_guess:
-                    for t in transformer.terms:
-                        self.output_printer.custom_print(f"dom({t}).")
+                unfounded_rules_list = unfounded_rules_heads[rule_key]
+                unfounded_rules_list = list(set(unfounded_rules_list)) # Remove duplicates
 
-                if not self.no_show:
-                    if not term_transformer.show:
-                        for f in transformer.shows.keys():
-                            for l in transformer.shows[f]:
-                                self.output_printer.custom_print(f"#show {f}/{l}.")
+                sum_list = []
+                for index in range(len(unfounded_rules_list)):
+                    unfounded_rule = unfounded_rules_list[index]
+                    sum_list.append(f"1,{index} : {unfounded_rule}")
+
+                sum_strings.append(f"#sum{{{'; '.join(sum_list)}}} >=1 ")
+
+            
+            self.output_printer.custom_print(f":- {key}, {','.join(sum_strings)}.")
+        
+        if not self.ground_guess:
+            for t in transformer.terms:
+                self.output_printer.custom_print(f"dom({t}).")
+
+        if not self.no_show:
+            if not term_transformer.show:
+                for f in transformer.shows.keys():
+                    for l in transformer.shows[f]:
+                        self.output_printer.custom_print(f"#show {f}/{l}.")
 
 
 

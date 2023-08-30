@@ -44,8 +44,6 @@ class GenerateFoundednessPart:
 
         g_r = {}
 
-        self._guess_head(self.rule_head)
-
         # path checking
         g = nx.Graph()
         for f in self.rule_literals:
@@ -421,66 +419,6 @@ class GenerateFoundednessPart:
                             head_string = f"{head.name}'"
 
                         self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
-
-    def _guess_head(self, head):
-
-        if self.current_rule in self.rule_strongly_restricted_components:
-
-            string_preds = ",".join([str(predicate) for predicate in self.rule_strongly_restricted_components[self.current_rule]])
-
-            additional_arguments = f" :- {string_preds}."
-        else:
-            additional_arguments = "."
-
-        new_head_name = head.name + "'"
-        new_arguments = ",".join([str(argument) for argument in head.arguments])
-
-        new_head = f"{new_head_name}({new_arguments})"
-
-        # head
-        h_args_len = len(head.arguments)
-        h_args = re.sub(r'^.*?\(', '', str(head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
-        h_args_nd = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
-        h_vars = list(dict.fromkeys(
-            [a for a in h_args if a in self.rule_variables]))  # which have to be grounded per combination
-
-
-        rem = [v for v in self.rule_variables if
-               v not in h_vars]  # remaining variables not included in head atom (without facts)
-
-        # GUESS head
-        if self.ground_guess:  
-            dom_list = [HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) for variable in h_vars]
-            combinations = [p for p in itertools.product(*dom_list)]
-
-            h_argument_interpretations = [f"({','.join(c[h_vars.index(a)] if a in h_vars else a for a in h_args)})" for c in combinations]
-            h_new_interpretations = [f"{new_head_name}{h_argument_interpretation}" for h_argument_interpretation in h_argument_interpretations]
-
-            if h_args_len > 0:
-                self.printer.custom_print(f"{{{';'.join(h_new_interpretations)}}}.")
-
-                for h_argument_interpretation in h_argument_interpretations:
-                    self.printer.custom_print(f"{head.name}{h_argument_interpretation} :- {new_head_name}{h_argument_interpretation}.")
-
-            else:
-                self.printer.custom_print(f"{{{new_head_name}}}")
-                self.printer.custom_print(f"{head.name} :- {new_head_name}.")
-
-        else:
-            domains = []
-            for variable in h_vars:
-                domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
-                values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
-                for value in values:
-                    self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{variable}({value}).")
-
-            if len(domains) > 0:
-                self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}} {additional_arguments}")
-            else:
-                self.printer.custom_print(f"{{{new_head}}} {additional_arguments}")
-
-            self.printer.custom_print(f"{str(head)} :- {new_head}.")
-
 
     def _checkForCoveredSubsets(self, base, current, c_varset):
         for key in base:

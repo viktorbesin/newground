@@ -13,7 +13,7 @@ from clingox.program import Program, ProgramObserver, Remapping
 
 from .hybrid_grounding.generate_satisfiability_part import GenerateSatisfiabilityPart
 from .hybrid_grounding.generate_foundedness_part import GenerateFoundednessPart
-from .hybrid_grounding.helper_part import HelperPart
+from .hybrid_grounding.guess_head_part import GuessHeadPart
 
 
 import networkx as nx
@@ -123,6 +123,21 @@ class MainTransformer(Transformer):
 
             # FOUND NEW
             if head is not None:
+
+                guess_head_generator = GuessHeadPart(head, 
+                                                                  self.current_rule_position,
+                                                                  self.printer, self.domain,
+                                                                  self.safe_variables_rules,
+                                                                  self.rule_variables,
+                                                                  self.rule_comparisons,
+                                                                  self.rule_literals,
+                                                                  self.rule_literals_signums,
+                                                                  self.current_rule,
+                                                                  self.rule_strongly_restricted_components,
+                                                                  self.ground_guess,
+                                                                  self.unfounded_rules)
+                guess_head_generator.guess_head()
+
                 foundedness_generator = GenerateFoundednessPart(head, 
                                                                   self.current_rule_position,
                                                                   self.printer, self.domain,
