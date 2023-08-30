@@ -1,0 +1,99 @@
+
+>>>> Now solving: instance_0160.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(False, 1085.18101978302, 1064.7069208621979, 17112.3583984375)
+[INFO] - NEWGROUND-IDLV needed 1085.18101978302 seconds!
+(False, 1046.4028165340424, 1030.722321987152, 18357.6513671875)
+[INFO] - NEWGROUND-GRINGO needed 1046.4028165340424 seconds!
+
+>>>> Now solving: instance_0170.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(False, 1238.6972489356995, 1194.8558657169342, 19403.5234375)
+[INFO] - NEWGROUND-IDLV needed 1238.6972489356995 seconds!
+(False, 1229.1959705352783, 1204.6094017028809, 21064.759765625)
+[INFO] - NEWGROUND-GRINGO needed 1229.1959705352783 seconds!
+
+>>>> Now solving: instance_0190.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(False, 1723.8798868656158, 1691.4507503509521, 24289.5625)
+[INFO] - NEWGROUND-IDLV needed 1723.8798868656158 seconds!
+(False, 1703.3244404792786, 1664.2521059513092, 27076.1337890625)
+[INFO] - NEWGROUND-GRINGO needed 1703.3244404792786 seconds!
+
+>>>> Now solving: instance_0200.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 60558.755859375)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 60305.3564453125)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0210.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 55039.794921875)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 54717.8486328125)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0230.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 46784.158203125)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 47061.279296875)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0240.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 44339.76953125)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 44365.564453125)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0250.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 47588.8681640625)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 47586.189453125)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0270.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 44348.115234375)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 44022.3828125)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0280.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 41931.654296875)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 41151.72265625)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
+
+>>>> Now solving: instance_0290.lp
+
+[INFO] - GRINGO timed out (1800)!
+[INFO] - IDLV timed out (1800)!
+(True, 1800, 1800, 39944.998046875)
+[INFO] - NEWGROUND-IDLV timed out (1800)!
+(True, 1800, 1800, 39997.732421875)
+[INFO] - NEWGROUND-GRINGO timed out (1800)!
