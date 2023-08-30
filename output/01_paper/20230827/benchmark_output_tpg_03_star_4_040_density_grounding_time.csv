@@ -1,0 +1,12 @@
+instance,gringo-duration,gringo-timeout-occurred,idlv-duration,idlv-timeout-occured,newground-idlv-duration,newground-idlv-timeout-occured,newground-gringo-duration,newground-gringo-timeout-occured
+instance_0160.lp,1800,True,1800,True,437.1754159927368,False,446.34888458251953,False
+instance_0170.lp,1800,True,1800,True,512.2194747924805,False,519.9775414466858,False
+instance_0190.lp,1800,True,1800,True,760.2437415122986,False,757.032310962677,False
+instance_0200.lp,1800,True,1800,True,808.9877429008484,False,845.9118840694427,False
+instance_0210.lp,1800,True,1800,True,883.5744032859802,False,957.8610928058624,False
+instance_0230.lp,1800,True,1800,True,1136.5723135471344,False,1216.2828199863434,False
+instance_0240.lp,1800,True,1800,True,1250.1913599967957,False,1431.9907641410828,False
+instance_0250.lp,1800,True,1800,True,1429.961834192276,False,1378.886663198471,False
+instance_0270.lp,1800,True,1800,True,1698.7465407848358,False,1824.7630097866058,True
+instance_0280.lp,1800,True,1800,True,1844.4468319416046,True,1800,True
+instance_0290.lp,1800,True,1800,True,1800,True,1800,True
