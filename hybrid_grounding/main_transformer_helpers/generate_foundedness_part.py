@@ -120,7 +120,7 @@ class GenerateFoundednessPart:
                             head_tuple_list.append(h_arg)
 
 
-                    head_interpretation = f"{head.name}'"
+                    head_interpretation = f"{head.name}{self.current_rule_position}"
 
 
                     if len(head_tuple_list) > 0:
@@ -293,9 +293,9 @@ class GenerateFoundednessPart:
                 for combination_2 in combinations_2:
 
                     if len(head_combination_list_2) > 0:
-                        head_string = f"{head.name}'({','.join(list(combination_2))})"
+                        head_string = f"{head.name}{self.current_rule_position}({','.join(list(combination_2))})"
                     else:
-                        head_string = f"{head.name}'"
+                        head_string = f"{head.name}{self.current_rule_position}"
 
                     #print(f"{head_string}/{unfound_atom}")
                     self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
@@ -426,12 +426,12 @@ class GenerateFoundednessPart:
                     
 
                     for combination_2 in combinations_2:
-
+                        self.current_rule_position
                         
                         if len(list(combination_2)) > 0:
-                            head_string = f"{head.name}'({','.join(list(combination_2))})"
+                            head_string = f"{head.name}{self.current_rule_position}({','.join(list(combination_2))})"
                         else:
-                            head_string = f"{head.name}'"
+                            head_string = f"{head.name}{self.current_rule_position}"
 
                         self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 

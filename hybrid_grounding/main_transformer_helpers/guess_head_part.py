@@ -35,7 +35,7 @@ class GuessHeadPart:
         else:
             cyclic_behavior_arguments = "."
 
-        new_head_name = self.rule_head.name + "'"
+        new_head_name = f"{self.rule_head.name}{self.current_rule_position}"
         new_arguments = ",".join([str(argument) for argument in self.rule_head.arguments])
 
         new_head = f"{new_head_name}({new_arguments})"

@@ -164,7 +164,7 @@ class GenerateSatisfiabilityPart:
 
 
                 if f is head:
-                    f_name = f"{f.name}'"
+                    f_name = f"{f.name}{self.current_rule_position}"
                 else:
                     f_name = f"{f.name}"
 
