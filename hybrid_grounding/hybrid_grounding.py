@@ -1,5 +1,3 @@
-from enum import Enum
-
 from clingo.ast import parse_string, ProgramBuilder
 
 from clingo.control import Control
@@ -9,25 +7,23 @@ from .aggregate_strategies.aggregate_mode import AggregateMode
 from .term_transformer import TermTransformer
 from .domain_transformer import DomainTransformer
 from .main_transformer import MainTransformer
+from .cyclic_strategy import CyclicStrategy
+
+from .main_transformer_helpers.level_mappings_part import LevelMappingsPart
 
 import matplotlib as plt
 import networkx as nx
 
-class NormalStrategy(Enum):
-    ASSUME_TIGHT = 1
-    AUXILIARY = 2
-    ORDERED_DERIVATION = 3
-
 class HybridGrounding:
 
-    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.REPLACE, normal_mode = NormalStrategy.ASSUME_TIGHT):
+    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.REPLACE, cyclic_strategy = CyclicStrategy.ASSUME_TIGHT):
         self.no_show = no_show
         self.ground_guess = ground_guess
         self.ground = ground
         self.output_printer = output_printer
 
         self.aggregate_mode = aggregate_mode
-        self.normal_mode = normal_mode
+        self.cyclic_strategy = cyclic_strategy
 
         self.rules = False
 
@@ -35,9 +31,9 @@ class HybridGrounding:
 
         aggregate_transformer_output_program = self.start_aggregate_transformer(contents)
 
-        domain, safe_variables, term_transformer, rule_strongly_connected_comps = self.start_domain_inference(aggregate_transformer_output_program)
+        domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads  = self.start_domain_inference(aggregate_transformer_output_program)
 
-        self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps)
+        self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads)
 
     def start_aggregate_transformer(self, contents):
  
@@ -47,8 +43,10 @@ class HybridGrounding:
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
 
+        """
         if self.ground:
             self.output_printer.custom_print(contents)
+        """
 
         return program_string
 
@@ -62,13 +60,30 @@ class HybridGrounding:
 
         comparisons = term_transformer.comparison_operators_variables
     
-        print(term_transformer.dependency_graph)
-
         strongly_connected_comps = [c for c in sorted(nx.strongly_connected_components(term_transformer.dependency_graph), key=len, reverse=True)]
 
+        strongly_connected_comps_counter = 0
+        predicates_strongly_connected_comps = {}
         rule_strongly_connected_comps = {}
+        rule_head_strongly_connected_comps = {}
+
         for strongly_connected_comp in strongly_connected_comps:
             if len(strongly_connected_comp) > 1:
+                
+                occurs_in_pi_t = False
+                occurs_in_pi_c = False
+                for node in strongly_connected_comp:
+                    string_node = list(term_transformer.dependency_graph_rule_node_lookup.keys())[list(term_transformer.dependency_graph_rule_node_lookup.values()).index(node)]
+                    occuring_in = term_transformer.dependency_graph_node_rules_part_lookup[string_node]
+                    if False in occuring_in:
+                        occurs_in_pi_c = True
+                    if True in occuring_in:
+                        occurs_in_pi_t = True
+
+                if not occurs_in_pi_t:
+                    continue
+
+                predicates_strongly_connected_comps[strongly_connected_comps_counter] = []
 
                 for node in strongly_connected_comp:
                     for rule in term_transformer.dependency_graph_node_rule_bodies_lookup[node].keys():
@@ -77,6 +92,16 @@ class HybridGrounding:
 
                         rule_strongly_connected_comps[rule] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
 
+                        predicates_strongly_connected_comps[strongly_connected_comps_counter] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
+
+                    for rule in term_transformer.dependency_graph_node_rule_heads_lookup[node].keys():
+                        if rule not in rule_head_strongly_connected_comps:
+                            rule_head_strongly_connected_comps[rule] = []
+
+                        rule_head_strongly_connected_comps[rule] += term_transformer.dependency_graph_node_rule_heads_lookup[node][rule]
+
+
+                strongly_connected_comps_counter += 1
 
         """
         for strongly_rule in rule_strongly_connected_comps.keys():
@@ -84,10 +109,10 @@ class HybridGrounding:
             
             for bodies in rule_strongly_connected_comps[strongly_rule]:
                 print(bodies)
-        """
 
-        #nx.draw(term_transformer.dependency_graph) 
-        #plt.pyplot.savefig("test.png")
+        nx.draw(term_transformer.dependency_graph) 
+        plt.pyplot.savefig("test.png")
+        """
 
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
@@ -105,10 +130,10 @@ class HybridGrounding:
 
             new_domain_hash = hash(str(domain))
 
-        return (domain, safe_variables, term_transformer, rule_strongly_connected_comps)
+        return (domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_head_strongly_connected_comps)
        
 
-    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps):
+    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads):
 
         ctl = Control()
         with ProgramBuilder(ctl) as program_builder:
@@ -116,16 +141,28 @@ class HybridGrounding:
                                           term_transformer.ng_heads, term_transformer.shows,
                                           self.ground_guess, self.ground, self.output_printer,
                                           domain, safe_variables, self.aggregate_mode,
-                                          rule_strongly_connected_comps
+                                          rule_strongly_connected_comps,
+                                          self.cyclic_strategy,
+                                          rule_strongly_connected_comps_heads
                                           )
 
             parse_string(aggregate_transformer_output_program, lambda stm: program_builder.add(transformer(stm)))
 
+            level_mappings_part = LevelMappingsPart(self.output_printer, domain, predicates_strongly_connected_comps, self.ground_guess, self.cyclic_strategy)
+            level_mappings_part.generate_level_mappings()
+
             if len(transformer.non_ground_rules.keys()) > 0:
+
+
                 self.global_main_transformations(program_builder, transformer, term_transformer)
 
 
+
+
     def global_main_transformations(self, program_builder, transformer, term_transformer):
+
+
+
         parse_string(":- not sat.", lambda stm: program_builder.add(stm))
         self.output_printer.custom_print(":- not sat.")
 

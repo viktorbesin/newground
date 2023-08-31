@@ -4,11 +4,13 @@ import re
 
 from .helper_part import HelperPart
 
+from ..cyclic_strategy import CyclicStrategy
+
 
 
 class GuessHeadPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -23,35 +25,31 @@ class GuessHeadPart:
         self.rule_strongly_restricted_components = strongly_connected_components
         self.ground_guess = ground_guess
         self.unfounded_rules = unfounded_rules
+        self.cyclic_strategy = cyclic_strategy
                  
     def guess_head(self):
 
-        if self.current_rule in self.rule_strongly_restricted_components:
-
+        if self.current_rule in self.rule_strongly_restricted_components and self.cyclic_strategy == CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES:
             string_preds = ",".join([str(predicate) for predicate in self.rule_strongly_restricted_components[self.current_rule]])
-
-            additional_arguments = f" :- {string_preds}."
+            cyclic_behavior_arguments = f" :- {string_preds}."
         else:
-            additional_arguments = "."
+            cyclic_behavior_arguments = "."
 
         new_head_name = self.rule_head.name + "'"
         new_arguments = ",".join([str(argument) for argument in self.rule_head.arguments])
 
         new_head = f"{new_head_name}({new_arguments})"
 
-        # head
         h_args_len = len(self.rule_head.arguments)
         h_args = re.sub(r'^.*?\(', '', str(self.rule_head))[:-1].split(',')  # all arguments (incl. duplicates / terms)
-        h_args_nd = list(dict.fromkeys(h_args)) # arguments (without duplicates / incl. terms)
         h_vars = list(dict.fromkeys(
             [a for a in h_args if a in self.rule_variables]))  # which have to be grounded per combination
 
-
-        rem = [v for v in self.rule_variables if
-               v not in h_vars]  # remaining variables not included in head atom (without facts)
-
-        # GUESS head
         if self.ground_guess:  
+            if self.cyclic_strategy == CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES:
+                print("NOT IMPLEMENTED!")
+                raise Exception("Not Implemented!")
+
             dom_list = [HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) for variable in h_vars]
             combinations = [p for p in itertools.product(*dom_list)]
 
@@ -77,9 +75,9 @@ class GuessHeadPart:
                     self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{variable}({value}).")
 
             if len(domains) > 0:
-                self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}} {additional_arguments}")
+                self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}} {cyclic_behavior_arguments}")
             else:
-                self.printer.custom_print(f"{{{new_head}}} {additional_arguments}")
+                self.printer.custom_print(f"{{{new_head}}} {cyclic_behavior_arguments}")
 
             self.printer.custom_print(f"{str(self.rule_head)} :- {new_head}.")
 

@@ -43,15 +43,21 @@ class TermTransformer(Transformer):
         self.dependency_graph_node_counter = 0
         self.current_head_predicate_names = []
         self.dependency_graph_node_rule_bodies_lookup = {}
+        self.dependency_graph_node_rule_heads_lookup = {}
+        self.dependency_graph_node_rules_part_lookup = {}
 
         self._node_signum = None
+        self._head_aggregate_element = False
 
         self.in_body = False
         self.in_head = False
 
+        self.in_program_rules_part = True
+
     def dependency_graph_update(self, predicate, rule):
         """
-        Add node/predicate to dependency graph.
+        Add node/predicate and relevant edges to dependency graph.
+        Note that it is assumed that the head predicates are always considered first.
         """
 
         predicate_name = predicate.name
@@ -59,6 +65,12 @@ class TermTransformer(Transformer):
         if self._node_signum == 1:
             # Only looking at positive cycles (node_signum 1 -> not)
             return
+        
+        if predicate_name not in self.dependency_graph_node_rules_part_lookup:
+            self.dependency_graph_node_rules_part_lookup[predicate_name] = [self.in_program_rules_part]
+
+        if self.in_program_rules_part not in self.dependency_graph_node_rules_part_lookup[predicate_name]:
+            self.dependency_graph_node_rules_part_lookup[predicate_name].append(self.in_program_rules_part)       
 
         if predicate_name not in self.dependency_graph_rule_node_lookup:
             self.dependency_graph_rule_node_lookup[predicate_name] = self.dependency_graph_node_counter
@@ -66,9 +78,13 @@ class TermTransformer(Transformer):
 
             self.dependency_graph.add_node(self.dependency_graph_node_counter)
 
-            if self.in_body:
+            if self.in_body == True or self._head_aggregate_element == True:
                 self.dependency_graph_node_rule_bodies_lookup[self.dependency_graph_node_counter] = {}
                 self.dependency_graph_node_rule_bodies_lookup[self.dependency_graph_node_counter][rule] = [predicate]
+
+                temp_node_counter = self.dependency_graph_node_counter
+                # This position is important!
+                self.dependency_graph_node_counter += 1
 
                 for head_predicate_name in self.current_head_predicate_names:
                     #TODO -> Could FAIL!
@@ -80,11 +96,15 @@ class TermTransformer(Transformer):
                         self.dependency_graph_node_counter += 1
 
                     head_counter = self.dependency_graph_rule_node_lookup[head_predicate_name]
-                    if not self.dependency_graph.has_edge(self.dependency_graph_node_counter, head_counter):
-                        self.dependency_graph.add_edge(self.dependency_graph_node_counter, head_counter)
+                    if not self.dependency_graph.has_edge(temp_node_counter, head_counter):
+                        self.dependency_graph.add_edge(temp_node_counter, head_counter)
+            elif self.in_head == True:
+                self.dependency_graph_node_rule_heads_lookup[self.dependency_graph_node_counter] = {}
+                self.dependency_graph_node_rule_heads_lookup[self.dependency_graph_node_counter][rule] = [predicate]
+
+                self.dependency_graph_node_counter += 1
             
-            self.dependency_graph_node_counter += 1
-        else:
+        elif predicate_name in self.dependency_graph_rule_node_lookup:
             node_counter = self.dependency_graph_rule_node_lookup[predicate_name]
 
             if rule not in self.dependency_graph_node_rule_lookup[node_counter]:
@@ -115,7 +135,18 @@ class TermTransformer(Transformer):
                     if not self.dependency_graph.has_edge(node_counter, head_counter):
                         self.dependency_graph.add_edge(node_counter, head_counter)
 
+            elif self.in_head:
+                if node_counter not in self.dependency_graph_node_rule_heads_lookup:
+                    self.dependency_graph_node_rule_heads_lookup[node_counter] = {}
+
+                if rule not in self.dependency_graph_node_rule_heads_lookup[node_counter]:
+                    self.dependency_graph_node_rule_heads_lookup[node_counter][rule] = []
+
+                if predicate not in self.dependency_graph_node_rule_heads_lookup[node_counter][rule]:
+                    self.dependency_graph_node_rule_heads_lookup[node_counter][rule].append(predicate)
+
     def visit_Rule(self, node):
+
         self.current_head = node.head
         self.current_head_functions.append(str(node.head))
 
@@ -123,7 +154,9 @@ class TermTransformer(Transformer):
 
         if 'head' in node.child_keys:
             self.in_head = True
-            self.visit_children(node.head)
+            old = getattr(node, 'head')
+            new = self._dispatch(old)
+            #self.visit_children(node.head)
             self.in_head = False
 
         if 'body' in node.child_keys:
@@ -161,11 +194,15 @@ class TermTransformer(Transformer):
 
     def visit_Aggregate(self, node):
 
-        if str(node) == str(self.current_head):
+        if self.in_head:
             for elem in node.elements:
                 self.current_head_functions.append(str(elem.literal))
+                self.visit_children(elem.literal)
 
-        self.visit_children(node)
+                self._head_aggregate_element = True
+                for condition in elem.condition:
+                    self.visit_Literal(condition)
+                self._head_aggregate_element = False
 
         return node
 
@@ -266,19 +303,30 @@ class TermTransformer(Transformer):
 
         self.visit_children(node)
 
+        if self.in_head == True and self._head_aggregate_element == False:
+            self.current_head_predicate_names.append(node.name)
+
         if self.current_rule is not None:
             self.dependency_graph_update(node, self.current_rule)
 
-        if self.in_head:
-            self.current_head_predicate_names.append(node.name)
 
         self._reset_temporary_function_variables()
 
         return node
     
     def visit_Literal(self, node):
+
         self._node_signum = node.sign
         self.visit_children(node)
+
+        return node
+    
+    
+    def visit_HeadAggregateElement(self, node):
+
+        self._head_aggregate_element = True
+        self.visit_children(node)
+        self._head_aggregate_element = False
 
         return node
 
@@ -372,4 +420,17 @@ class TermTransformer(Transformer):
             self.printer.custom_print(node)
         return node
 
+    def visit_Program(self, node):
+
+        keyword_dict = {}
+        keyword_dict["rules"] = "rules"
+        keyword_dict["max"] = "max"
+        keyword_dict["min"] = "min"
+        keyword_dict["count"] = "count"
+        keyword_dict["sum"] = "sum"
+
+        self.in_program_rules_part = False
+        
+        if str(node.name) in keyword_dict:
+            self.in_program_rules_part = True
 

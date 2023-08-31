@@ -345,7 +345,7 @@ if __name__ == "__main__":
         ground_guess = True
         ground = True
 
-    handler = AggregateHandler()
+    handler = AggregateTransformer()
     handler.start(total_contents)
 
 

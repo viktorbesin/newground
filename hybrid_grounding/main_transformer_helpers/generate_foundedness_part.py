@@ -8,12 +8,13 @@ import networkx as nx
 
 from ..comparison_tools import ComparisonTools
 from .helper_part import HelperPart
+from ..cyclic_strategy import CyclicStrategy
 
 
 
 class GenerateFoundednessPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -22,13 +23,14 @@ class GenerateFoundednessPart:
         self.safe_variables_rules = safe_variables_rules
         self.rule_variables = rule_variables
         self.rule_comparisons = rule_comparisons
-        self.rule_literals = rule_literals
+        self.rule_literals = rule_predicate_functions
         self.rule_literals_signums = rule_literals_signums
         self.current_rule = current_rule
         self.rule_strongly_restricted_components = strongly_connected_components
         self.ground_guess = ground_guess
         self.unfounded_rules = unfounded_rules
-
+        self.cyclic_strategy = cyclic_strategy
+        self.rule_strongly_restricted_components_heads = strongly_connected_components_heads
 
     def generate_foundedness_part(self):
 
@@ -221,7 +223,7 @@ class GenerateFoundednessPart:
                     variable_assignments[variable] = value
 
 
-                head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
+                head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                 body_combination = {}
 
@@ -303,11 +305,11 @@ class GenerateFoundednessPart:
     def _generate_foundedness_functions(self, head, rem, h_vars, h_args, g, covered_subsets):
         # -------------------------------------------
         # over every body-atom
-        for f in self.rule_literals:
-            if f != head:
+        for rule_predicate_function in self.rule_literals:
+            if rule_predicate_function != head:
 
-                f_args_len = len(f.arguments)
-                f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+                f_args_len = len(rule_predicate_function.arguments)
+                f_args = re.sub(r'^.*?\(', '', str(rule_predicate_function))[:-1].split(',')  # all arguments (incl. duplicates / terms)
                 f_args_nd = list(dict.fromkeys(f_args))  # arguments (without duplicates / incl. terms)
                 f_vars = list(dict.fromkeys([a for a in f_args if a in self.rule_variables]))  # which have to be grounded per combination
 
@@ -325,7 +327,7 @@ class GenerateFoundednessPart:
 
                 for combination in combinations:
 
-                    head_combination, head_combination_list_2, unfound_atom, not_head_counter = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
+                    head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
 
                     # ---------
                     body_combination = {}
@@ -367,8 +369,8 @@ class GenerateFoundednessPart:
                         if found == True:
                             continue
                                     
-                            
-                    unfound_predicate = f"{f.name}"
+                    unfound_predicate_name = rule_predicate_function.name
+                    unfound_predicate = unfound_predicate_name
                     if len(f_args) > 0:
                         unfound_predicate += f"("
 
@@ -387,7 +389,7 @@ class GenerateFoundednessPart:
                         unfound_body = ""
 
                     sign_adjusted_predicate = "" 
-                    if not self.rule_literals_signums[self.rule_literals.index(f)]: # i.e. a ''positive'' occurence (e.g. q(X) :- p(X) -> p(X) is positive)
+                    if not self.rule_literals_signums[self.rule_literals.index(rule_predicate_function)]: # i.e. a ''positive'' occurence (e.g. q(X) :- p(X) -> p(X) is positive)
                         sign_adjusted_predicate = f"not {unfound_predicate}"
                     else: # i.e. a ''negative'' occurence (e.g. q(X) :- p(X), not p(1). -> p(1) is negative)
                         sign_adjusted_predicate = f"{unfound_predicate}"
@@ -395,6 +397,19 @@ class GenerateFoundednessPart:
                     unfound_rule = f"{unfound_atom} :-{unfound_body} {sign_adjusted_predicate}."
 
                     self.printer.custom_print(unfound_rule)
+
+
+                    if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
+
+                        #relevant_heads = self.rule_strongly_restricted_components_heads[self.current_rule]
+
+                        if self.current_rule in self.rule_strongly_restricted_components:
+                            relevant_bodies = self.rule_strongly_restricted_components[self.current_rule]
+
+                            if rule_predicate_function in relevant_bodies:
+                                head_predicate = f"{head.name}({','.join(full_head_args)})"
+                                unfound_level_mapping = f"{unfound_atom} :-{unfound_body} not prec({unfound_predicate},{head_predicate})."
+                                self.printer.custom_print(unfound_level_mapping)
 
                     dom_list_2 = []
                     for arg in h_args:
@@ -443,6 +458,8 @@ class GenerateFoundednessPart:
         head_combination_list_2 = []
         head_combination = {}
 
+        full_head_args = []
+
         if len(h_vars) > 0:
             head_combination_list = list(combination[:len(h_vars)])
 
@@ -450,10 +467,15 @@ class GenerateFoundednessPart:
             for h_arg in h_args:
                 if h_arg in h_vars and h_arg in f_vars_needed:
                     head_combination[h_arg] = combination[head_counter]
+                    full_head_args.append(combination[head_counter])
                     head_counter += 1
+
                 elif h_arg not in h_vars:
                     head_combination[h_arg] = h_arg
+                    
+                    full_head_args.append(h_arg)
                 else:   
+                    full_head_args.append("_")
                     pass
 
             for h_arg in h_args:
@@ -471,6 +493,7 @@ class GenerateFoundednessPart:
             for h_arg in h_args:
                 head_combination_list_2.append(h_arg)
                 head_combination[h_arg] = h_arg
+                full_head_args.append(h_arg)
                 
             unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
 
@@ -479,8 +502,8 @@ class GenerateFoundednessPart:
         else:
             unfound_atom = f"r{self.current_rule_position}_unfound"
             not_head_counter = 0
-    
-        return (head_combination, head_combination_list_2, unfound_atom, not_head_counter)
+
+        return (head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args)
 
     def _add_atom_to_unfoundedness_check(self, head_string, unfound_atom):
 
