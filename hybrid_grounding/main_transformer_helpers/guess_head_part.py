@@ -92,12 +92,10 @@ class GuessHeadPart:
                         found_scc_key = scc_key
                         break
 
-            if found_scc_key < 0:
-                raise Exception("COULD NOT FIND SCC KEY")
-            
             new_head_func = Function(name=new_head_name,arguments=[Function(arg_) for arg_ in new_arguments])
-
-            self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
-
+            
+            if found_scc_key >= 0:
+                self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
+            
             self.printer.custom_print(f"{str(self.rule_head)} :- {new_head}.")
 

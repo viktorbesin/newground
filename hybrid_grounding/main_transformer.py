@@ -116,7 +116,9 @@ class MainTransformer(Transformer):
 
         # if so: handle grounding
         if self.rule_is_non_ground:
-            self.non_ground_rules[self.current_rule_position] = self.current_rule_position
+            if self.program_rules:
+                self.non_ground_rules[self.current_rule_position] = self.current_rule_position
+                
             #self.current_rule_position += 1
             if str(node.head) != "#false":
                 head = self.rule_predicate_functions[0]
