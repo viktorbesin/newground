@@ -14,7 +14,7 @@ from ..cyclic_strategy import CyclicStrategy
 
 class GenerateFoundednessPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads, program_rules):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -31,6 +31,7 @@ class GenerateFoundednessPart:
         self.unfounded_rules = unfounded_rules
         self.cyclic_strategy = cyclic_strategy
         self.rule_strongly_restricted_components_heads = strongly_connected_components_heads
+        self.program_rules = program_rules
 
     def generate_foundedness_part(self):
 
@@ -76,7 +77,10 @@ class GenerateFoundednessPart:
 
         self._generate_foundedness_head(self.rule_head, rem, g, g_r, h_vars, h_args, h_args_len, h_args_nd)
 
-        covered_subsets = self._generate_foundedness_comparisons(self.rule_head, rem, h_vars, h_args, g)
+        if self.program_rules:
+            covered_subsets = self._generate_foundedness_comparisons(self.rule_head, rem, h_vars, h_args, g)
+        else:
+            covered_subsets = {}
 
         self._generate_foundedness_functions(self.rule_head, rem, h_vars, h_args, g, covered_subsets)
 
@@ -396,7 +400,8 @@ class GenerateFoundednessPart:
 
                     unfound_rule = f"{unfound_atom} :-{unfound_body} {sign_adjusted_predicate}."
 
-                    self.printer.custom_print(unfound_rule)
+                    if self.program_rules:
+                        self.printer.custom_print(unfound_rule)
 
 
                     if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
@@ -407,7 +412,7 @@ class GenerateFoundednessPart:
                             relevant_bodies = self.rule_strongly_restricted_components[self.current_rule]
 
                             if rule_predicate_function in relevant_bodies:
-                                head_predicate = f"{head.name}({','.join(full_head_args)})"
+                                head_predicate = f"{head.name}{self.current_rule_position}({','.join(full_head_args)})"
                                 unfound_level_mapping = f"{unfound_atom} :-{unfound_body} not prec({unfound_predicate},{head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
 

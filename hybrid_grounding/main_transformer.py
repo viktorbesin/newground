@@ -5,6 +5,7 @@ import re
 import itertools
 import argparse
 import clingo
+from clingo import Function
 
 from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
 from clingo.control import Control
@@ -23,12 +24,13 @@ from .cyclic_strategy import CyclicStrategy
 
 
 class MainTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads):
-        self.rules = False
-        self.count = False
-        self.sum = False
-        self.min = False
-        self.max = False
+    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps):
+                                          
+        self.program_rules = False
+        self.program_count = False
+        self.program_sum = False
+        self.program_min = False
+        self.program_max = False
         
         self.aggregate_mode = aggregate_mode
 
@@ -70,6 +72,7 @@ class MainTransformer(Transformer):
 
         self.rule_strongly_restricted_components = rule_strongly_restricted_components
         self.rule_strongly_connected_components_heads = rule_strongly_connected_comps_heads
+        self.predicates_strongly_connected_comps = predicates_strongly_connected_comps
 
     def _reset_after_rule(self):
         self.rule_variables = []
@@ -89,22 +92,20 @@ class MainTransformer(Transformer):
 
     def visit_Rule(self, node):
 
-        if not self.rules:
+        if not self.program_rules:
             self._reset_after_rule()
             if self.cyclic_strategy != CyclicStrategy.LEVEL_MAPPING:
                 self._outputNodeFormatConform(node)
             elif self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
                 if node in self.rule_strongly_restricted_components:
                     self._outputNodeFormatConformLevelMappings(node, self.rule_strongly_connected_components_heads[node], self.rule_strongly_restricted_components[node])
+                    #NO-RETURN
                 else:
                     self._outputNodeFormatConform(node)
+                    self.current_rule_position += 1
+                    return node
 
-
-            self.current_rule_position += 1
-
-            return node
-
-        if (self.count or self.sum or self.min or self.max) and self.aggregate_mode == AggregateMode.REPLACE:
+        if (self.program_count or self.program_sum or self.program_min or self.program_max) and self.aggregate_mode == AggregateMode.REPLACE and self.program_rules:
             self._outputNodeFormatConform(node)
 
             return node
@@ -122,33 +123,35 @@ class MainTransformer(Transformer):
             else:
                 head = None
 
-            satisfiability_generator = GenerateSatisfiabilityPart(head, 
-                                                                  self.current_rule_position,
-                                                                  self.printer, self.domain,
-                                                                  self.safe_variables_rules,
-                                                                  self.rule_variables,
-                                                                  self.rule_comparisons,
-                                                                  self.rule_predicate_functions,
-                                                                  self.rule_literals_signums)
-            satisfiability_generator.generate_sat_part()
+            if self.program_rules:
+                satisfiability_generator = GenerateSatisfiabilityPart(head, 
+                                                                      self.current_rule_position,
+                                                                      self.printer, self.domain,
+                                                                      self.safe_variables_rules,
+                                                                      self.rule_variables,
+                                                                      self.rule_comparisons,
+                                                                      self.rule_predicate_functions,
+                                                                      self.rule_literals_signums)
+                satisfiability_generator.generate_sat_part()
 
             # FOUND NEW
             if head is not None:
-
-                guess_head_generator = GuessHeadPart(head, 
-                                                                  self.current_rule_position,
-                                                                  self.printer, self.domain,
-                                                                  self.safe_variables_rules,
-                                                                  self.rule_variables,
-                                                                  self.rule_comparisons,
-                                                                  self.rule_predicate_functions,
-                                                                  self.rule_literals_signums,
-                                                                  self.current_rule,
-                                                                  self.rule_strongly_restricted_components,
-                                                                  self.ground_guess,
-                                                                  self.unfounded_rules,
-                                                                  self.cyclic_strategy)
-                guess_head_generator.guess_head()
+                if self.program_rules:
+                    guess_head_generator = GuessHeadPart(head, 
+                                                                      self.current_rule_position,
+                                                                      self.printer, self.domain,
+                                                                      self.safe_variables_rules,
+                                                                      self.rule_variables,
+                                                                      self.rule_comparisons,
+                                                                      self.rule_predicate_functions,
+                                                                      self.rule_literals_signums,
+                                                                      self.current_rule,
+                                                                      self.rule_strongly_restricted_components,
+                                                                      self.ground_guess,
+                                                                      self.unfounded_rules,
+                                                                      self.cyclic_strategy,
+                                                                      self.predicates_strongly_connected_comps)
+                    guess_head_generator.guess_head()
 
                 foundedness_generator = GenerateFoundednessPart(head, 
                                                                   self.current_rule_position,
@@ -163,7 +166,8 @@ class MainTransformer(Transformer):
                                                                   self.ground_guess,
                                                                   self.unfounded_rules,
                                                                   self.cyclic_strategy,
-                                                                  self.rule_strongly_connected_components_heads)
+                                                                  self.rule_strongly_connected_components_heads,
+                                                                  self.program_rules)
                 foundedness_generator.generate_foundedness_part()
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -240,26 +244,26 @@ class MainTransformer(Transformer):
         keyword_dict["count"] = "count"
         keyword_dict["sum"] = "sum"
 
-        self.rules = False
-        self.count = False
-        self.sum = False
-        self.min = False
-        self.max = False
+        self.program_rules = False
+        self.program_count = False
+        self.program_sum = False
+        self.program_min = False
+        self.program_max = False
         
         if str(node.name) in keyword_dict:
-            self.rules = True
+            self.program_rules = True
 
         if str(node.name) == "count":
-            self.count = True
+            self.program_count = True
 
         if str(node.name) == "sum":
-            self.sum = True
+            self.program_sum = True
 
         if str(node.name) == "min":
-            self.min = True
+            self.program_min = True
 
         if str(node.name) == "max":
-            self.max = True
+            self.program_max = True
 
         return node
 
@@ -384,21 +388,54 @@ class MainTransformer(Transformer):
             self.printer.custom_print(f":- {', '.join(str(n) for n in rule.body)}.")
         else:
 
-            precs = []
-            for relevant_head in relevant_heads:
-                for relevant_body in relevant_bodies:
-                    precs.append(f"prec({str(relevant_body)},{str(relevant_head)})")
+            # Simple search for SCC KEY
+            found_scc_key = -1
 
-            body_string = f"{', '.join([str(b) for b in rule.body])},{', '.join(precs)}"
+            rule_head = rule.head.atom.symbol
+
+            for scc_key in self.predicates_strongly_connected_comps.keys():
+                for pred in self.predicates_strongly_connected_comps[scc_key]:
+                    if str(pred) == str(rule.head) or str(pred) == str(rule_head.name):
+                        found_scc_key = scc_key
+                        break
+
+            if found_scc_key < 0:
+                raise Exception("COULD NOT FIND SCC KEY")
+
+
+            #precs = []
+            #for relevant_head in relevant_heads:
+            #    for relevant_body in relevant_bodies:
+            #        precs.append(f"prec({str(relevant_body)},{str(relevant_head)})")
+
+            #body_string = f"{', '.join([str(b) for b in rule.body])},{', '.join(precs)}"
+            body_string = f"{', '.join([str(b) for b in rule.body])}"
+
 
             if rule.head.ast_type == clingo.ast.ASTType.Aggregate:
-                head_string = f"{str(rule.head)}"
+                #head_string = f"{str(rule.head)}"
+                raise Exception("NOT SUPPORTED!")
             elif rule.head.ast_type == clingo.ast.ASTType.Disjunction:
-                head_string = "|".join([str(elem) for elem in rule.head.elements])
+                #head_string = "|".join([str(elem) for elem in rule.head.elements])
+                raise Exception("NOT SUPPORTED!")
             else:
                 head_string = f"{str(rule.head).replace(';', ',')}"
+                
+                new_head_name = f"{rule_head.name}{self.current_rule_position}"
+
+                
+                new_arguments = ",".join([str(argument) for argument in rule_head.arguments])
+
+                new_head_string = f"{new_head_name}({new_arguments})"
+
+                #new_head_func = Function(name=new_head_name,arguments=new_arguments)
+                new_head_func = Function(name=new_head_name,arguments=[Function(arg_) for arg_ in new_arguments])
+
+                self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
 
             if len(rule.body) > 0:  
-                self.printer.custom_print(f"{head_string} :- {body_string}.")
+                self.printer.custom_print(f"{new_head_string} :- {body_string}.")
             else:
-                self.printer.custom_print(f"{head_string}.")
+                self.printer.custom_print(f"{new_head_string}.")
+
+            self.printer.custom_print(f"{head_string} :- {new_head_string}.")

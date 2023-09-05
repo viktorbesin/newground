@@ -2,6 +2,8 @@
 import itertools
 import re
 
+from clingo import Function
+
 from .helper_part import HelperPart
 
 from ..cyclic_strategy import CyclicStrategy
@@ -10,7 +12,7 @@ from ..cyclic_strategy import CyclicStrategy
 
 class GuessHeadPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy,predicates_strongly_connected_comps):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -26,6 +28,7 @@ class GuessHeadPart:
         self.ground_guess = ground_guess
         self.unfounded_rules = unfounded_rules
         self.cyclic_strategy = cyclic_strategy
+        self.predicates_strongly_connected_comps = predicates_strongly_connected_comps
                  
     def guess_head(self):
 
@@ -78,6 +81,23 @@ class GuessHeadPart:
                 self.printer.custom_print(f"{{{new_head} : {','.join(domains)}}} {cyclic_behavior_arguments}")
             else:
                 self.printer.custom_print(f"{{{new_head}}} {cyclic_behavior_arguments}")
+
+
+            # Simple search for SCC KEY
+            found_scc_key = -1
+
+            for scc_key in self.predicates_strongly_connected_comps.keys():
+                for pred in self.predicates_strongly_connected_comps[scc_key]:
+                    if str(pred) == str(self.rule_head) or str(pred) == str(self.rule_head.name):
+                        found_scc_key = scc_key
+                        break
+
+            if found_scc_key < 0:
+                raise Exception("COULD NOT FIND SCC KEY")
+            
+            new_head_func = Function(name=new_head_name,arguments=[Function(arg_) for arg_ in new_arguments])
+
+            self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
 
             self.printer.custom_print(f"{str(self.rule_head)} :- {new_head}.")
 

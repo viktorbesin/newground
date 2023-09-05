@@ -29,17 +29,20 @@ class LevelMappingsPart:
                             p2 = str(scc[index_2])
 
                             variables_p1 = ((p1.split("(")[1])[:-1]).split(",")
-                            #new_variables_p1 = [variable + "_1" for variable in variables_p1]
-                            new_variables_p1 = [variable for variable in variables_p1]
+                            new_variables_p1 = [variable + "_1" for variable in variables_p1]
+                            #new_variables_p1 = [variable for variable in variables_p1]
 
                             variables_p2 = ((p2.split("(")[1])[:-1]).split(",")
-                            #new_variables_p2 = [variable + "_2" for variable in variables_p2]
-                            new_variables_p2 = [variable for variable in variables_p2]
+                            new_variables_p2 = [variable + "_2" for variable in variables_p2]
+                            #new_variables_p2 = [variable for variable in variables_p2]
 
                             np1 = scc[index_1].name + "(" + ",".join(new_variables_p1) + ")"
                             np2 = scc[index_2].name + "(" + ",".join(new_variables_p2) + ")"
 
-                            self.printer.custom_print(f"1 <= {{prec({np1},{np2});prec({np2},{np1})}} <= 1 :- {np1}, {np2}.")
+                            doms1 = [f"dom({var})" for var in new_variables_p1]
+                            doms2 = [f"dom({var})" for var in new_variables_p2]
+
+                            self.printer.custom_print(f"1 <= {{prec({np1},{np2});prec({np2},{np1})}} <= 1 :- {','.join(doms1)}, {','.join(doms2)}.")
 
                     # Create rules (21)
                     for index_1 in range(len(scc)):
@@ -56,28 +59,23 @@ class LevelMappingsPart:
                                 p3 = str(scc[index_3])
 
                                 variables_p1 = ((p1.split("(")[1])[:-1]).split(",")
-                                #new_variables_p1 = [variable + "_1" for variable in variables_p1]
-                                new_variables_p1 = [variable for variable in variables_p1]
+                                new_variables_p1 = [variable + "_1" for variable in variables_p1]
+                                #new_variables_p1 = [variable for variable in variables_p1]
 
                                 variables_p2 = ((p2.split("(")[1])[:-1]).split(",")
-                                #new_variables_p2 = [variable + "_2" for variable in variables_p2]
-                                new_variables_p2 = [variable for variable in variables_p2]
+                                new_variables_p2 = [variable + "_2" for variable in variables_p2]
+                                #new_variables_p2 = [variable for variable in variables_p2]
 
                                 variables_p3 = ((p3.split("(")[1])[:-1]).split(",")
-                                #new_variables_p3 = [variable + "_3" for variable in variables_p3]
-                                new_variables_p3 = [variable for variable in variables_p3]
+                                new_variables_p3 = [variable + "_3" for variable in variables_p3]
+                                #new_variables_p3 = [variable for variable in variables_p3]
 
                                 np1 = scc[index_1].name + "(" + ",".join(new_variables_p1) + ")"
                                 np2 = scc[index_2].name + "(" + ",".join(new_variables_p2) + ")"
                                 np3 = scc[index_3].name + "(" + ",".join(new_variables_p3) + ")"
+                                
+                                doms1 = [f"dom({var})" for var in new_variables_p1]
+                                doms2 = [f"dom({var})" for var in new_variables_p2]
+                                doms3 = [f"dom({var})" for var in new_variables_p3]
 
-                                self.printer.custom_print(f":- {np1}, {np2}, {np3}, prec({np1},{np2}), prec({np2},{np3}), prec({np3},{np1}).")
-                                                          
-
-
-
-
-
-
-
-
+                                self.printer.custom_print(f":- {','.join(doms1)}, {','.join(doms2)}, {','.join(doms3)}, prec({np1},{np2}), prec({np2},{np3}), prec({np3},{np1}).")

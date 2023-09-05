@@ -143,7 +143,8 @@ class HybridGrounding:
                                           domain, safe_variables, self.aggregate_mode,
                                           rule_strongly_connected_comps,
                                           self.cyclic_strategy,
-                                          rule_strongly_connected_comps_heads
+                                          rule_strongly_connected_comps_heads,
+                                          predicates_strongly_connected_comps
                                           )
 
             parse_string(aggregate_transformer_output_program, lambda stm: program_builder.add(transformer(stm)))
