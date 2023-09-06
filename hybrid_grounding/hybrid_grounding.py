@@ -16,7 +16,7 @@ import networkx as nx
 
 class HybridGrounding:
 
-    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.REPLACE, cyclic_strategy = CyclicStrategy.ASSUME_TIGHT):
+    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.RA, cyclic_strategy = CyclicStrategy.ASSUME_TIGHT):
         self.no_show = no_show
         self.ground_guess = ground_guess
         self.ground = ground
@@ -29,15 +29,17 @@ class HybridGrounding:
 
     def start(self, contents):
 
-        aggregate_transformer_output_program = self.start_aggregate_transformer(contents)
+        domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads  = self.start_domain_inference(contents)
+        
+        aggregate_transformer_output_program = self.start_aggregate_transformer(contents, domain)
 
-        domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads  = self.start_domain_inference(aggregate_transformer_output_program)
+        print(aggregate_transformer_output_program)
 
-        self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads)
+        #self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads)
 
-    def start_aggregate_transformer(self, contents):
+    def start_aggregate_transformer(self, contents, domain):
  
-        aggregate_transformer = AggregateTransformer(self.aggregate_mode)
+        aggregate_transformer = AggregateTransformer(self.aggregate_mode, domain)
         parse_string(contents, lambda stm: aggregate_transformer(stm))
 
         shown_predicates = list(set(aggregate_transformer.shown_predicates))

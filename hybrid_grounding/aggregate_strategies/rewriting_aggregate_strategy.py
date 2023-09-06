@@ -3,32 +3,74 @@ import itertools
 import clingo
 
 from ..comparison_tools import ComparisonTools
+from .rm_case import RMCase
 
 from .aggregate_mode import AggregateMode
 
-class RewritingAggregateStrategy:
+class RSPlusStarRewriting:
 
     @classmethod
-    def rewriting_aggregate_strategy(cls, aggregate_index, aggregate, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies):
+    def rewriting_aggregate_strategy(cls, aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain):
 
-        str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
+        str_type = aggregate_dict["function"][1]
+        str_id = aggregate_dict["id"] 
 
         new_prg_list = []
         output_remaining_body = []
 
+
+        if aggregate_dict["left_guard"]:    
+            left_guard = aggregate_dict["left_guard"]
+            left_guard_string = str(left_guard.term) 
+
+            left_guard_domain = cls.get_guard_domain(cur_variable_dependencies, domain, left_guard, left_guard_string)
+                
+            operator = ComparisonTools.getCompOperator(left_guard.comparison)
+            if operator == "<":
+                operator_type = ">"
+            elif operator == "<=":
+                operator_type = ">="
+            elif operator == ">":
+                operator_type = "<" 
+            elif operator == ">=":
+                operator_type = "<="
+            else:
+                operator_type == operator
+
+            (new_prg_list_tmp, output_remaining_body_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type)
+
+            new_prg_list += new_prg_list
+            output_remaining_body += output_remaining_body_tmp
+
+        if aggregate_dict["right_guard"]:    
+            right_guard = aggregate_dict["right_guard"]
+            right_guard_string = str(right_guard.term) 
+
+            right_guard_domain = cls.get_guard_domain(cur_variable_dependencies, domain, right_guard, right_guard_string)
+                
+            operator = ComparisonTools.getCompOperator(right_guard.comparison)
+            operator_type == operator
+
+            (new_prg_list_tmp, output_remaining_body_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, right_guard_domain, operator_type)
+
+            new_prg_list += new_prg_list
+            output_remaining_body += output_remaining_body_tmp
+
+        """
         if str_type == "sum":
 
             output_remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
 
-            if aggregate["left_guard"]:
-                guard = aggregate["left_guard"]
+            if aggregate_dict["left_guard"]:
+                guard = aggregate_dict["left_guard"]
                 output_remaining_body.append(f"{guard.term} {ComparisonTools.getCompOperator(guard.comparison)} S{aggregate_index}")
-            if aggregate["right_guard"]:
-                guard = aggregate["right_guard"]
+            if aggregate_dict["right_guard"]:
+                guard = aggregate_dict["right_guard"]
                 output_remaining_body.append(f"S{aggregate_index} {ComparisonTools.getCompOperator(guard.comparison)} {guard.term}")
 
-            new_prg_list += cls._add_sum_aggregate_rules(aggregate)
+            #new_prg_list += cls._add_sum_aggregate_rules(aggregate)
+            print("TODO")
+            assert(False)
 
         elif str_type == "count":
 
@@ -39,29 +81,70 @@ class RewritingAggregateStrategy:
                 count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
 
             # cls.cur_variable_dependencies 
-            if aggregate["left_guard"]:
+            if aggregate_dict["left_guard"]:
                 left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
                 output_remaining_body.append(left_name)
-            if aggregate["right_guard"]:
+
+            if aggregate_dict["right_guard"]:
                 right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
                 output_remaining_body.append(right_name)
 
-            new_prg_list += cls._add_count_aggregate_rules(aggregate, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies)
+            new_prg_list += cls._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies)
+
+
         elif str_type == "min":
-            (new_prg_list_tmp, output_remaining_body_tmp) = cls._add_min_max_aggregate_rules(aggregate, variables_dependencies_aggregate, cls._min_operator_functions, cls._min_remaining_body_functions, aggregate_mode, cur_variable_dependencies)
+            (new_prg_list_tmp, output_remaining_body_tmp) = cls._add_min_max_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, cls._min_operator_functions, cls._min_remaining_body_functions, aggregate_mode, cur_variable_dependencies)
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
         elif str_type == "max":
-            (new_prg_list_tmp, output_remaining_body_tmp) = cls._add_min_max_aggregate_rules(aggregate, variables_dependencies_aggregate, cls._max_operator_functions, cls._max_remaining_body_functions, aggregate_mode, cur_variable_dependencies)
+            (new_prg_list_tmp, output_remaining_body_tmp) = cls._add_min_max_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, cls._max_operator_functions, cls._max_remaining_body_functions, aggregate_mode, cur_variable_dependencies)
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
         else: 
             assert(False) # Not Implemented
 
+        """
+
+        return (new_prg_list, output_remaining_body)
+   
+    @classmethod
+    def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type):
+
+        if str_type == "count":
+            new_prg_list, output_remaining_body = cls._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type)
+        else:
+            assert(False)
+
         return (new_prg_list, output_remaining_body)
 
     @classmethod
-    def rewriting_no_body_aggregate_strategy(cls, aggregate, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies):
+    def get_guard_domain(cls, cur_variable_dependencies, domain, left_guard, left_guard_string):
+        if left_guard_string in cur_variable_dependencies:
+            left_guard_domain = None
+
+            for var_dependency in cur_variable_dependencies[left_guard_string]:
+                var_dependency_argument_position = -1
+                var_dependency_argument_position_counter = 0
+                for argument in var_dependency.arguments:
+                    if str(argument) == left_guard_string:
+                        var_dependency_argument_position = var_dependency_argument_position_counter
+
+                    var_dependency_argument_position_counter += 1
+
+                cur_var_dependency_domain = set(domain[var_dependency.name][str(var_dependency_argument_position)])
+
+                if left_guard_domain is None:
+                    left_guard_domain = cur_var_dependency_domain
+                else:
+                    left_guard_domain = set(left_guard_domain).intersection(cur_var_dependency_domain)
+
+        else:
+                # Otherwise assuming int
+            left_guard_domain = [int(str(left_guard.term))]
+        return left_guard_domain
+
+    @classmethod
+    def rewriting_no_body_aggregate_strategy(cls, aggregate, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain):
 
         new_prg_list = []
         output_remaining_body = []
@@ -210,7 +293,7 @@ class RewritingAggregateStrategy:
 
             terms = element["terms"]
 
-            if aggregate_mode == AggregateMode.REWRITING:
+            if aggregate_mode == AggregateMode.RS_STAR:
 
                 element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
 
@@ -328,11 +411,11 @@ class RewritingAggregateStrategy:
 
         terms += element_dependent_variables
 
-        if aggregate_mode == AggregateMode.REWRITING:
+        if aggregate_mode == AggregateMode.RS_STAR:
             body = f"{element_predicate_names[element_index]}({','.join(terms)}), {terms[0]} {new_operator} {guard_term}"
             bodies.append(body)
 
-        elif aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+        elif aggregate_mode == AggregateMode.RS_PLUS:
 
             new_conditions = []
             for condition in element["condition"]:
@@ -400,21 +483,32 @@ class RewritingAggregateStrategy:
     #--------------------------------------------------------------------------------------------------------
     #------------------------------------ COUNT-PART --------------------------------------------------------
     #--------------------------------------------------------------------------------------------------------
-                      
+
 
     @classmethod
-    def _add_count_aggregate_rules(cls, aggregate, variable_dependencies, aggregate_mode, cur_variable_dependencies):
+    def _add_count_aggregate_rules(cls, aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type):
         
         new_prg_part = []
 
-        str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
+        str_type = aggregate_dict["function"][1]
+        str_id = aggregate_dict["id"] 
+        
+        number_of_elements = len(aggregate_dict["elements"])
 
+        additional_bodies = []
 
-        if aggregate_mode == AggregateMode.REWRITING:
-            for element_index in range(len(aggregate["elements"])):
+        if number_of_elements == 1 and (operator_type == ">=" or ">") and len(list(guard_domain)) == 1:
+            # Handle special case RM (RM from paper)
+            additional_bodies += RMCase._handle_rm_case(aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type)
+        else:
+            print("TODO")
+            assert(False)
+
+        """
+        elif aggregate_mode == AggregateMode.RS_STAR:
+            for element_index in range(len(aggregate_dict["elements"])):
                 
-                element = aggregate["elements"][element_index]
+                element = aggregate_dict["elements"][element_index]
 
                 element_dependent_variables = []
                 for variable in element["condition_variables"]:
@@ -428,8 +522,8 @@ class RewritingAggregateStrategy:
 
         new_prg_part.append(f"#program {str_type}.")
 
-        if aggregate["left_guard"]:
-            left_guard = aggregate["left_guard"]
+        if aggregate_dict["left_guard"]:
+            left_guard = aggregate_dict["left_guard"]
 
             left_name = f"{str_type}_ag{str_id}_left"
 
@@ -443,13 +537,13 @@ class RewritingAggregateStrategy:
             else:
                 assert(False) # Not implemented
 
-            rules_strings = cls._count_generate_bodies_and_helper_bodies(left_name, count, aggregate["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies)
+            rules_strings = cls._count_generate_bodies_and_helper_bodies(left_name, count, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies)
 
             for rule_string in rules_strings:
                 new_prg_part.append(rule_string)
         
-        if aggregate["right_guard"]:
-            right_guard = aggregate["right_guard"]
+        if aggregate_dict["right_guard"]:
+            right_guard = aggregate_dict["right_guard"]
 
             right_name = f"{str_type}_ag{str_id}_right"
 
@@ -463,12 +557,14 @@ class RewritingAggregateStrategy:
             else:
                 assert(False) # Not implemented
 
-            rules_strings = cls._count_generate_bodies_and_helper_bodies(right_name, count,  aggregate["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies)
+            rules_strings = cls._count_generate_bodies_and_helper_bodies(right_name, count,  aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies)
 
             for rule_string in rules_strings:
                 new_prg_part.append(rule_string)
 
-        return new_prg_part
+        """ 
+
+        return (new_prg_part, additional_bodies)
                 
     @classmethod
     def _count_generate_bodies_and_helper_bodies(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies):
@@ -520,12 +616,12 @@ class RewritingAggregateStrategy:
 
                 terms.append(new_terms)
 
-                if aggregate_mode == AggregateMode.REWRITING:
+                if aggregate_mode == AggregateMode.RS_STAR:
                     terms_string = f"{','.join(new_terms + element_dependent_variables)}"
 
                     bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({terms_string})") 
 
-                elif aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+                elif aggregate_mode == AggregateMode.RS_PLUS:
 
                     new_conditions = []
 
@@ -650,119 +746,6 @@ class RewritingAggregateStrategy:
         rules_strings.append(helper_rule)
 
         return (rules_strings)
-
-
-    #--------------------------------------------------------------------------------------------------------
-    #------------------------------------ SUM-PART ----------------------------------------------------------
-    #--------------------------------------------------------------------------------------------------------
-                      
-    @classmethod
-    def _add_sum_aggregate_rules(cls, aggregate):
-        """
-            Adds the necessary rules for the recursive sum aggregate.
-        """
-
-        new_prg_part = []
-
-        str_type = aggregate["function"][1]
-        str_id = aggregate["id"] 
-
-        
-        new_prg_part.append(f"#program {str_type}.")
-
-        rule_string = f"{str_type}_ag{str_id}(S) :- "
-       
-        element_strings = []
-        element_variables = [] 
-
-        for element_id in range(len(aggregate["elements"])):
-            element = aggregate["elements"][element_id]
-
-            element_strings.append(f"{str_type}_ag{str_id}_elem{element_id}(S{element_id})")
-            element_variables.append(f"S{element_id}")
-
-        rule_string += ','.join(element_strings)
-
-        rule_string += f", S = {'+'.join(element_variables)}."
-
-        new_prg_part.append(rule_string)
-
-        for element_id in range(len(aggregate["elements"])):
-
-            element = aggregate["elements"][element_id]
-            guard = aggregate["right_guard"]
-            # Body
-            body_head_def = f"body_ag{str_id}_elem{element_id}({','.join(element['terms'])})"
-            body_head_def_terms = ','.join(element['terms'])
-
-            # DRY VIOLATION START: DRY (Do Not Repeat) justification: Because it is only used here and writing a subroutine creates more overload than simply duplicating the code
-            term_strings_temp = []
-            for term_string in element['terms']:
-                term_strings_temp.append(term_string + "1")
-            body_head_1 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
-            body_head_1_def_terms = ','.join(term_strings_temp)
-             
-            term_strings_temp = []
-            for term_string in element['terms']:
-                term_strings_temp.append(term_string + "2")
-            body_head_2 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
-            body_head_2_first = term_strings_temp[0]
-            body_head_2_def_terms = ','.join(term_strings_temp)
-
-            term_strings_temp = []
-            for term_string in element['terms']:
-                term_strings_temp.append(term_string + "3")
-            body_head_3 = f"body_ag{str_id}_elem{element_id}({','.join(term_strings_temp)})"
-            # DRY VIOLATION END
-
-            if len(element['condition']) > 0:
-                rule_string = f"{body_head_def} :- {','.join(element['condition'])}."
-            else:
-                rule_string = f"{body_head_def}."
-
-
-            new_prg_part.append(rule_string)
-
-            # Partial Sum Last
-
-            rule_string = f"{str_type}_ag{str_id}_elem{element_id}(S) :- last_ag{str_id}_elem{element_id}({body_head_def_terms}), partial_{str_type}_ag{str_id}_elem{element_id}({body_head_def_terms},S)."
-            new_prg_part.append(rule_string)
-
-            # Partial Sum Middle
-
-            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}({body_head_2_def_terms},S2) :- next_ag{str_id}_elem{element_id}({body_head_1_def_terms},{body_head_2_def_terms}), partial_{str_type}_ag{str_id}_elem{element_id}({body_head_1_def_terms},S1), S2 = S1 + {body_head_2_first}, S2 <= {guard.term}."
-            new_prg_part.append(rule_string)
-
-            # Partial Sum First
-
-            rule_string = f"partial_{str_type}_ag{str_id}_elem{element_id}({body_head_def_terms},S) :- first_ag{str_id}_elem{element_id}({body_head_def_terms}), S = {body_head_def_terms}."
-            new_prg_part.append(rule_string)
-
-            # not_last
-            rule_string = f"not_last_ag{str_id}_elem{element_id}({body_head_1_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
-            new_prg_part.append(rule_string)
-
-            # Last
-            rule_string = f"last_ag{str_id}_elem{element_id}({body_head_def_terms}) :- {body_head_def}, not not_last_ag{str_id}_elem{element_id}({body_head_def_terms})."
-            new_prg_part.append(rule_string)
-
-            # not_next
-            rule_string = f"not_next_ag{str_id}_elem{element_id}({body_head_1_def_terms}, {body_head_2_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_3}, {body_head_1} < {body_head_3}, {body_head_3} < {body_head_2}."
-            new_prg_part.append(rule_string)
-
-            # next
-            rule_string = f"next_ag{str_id}_elem{element_id}({body_head_1_def_terms}, {body_head_2_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}, not not_next_ag{str_id}_elem{element_id}({body_head_1_def_terms}, {body_head_2_def_terms})."
-            new_prg_part.append(rule_string)
-
-            # not_first
-            rule_string = f"not_first_ag{str_id}_elem{element_id}({body_head_2_def_terms}) :- {body_head_1}, {body_head_2}, {body_head_1} < {body_head_2}."
-            new_prg_part.append(rule_string)
-
-            # first
-            rule_string = f"first_ag{str_id}_elem{element_id}({body_head_1_def_terms}) :- {body_head_1}, not not_first_ag{str_id}_elem{element_id}({body_head_1_def_terms})."
-            new_prg_part.append(rule_string)
-
-            return new_prg_part
 
     @classmethod
     def check_string_is_int(cls, string):

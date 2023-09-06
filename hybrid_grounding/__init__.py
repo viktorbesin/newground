@@ -11,6 +11,14 @@ def main():
     choice_level_mappings = "level-mappings"
     choice_shared_cycle_body_predicates = "shared-cycle-body-predicates"
 
+    aggregate_choices = {
+        "RA":{"cmd_line":"RA","enum_mode":AggregateMode.RA},
+        "RS":{"cmd_line":"RS","enum_mode":AggregateMode.RS},
+        "RS_PLUS":{"cmd_line":"RS-PLUS","enum_mode":AggregateMode.RS_PLUS},
+        "RS_STAR":{"cmd_line":"RS-STAR","enum_mode":AggregateMode.RS_STAR},
+        "RECURSIVE":{"cmd_line":"RECURSIVE","enum_mode":AggregateMode.RECURSIVE},
+    }
+
 
 
     parser = argparse.ArgumentParser(prog='hybrid_grounding', usage='%(prog)s [files]')
@@ -19,7 +27,7 @@ def main():
                         help='Additionally ground guesses which results in (fully) grounded output. ')
     parser.add_argument('--ground', action='store_true',
                         help='Output program fully grounded. ')
-    parser.add_argument('--aggregate-strategy', default='replace', choices=['replace','rewrite','rewrite-no-body'])
+    parser.add_argument('--aggregate-strategy', default=aggregate_choices["RA"]["cmd_line"], choices=[aggregate_choices[key]["cmd_line"] for key in aggregate_choices.keys()])
     parser.add_argument('--cyclic-strategy', default=choice_tight, choices=[choice_tight, choice_level_mappings, choice_shared_cycle_body_predicates])
     parser.add_argument('files', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
@@ -39,13 +47,10 @@ def main():
         ground = True
 
     aggregate_strategy = None
-    if args.aggregate_strategy == 'replace':
-        aggregate_strategy = AggregateMode.REPLACE
-    elif args.aggregate_strategy == 'rewrite':
-        aggregate_strategy = AggregateMode.REWRITING
-    elif args.aggregate_strategy == 'rewrite-no-body':
-        aggregate_strategy = AggregateMode.REWRITING_NO_BODY
-
+    for key in aggregate_choices.keys():
+        if args.aggregate_strategy == aggregate_choices[key]["cmd_line"]:
+            aggregate_strategy = aggregate_choices[key]["enum_mode"]
+    
     normal_strategy = None
     if args.cyclic_strategy == choice_tight:
         normal_strategy = CyclicStrategy.ASSUME_TIGHT

@@ -105,7 +105,7 @@ class MainTransformer(Transformer):
                     self.current_rule_position += 1
                     return node
 
-        if (self.program_count or self.program_sum or self.program_min or self.program_max) and self.aggregate_mode == AggregateMode.REPLACE and self.program_rules:
+        if (self.program_count or self.program_sum or self.program_min or self.program_max) and self.aggregate_mode == AggregateMode.RA and self.program_rules:
             self._outputNodeFormatConform(node)
 
             return node

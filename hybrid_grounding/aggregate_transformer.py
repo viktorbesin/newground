@@ -1,7 +1,6 @@
 import os
 import sys
 
-
 import argparse
 
 import clingo
@@ -11,15 +10,13 @@ from clingo.ast import Transformer, Variable, parse_string
 from .comparison_tools import ComparisonTools
 from .aggregate_strategies.replace_aggregate_strategy import ReplaceAggregateStrategy
 from .aggregate_strategies.aggregate_mode import AggregateMode
-from .aggregate_strategies.rewriting_aggregate_strategy import RewritingAggregateStrategy
-
-def do_nothing(stuff):
-    pass
+from .aggregate_strategies.rewriting_aggregate_strategy import RSPlusStarRewriting
 
 class AggregateTransformer(Transformer):
     
-    def __init__(self, aggregate_mode):
+    def __init__(self, aggregate_mode, domain):
         self.aggregate_mode = aggregate_mode
+        self.domain = domain
 
         self.new_prg = []
         self.aggregate_count = 0
@@ -111,7 +108,6 @@ class AggregateTransformer(Transformer):
             remaining_body_string = ','.join(remaining_body)
             new_rule = f"{head} :- {remaining_body_string}."
             self.new_prg.append(new_rule)
-            self.new_prg.append(f"#program rules.")
 
         self.reset_temporary_variables() # MUST BE LAST
         return node
@@ -167,8 +163,10 @@ class AggregateTransformer(Transformer):
 
             element_dict["condition_variables"] = []
 
+            condition_ast_list = []
             condition_strings = []
             for condition in node.condition:
+                condition_ast_list.append(condition)
 
                 if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
                     for argument in condition.atom.symbol.arguments:
@@ -202,7 +200,7 @@ class AggregateTransformer(Transformer):
                     assert(False)
 
 
-                if self.aggregate_mode == AggregateMode.REWRITING_NO_BODY:
+                if self.aggregate_mode == AggregateMode.RS_PLUS:
                     if hasattr(condition, "atom") and hasattr(condition.atom, "symbol") and condition.atom.symbol.ast_type == clingo.ast.ASTType.Function:
                         cur_dict = {}
                         cur_dict["all"] = str(condition)
@@ -246,6 +244,7 @@ class AggregateTransformer(Transformer):
                     condition_strings.append(str(condition))
 
             element_dict["condition"] = condition_strings
+            element_dict["condition_ast"] = condition_ast_list
 
             aggregate_dict["elements"].append(element_dict) 
 
@@ -286,26 +285,34 @@ class AggregateTransformer(Transformer):
                 variables_dependencies_aggregate.append(variable)
 
         remaining_body = []
-        if self.aggregate_mode == AggregateMode.REWRITING:
+        if self.aggregate_mode == AggregateMode.RS_STAR:
 
-            (program_list, remaining_body_part) = RewritingAggregateStrategy.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies)
-
-            self.new_prg = self.new_prg + program_list
-            remaining_body = remaining_body_part
-
-        elif self.aggregate_mode == AggregateMode.REWRITING_NO_BODY and (str_type == "count" or str_type == "max" or str_type == "min"):
-
-            (program_list, remaining_body_part) = RewritingAggregateStrategy.rewriting_no_body_aggregate_strategy(aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies)
+            (program_list, remaining_body_part) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
 
             self.new_prg = self.new_prg + program_list
             remaining_body = remaining_body_part
 
-        elif self.aggregate_mode == AggregateMode.REPLACE:
+        elif self.aggregate_mode == AggregateMode.RS_PLUS:
+
+            (program_list, remaining_body_part) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
+
+            self.new_prg = self.new_prg + program_list
+            remaining_body = remaining_body_part
+
+        elif self.aggregate_mode == AggregateMode.RA:
 
             (program_list, remaining_body_part) = ReplaceAggregateStrategy.replace_aggregate_strategy(aggregate, variables_dependencies_aggregate)
 
             self.new_prg = self.new_prg + program_list
             remaining_body = remaining_body_part
+
+        elif self.aggregate_mode == AggregateMode.RS:
+            print(f"Aggregate mode {self.aggregate_mode} IMPLEMENTED SOON")
+            assert(False)
+        
+        elif self.aggregate_mode == AggregateMode.RECURSIVE:
+            print(f"Aggregate mode {self.aggregate_mode} IMPLEMENTED SOON")
+            assert(False)
 
         else:
             print(f"Aggregate mode {self.aggregate_mode} not implemented!")

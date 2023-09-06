@@ -57,7 +57,7 @@ class ComparisonTools:
     @classmethod
     def get_arguments_from_operation(cls, root):
         """
-            Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lasylt ''Y'' -> then combines together)
+            Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lastly ''Y'' -> then combines together)
         """
 
         if root.ast_type is clingo.ast.ASTType.BinaryOperation:
