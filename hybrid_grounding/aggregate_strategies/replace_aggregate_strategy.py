@@ -7,7 +7,8 @@ class ReplaceAggregateStrategy:
     @classmethod
     def replace_aggregate_strategy(cls, aggregate, variables_dependencies_aggregate):
 
-        output_string_list = []
+        new_program_list = [] 
+        new_program_set = []
 
         elements = aggregate["elements"]
 
@@ -35,7 +36,7 @@ class ReplaceAggregateStrategy:
             element_body = f"{element_predicate_name}({terms_string})"
             body_string = f"{element_body} :- {','.join(element['condition'])}."
 
-            output_string_list.append(body_string)
+            new_program_list.append(body_string)
 
         new_elements = []
 
@@ -75,7 +76,7 @@ class ReplaceAggregateStrategy:
 
             new_aggregate += f" {operator} {right_guard_term}"
 
-        output_string_list.append("#program no_rules.")
+        new_program_list.append("#program no_rules.")
 
-        return (output_string_list, [new_aggregate])
+        return (new_program_list, [new_aggregate], list(set(new_program_set)))
 

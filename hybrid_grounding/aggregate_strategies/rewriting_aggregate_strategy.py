@@ -16,6 +16,7 @@ class RSPlusStarRewriting:
         str_id = aggregate_dict["id"] 
 
         new_prg_list = []
+        new_prg_set = []
         output_remaining_body = []
 
 
@@ -23,9 +24,10 @@ class RSPlusStarRewriting:
             left_guard = aggregate_dict["left_guard"]
             left_guard_string = str(left_guard.term) 
 
-            left_guard_domain = cls.get_guard_domain(cur_variable_dependencies, domain, left_guard, left_guard_string)
+            left_guard_domain = cls.get_guard_domain(cur_variable_dependencies, domain, left_guard, left_guard_string, variables_dependencies_aggregate, aggregate_dict)
                 
             operator = ComparisonTools.getCompOperator(left_guard.comparison)
+            
             if operator == "<":
                 operator_type = ">"
             elif operator == "<=":
@@ -35,119 +37,86 @@ class RSPlusStarRewriting:
             elif operator == ">=":
                 operator_type = "<="
             else:
-                operator_type == operator
+                operator_type = operator
 
-            (new_prg_list_tmp, output_remaining_body_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type)
+            string_capsulation = "left"
 
-            new_prg_list += new_prg_list
+            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type, string_capsulation, left_guard_string)
+
+            new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
+            new_prg_set += new_prg_set_tmp
 
         if aggregate_dict["right_guard"]:    
             right_guard = aggregate_dict["right_guard"]
             right_guard_string = str(right_guard.term) 
 
-            right_guard_domain = cls.get_guard_domain(cur_variable_dependencies, domain, right_guard, right_guard_string)
+            right_guard_domain = cls.get_guard_domain(cur_variable_dependencies, domain, right_guard, right_guard_string, variables_dependencies_aggregate, aggregate_dict)
                 
             operator = ComparisonTools.getCompOperator(right_guard.comparison)
-            operator_type == operator
+            operator_type = operator
 
-            (new_prg_list_tmp, output_remaining_body_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, right_guard_domain, operator_type)
+            string_capsulation = "right"
 
-            new_prg_list += new_prg_list
-            output_remaining_body += output_remaining_body_tmp
+            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, right_guard_domain, operator_type, string_capsulation, left_guard_string)
 
-        """
-        if str_type == "sum":
-
-            output_remaining_body.append(f"{str_type}_ag{str_id}(S{aggregate_index})")
-
-            if aggregate_dict["left_guard"]:
-                guard = aggregate_dict["left_guard"]
-                output_remaining_body.append(f"{guard.term} {ComparisonTools.getCompOperator(guard.comparison)} S{aggregate_index}")
-            if aggregate_dict["right_guard"]:
-                guard = aggregate_dict["right_guard"]
-                output_remaining_body.append(f"S{aggregate_index} {ComparisonTools.getCompOperator(guard.comparison)} {guard.term}")
-
-            #new_prg_list += cls._add_sum_aggregate_rules(aggregate)
-            print("TODO")
-            assert(False)
-
-        elif str_type == "count":
-
-            count_name_ending = ""
-            if len(variables_dependencies_aggregate) == 0:
-                count_name_ending += "(1)"
-            else:
-                count_name_ending += f"({','.join(variables_dependencies_aggregate)})"
-
-            # cls.cur_variable_dependencies 
-            if aggregate_dict["left_guard"]:
-                left_name = f"not not_{str_type}_ag{str_id}_left{count_name_ending}"
-                output_remaining_body.append(left_name)
-
-            if aggregate_dict["right_guard"]:
-                right_name = f"not not not_{str_type}_ag{str_id}_right{count_name_ending}"
-                output_remaining_body.append(right_name)
-
-            new_prg_list += cls._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies)
-
-
-        elif str_type == "min":
-            (new_prg_list_tmp, output_remaining_body_tmp) = cls._add_min_max_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, cls._min_operator_functions, cls._min_remaining_body_functions, aggregate_mode, cur_variable_dependencies)
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
-        elif str_type == "max":
-            (new_prg_list_tmp, output_remaining_body_tmp) = cls._add_min_max_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, cls._max_operator_functions, cls._max_remaining_body_functions, aggregate_mode, cur_variable_dependencies)
-            new_prg_list += new_prg_list_tmp
-            output_remaining_body += output_remaining_body_tmp
-        else: 
-            assert(False) # Not Implemented
+            new_prg_set += new_prg_set_tmp
 
-        """
-
-        return (new_prg_list, output_remaining_body)
+        return (new_prg_list, output_remaining_body, list(set(new_prg_set)))
    
     @classmethod
-    def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type):
+    def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string):
 
         if str_type == "count":
-            new_prg_list, output_remaining_body = cls._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type)
+            new_prg_list, output_remaining_body, new_prg_set = cls._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
         else:
             assert(False)
 
-        return (new_prg_list, output_remaining_body)
+        return (new_prg_list, output_remaining_body, new_prg_set)
 
     @classmethod
-    def get_guard_domain(cls, cur_variable_dependencies, domain, left_guard, left_guard_string):
-        if left_guard_string in cur_variable_dependencies:
-            left_guard_domain = None
+    def get_guard_domain(cls, cur_variable_dependencies, domain, guard, guard_string, variable_dependencies_aggregate, aggregate_dict):
 
-            for var_dependency in cur_variable_dependencies[left_guard_string]:
-                var_dependency_argument_position = -1
-                var_dependency_argument_position_counter = 0
-                for argument in var_dependency.arguments:
-                    if str(argument) == left_guard_string:
-                        var_dependency_argument_position = var_dependency_argument_position_counter
+        if guard_string in cur_variable_dependencies:
+            # Guard is a Variable
+            guard_domain = None
 
-                    var_dependency_argument_position_counter += 1
+            operator = ComparisonTools.getCompOperator(guard.comparison)
 
-                cur_var_dependency_domain = set(domain[var_dependency.name][str(var_dependency_argument_position)])
+            if operator != "=":
+                for var_dependency in cur_variable_dependencies[guard_string]:
+                    var_dependency_argument_position = -1
+                    var_dependency_argument_position_counter = 0
+                    for argument in var_dependency.arguments:
+                        if str(argument) == guard_string:
+                            var_dependency_argument_position = var_dependency_argument_position_counter
+                            break
 
-                if left_guard_domain is None:
-                    left_guard_domain = cur_var_dependency_domain
-                else:
-                    left_guard_domain = set(left_guard_domain).intersection(cur_var_dependency_domain)
+                        var_dependency_argument_position_counter += 1
+
+                    cur_var_dependency_domain = set(domain[var_dependency.name][str(var_dependency_argument_position)])
+
+                    if guard_domain is None:
+                        guard_domain = cur_var_dependency_domain
+                    else:
+                        guard_domain = set(guard_domain).intersection(cur_var_dependency_domain)
+            else:
+                print("Equality with Variable not Implemented!")
+                raise Exception("Equality with Variable not Implemented!")
 
         else:
-                # Otherwise assuming int
-            left_guard_domain = [int(str(left_guard.term))]
-        return left_guard_domain
+            # Otherwise assuming int, will fail if e.g. is comparison or something else
+            guard_domain = [int(str(guard.term))]
+        return guard_domain
 
     @classmethod
     def rewriting_no_body_aggregate_strategy(cls, aggregate, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain):
 
         new_prg_list = []
         output_remaining_body = []
+        new_prg_set = []
 
         str_type = aggregate["function"][1]
         str_id = aggregate["id"] 
@@ -178,7 +147,7 @@ class RSPlusStarRewriting:
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
 
-        return (new_prg_list, output_remaining_body)
+        return (new_prg_list, output_remaining_body, list(set(new_prg_set)))
 
     #--------------------------------------------------------------------------------------------------------
     #------------------------------------ MIN-MAX-PART ------------------------------------------------------
@@ -486,88 +455,173 @@ class RSPlusStarRewriting:
 
 
     @classmethod
-    def _add_count_aggregate_rules(cls, aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type):
+    def _add_count_aggregate_rules(cls, aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string):
         
-        new_prg_part = []
+        new_prg_part_list = []
+        new_prg_part_set = []
 
         str_type = aggregate_dict["function"][1]
         str_id = aggregate_dict["id"] 
         
         number_of_elements = len(aggregate_dict["elements"])
 
-        additional_bodies = []
+        original_rule_additional_body_literals = []
 
         if number_of_elements == 1 and (operator_type == ">=" or ">") and len(list(guard_domain)) == 1:
             # Handle special case RM (RM from paper)
-            additional_bodies += RMCase._handle_rm_case(aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type)
-        else:
-            print("TODO")
-            assert(False)
+            original_rule_additional_body_literals += RMCase._handle_rm_case(aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type)
 
-        """
-        elif aggregate_mode == AggregateMode.RS_STAR:
-            for element_index in range(len(aggregate_dict["elements"])):
+        elif aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS_PLUS: 
+
+            if len(list(guard_domain)) == 1:
+                guard_value = int(str(list(guard_domain)[0])) # Assuming constant
+
+                cls._count_single_domain_adder(aggregate_dict, aggregate_mode, str_type, str_id, variable_dependencies, operator_type, string_capsulation, guard_value, cur_variable_dependencies, original_rule_additional_body_literals, new_prg_part_list, new_prg_part_set, [], guard_string)
+            else:
+                guard_domain_list = [int(value) for value in list(guard_domain)]
+
+                for guard_value in guard_domain_list:
+                    always_add_variable_dependecies = [str(guard_value)]
+
+                    cls._count_single_domain_adder(aggregate_dict, aggregate_mode, str_type, str_id, variable_dependencies, operator_type, string_capsulation, guard_value, cur_variable_dependencies, original_rule_additional_body_literals, new_prg_part_list, new_prg_part_set, always_add_variable_dependecies, guard_string)
+
+
+
+        return (new_prg_part_list, original_rule_additional_body_literals, list(set(new_prg_part_set)))
+    
+    @classmethod
+    def _count_single_domain_adder(cls, aggregate_dict, aggregate_mode, str_type, str_id, variable_dependencies, operator_type, string_capsulation, guard_value, cur_variable_dependencies, original_rule_additional_body_literals, new_prg_part_list, new_prg_part_set, always_add_variable_dependencies, guard_string):
+
+            if aggregate_mode == AggregateMode.RS_STAR:
+                for element_index in range(len(aggregate_dict["elements"])):
+                    
+                    element = aggregate_dict["elements"][element_index]
+
+                    element_dependent_variables = []
+                    for variable in element["condition_variables"]:
+                        if variable in variable_dependencies:
+                            element_dependent_variables.append(variable)
+
+                    for literal in always_add_variable_dependencies:
+                        element_dependent_variables.append(literal)
+
+                    term_string = f"{','.join(element['terms'] + element_dependent_variables)}"
+
+                    body_string = f"body_{str_type}_ag{str_id}_{element_index}({term_string}) :- {','.join(element['condition'])}."
+                    new_prg_part_set.append(body_string)
+ 
+
+            count = guard_value
+            count_predicate_name = f"{str_type}_ag{str_id}_{string_capsulation}"
+
+            if operator_type in [">=",">","<=","<"]:
+                if len(always_add_variable_dependencies) == 0:
+                    arguments = ""
+                    if len(variable_dependencies) == 0:
+                        arguments += "(1)"
+                    else:
+                        arguments += f"({','.join(variable_dependencies)})" 
+                else:
+                    # Special case if guard is variable
+                    arguments = ""
+                    if len(variable_dependencies) == 0:
+                        arguments += "(1)"
+                    else:
+                        arguments += f"({','.join(variable_dependencies + [guard_string])})" 
+
+                if operator_type == ">=" or operator_type == ">":
+                    # Monotone
+                    double_negated_count_predicate = f"not not_{count_predicate_name}{arguments}"
+                    original_rule_additional_body_literals.append(double_negated_count_predicate)
+                elif operator_type == "<=" or operator_type == "<":
+                    # Anti-Monotone
+                    triple_negated_count_predicate = f"not not not_{count_predicate_name}{arguments}"
+                    original_rule_additional_body_literals.append(triple_negated_count_predicate)
+
+                if operator_type == "<":
+                    count = count
+                elif operator_type == ">=":
+                    count = count
+                elif operator_type == ">":
+                    count = count + 1
+                elif operator_type == "<=":
+                    count = count + 1
+                else:
+                    assert(False) # Not implemented
+
+                rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name, count, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+
+            elif operator_type == "!=":
+                if len(always_add_variable_dependencies) == 0:
+                    arguments = ""
+                    if len(variable_dependencies) == 0:
+                        arguments += "(1)"
+                    else:
+                        arguments += f"({','.join(variable_dependencies)})" 
+                else:
+                    # Special case if guard is variable
+                    arguments = ""
+                    if len(variable_dependencies) == 0:
+                        arguments += "(1)"
+                    else:
+                        arguments += f"({','.join(variable_dependencies + [guard_string])})" 
+
+                double_negated_count_predicate = f"not not_{count_predicate_name}{arguments}"
+                original_rule_additional_body_literals.append(double_negated_count_predicate)
+
+                #count = int(str(list(guard_domain)[0])) # Assuming constant
+
+                count1 = count
+                count2 = count + 1
+
+                rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_1", count1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+                rules_strings += cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_2", count2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+
+                if len(always_add_variable_dependencies) == 0:
+                    arguments = ""
+                    if len(variable_dependencies) == 0:
+                        arguments += "(1)"
+                    else:
+                        arguments += f"({','.join(variable_dependencies)})" 
+                else:
+                    # Special case if guard is variable
+                    arguments = ""
+                    if len(variable_dependencies) == 0:
+                        arguments += "(1)"
+                    else:
+                        arguments += f"({','.join(variable_dependencies + [str(guard_value)])})" 
+
+                intermediate_rule = f"not_{count_predicate_name}{arguments} :- not not_{count_predicate_name}_1{arguments}, not_{count_predicate_name}_2{arguments}."
+
+                rules_strings.append(intermediate_rule)
+
+            elif operator_type == "=":
+                arguments = ""
+                if len(variable_dependencies) == 0:
+                    arguments += "(1)"
+                else:
+                    arguments += f"({','.join(variable_dependencies)})" 
+
+                count1 = count
+                count2 = count + 1
+
+                rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_1", count1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+                rules_strings += cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_2", count2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+
+                original_rule_additional_body_literals.append(f"not not_{count_predicate_name}_1{arguments}")
+                original_rule_additional_body_literals.append(f"not not not_{count_predicate_name}_2{arguments}")
+
+                #rules_strings.append(intermediate_rule)
                 
-                element = aggregate_dict["elements"][element_index]
-
-                element_dependent_variables = []
-                for variable in element["condition_variables"]:
-                    if variable in variable_dependencies:
-                        element_dependent_variables.append(variable)
-
-                term_string = f"{','.join(element['terms'] + element_dependent_variables)}"
-
-                body_string = f"body_{str_type}_ag{str_id}_{element_index}({term_string}) :- {','.join(element['condition'])}."
-                new_prg_part.append(body_string)
-
-        new_prg_part.append(f"#program {str_type}.")
-
-        if aggregate_dict["left_guard"]:
-            left_guard = aggregate_dict["left_guard"]
-
-            left_name = f"{str_type}_ag{str_id}_left"
-
-            count = int(str(left_guard.term)) # Assuming constant
-
-            operator = ComparisonTools.getCompOperator(left_guard.comparison)
-            if operator == "<":
-                count += 1
-            elif operator == "<=":
-                count = count
             else:
-                assert(False) # Not implemented
-
-            rules_strings = cls._count_generate_bodies_and_helper_bodies(left_name, count, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies)
+                print(f"Operator Type {operator_type} currently not supported!")
+                raise Exception("Not supported operator type for aggregate!")
 
             for rule_string in rules_strings:
-                new_prg_part.append(rule_string)
-        
-        if aggregate_dict["right_guard"]:
-            right_guard = aggregate_dict["right_guard"]
-
-            right_name = f"{str_type}_ag{str_id}_right"
-
-            count = int(str(right_guard.term)) # Assuming constant
-
-            operator = ComparisonTools.getCompOperator(left_guard.comparison)
-            if operator == "<":
-                count = count
-            elif operator == "<=":
-                count += 1
-            else:
-                assert(False) # Not implemented
-
-            rules_strings = cls._count_generate_bodies_and_helper_bodies(right_name, count,  aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies)
-
-            for rule_string in rules_strings:
-                new_prg_part.append(rule_string)
-
-        """ 
-
-        return (new_prg_part, additional_bodies)
+                new_prg_part_list.append(rule_string)
                 
     @classmethod
-    def _count_generate_bodies_and_helper_bodies(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies):
+    def _count_generate_bodies_and_helper_bodies(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies):
 
         rules_strings = []
         rules_head_strings = []
@@ -598,7 +652,6 @@ class RSPlusStarRewriting:
                 element_index = combination[index]
                 element = elements[element_index]
 
-
                 element_dependent_variables = []
                 for variable in element["condition_variables"]:
                     if variable in variable_dependencies:
@@ -617,7 +670,7 @@ class RSPlusStarRewriting:
                 terms.append(new_terms)
 
                 if aggregate_mode == AggregateMode.RS_STAR:
-                    terms_string = f"{','.join(new_terms + element_dependent_variables)}"
+                    terms_string = f"{','.join(new_terms + element_dependent_variables + always_add_variable_dependencies)}"
 
                     bodies.append(f"body_{str_type}_ag{str_id}_{element_index}({terms_string})") 
 
@@ -715,7 +768,7 @@ class RSPlusStarRewriting:
             if len(combination_variables) == 0:
                 rule_head_ending = "(1)"
             else:
-                rule_head_ending = f"({','.join(combination_variables)})"
+                rule_head_ending = f"({','.join(combination_variables + always_add_variable_dependencies)})"
 
             rule_head = f"{rule_head_name}_{combination_index}{rule_head_ending}"
    
@@ -728,7 +781,7 @@ class RSPlusStarRewriting:
         if len(variable_dependencies) == 0:
             count_name_ending += "(1)"
         else:
-            count_name_ending += f"({','.join(variable_dependencies)})"
+            count_name_ending += f"({','.join(variable_dependencies + always_add_variable_dependencies)})"
 
         spawner_functions = []
         for variable in variable_dependencies:

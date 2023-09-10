@@ -287,23 +287,23 @@ class AggregateTransformer(Transformer):
         remaining_body = []
         if self.aggregate_mode == AggregateMode.RS_STAR:
 
-            (program_list, remaining_body_part) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
+            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
 
-            self.new_prg = self.new_prg + program_list
+            self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
 
         elif self.aggregate_mode == AggregateMode.RS_PLUS:
 
-            (program_list, remaining_body_part) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
+            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
 
-            self.new_prg = self.new_prg + program_list
+            self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
 
         elif self.aggregate_mode == AggregateMode.RA:
 
-            (program_list, remaining_body_part) = ReplaceAggregateStrategy.replace_aggregate_strategy(aggregate, variables_dependencies_aggregate)
+            (program_list, remaining_body_part, program_set) = ReplaceAggregateStrategy.replace_aggregate_strategy(aggregate, variables_dependencies_aggregate)
 
-            self.new_prg = self.new_prg + program_list
+            self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
 
         elif self.aggregate_mode == AggregateMode.RS:
