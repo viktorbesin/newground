@@ -15,3 +15,11 @@ class CountAggregateHelper:
                     all_diff_list.append(first_item + "!=" + second_item)
 
         return all_diff_list
+   
+    @classmethod
+    def check_string_is_int(cls, string):
+        try:
+            a = int(string, 10)
+            return True
+        except ValueError:
+            return False

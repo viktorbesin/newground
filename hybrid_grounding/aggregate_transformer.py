@@ -30,12 +30,18 @@ class AggregateTransformer(Transformer):
         self.cur_aggregates = []
         self.cur_variable_dependencies = {}
 
-    def reset_temporary_variables(self):
+        self.rule_positive_body = []
+
+        self.in_head = False
+        self.in_body = False
+
+    def reset_temporary_rule_variables(self):
 
         self.cur_head = None
         self.cur_has_aggregate = False
         self.cur_aggregates = []
         self.cur_variable_dependencies = {}
+        self.rule_positive_body = []
 
     def visit_Program(self, node):
 
@@ -69,7 +75,21 @@ class AggregateTransformer(Transformer):
 
         self.cur_head = node.head
 
-        self.visit_children(node)
+        
+        if 'head' in node.child_keys:
+            self.in_head = True
+            old = getattr(node, 'head')
+            new = self._dispatch(old)
+            #self.visit_children(node.head)
+            self.in_head = False
+
+        if 'body' in node.child_keys:
+            self.in_body = True 
+            old = getattr(node, 'body')
+            new = self._dispatch(old)
+            self.in_body = False
+
+        #self.visit_children(node)
 
         if not self.cur_has_aggregate or not self.rules:
             body_rep = ""
@@ -109,7 +129,15 @@ class AggregateTransformer(Transformer):
             new_rule = f"{head} :- {remaining_body_string}."
             self.new_prg.append(new_rule)
 
-        self.reset_temporary_variables() # MUST BE LAST
+        self.reset_temporary_rule_variables() # MUST BE LAST
+        return node
+    
+    def visit_Literal(self, node):
+        self.visit_children(node)
+
+        if node.atom.ast_type != clingo.ast.ASTType.BodyAggregate and node.sign == 0 and not self.in_head:
+            self.rule_positive_body.append(node)
+
         return node
 
     def visit_BodyAggregate(self, node):
@@ -287,14 +315,14 @@ class AggregateTransformer(Transformer):
         remaining_body = []
         if self.aggregate_mode == AggregateMode.RS_STAR:
 
-            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
+            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body)
 
             self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
 
         elif self.aggregate_mode == AggregateMode.RS_PLUS:
 
-            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain)
+            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body)
 
             self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
