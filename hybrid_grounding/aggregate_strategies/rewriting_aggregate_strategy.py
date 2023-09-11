@@ -7,6 +7,7 @@ from .aggregate_mode import AggregateMode
 from .rs_plus_star_count import RSPlusStarCount
 from .count_aggregate_helper import CountAggregateHelper
 from .rs_plus_star_min_max import RSPlusStarMinMax
+from .rs_plus_star_sum import RSPlusStarSum
 
 class RSPlusStarRewriting:
 
@@ -74,6 +75,8 @@ class RSPlusStarRewriting:
             new_prg_list, output_remaining_body, new_prg_set = RSPlusStarCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
         elif str_type == "max" or str_type == "min":
             new_prg_list, output_remaining_body, new_prg_set = RSPlusStarMinMax._add_min_max_aggregate_rules(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body)
+        elif str_type == "sum":
+            new_prg_list, output_remaining_body, new_prg_set = RSPlusStarSum._add_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
         else:
             raise Exception("NOT IMPLMENTED AGGREGATE TYPE: " + str_type)
 

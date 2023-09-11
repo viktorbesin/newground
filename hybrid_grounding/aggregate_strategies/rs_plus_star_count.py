@@ -48,143 +48,127 @@ class RSPlusStarCount:
     @classmethod
     def _count_single_domain_adder(cls, aggregate_dict, aggregate_mode, str_type, str_id, variable_dependencies, operator_type, string_capsulation, guard_value, cur_variable_dependencies, original_rule_additional_body_literals, new_prg_part_list, new_prg_part_set, always_add_variable_dependencies, guard_string):
 
-            if aggregate_mode == AggregateMode.RS_STAR:
-                for element_index in range(len(aggregate_dict["elements"])):
-                    
-                    element = aggregate_dict["elements"][element_index]
+        if aggregate_mode == AggregateMode.RS_STAR:
+            for element_index in range(len(aggregate_dict["elements"])):
+                
+                element = aggregate_dict["elements"][element_index]
 
-                    element_dependent_variables = []
-                    for variable in element["condition_variables"]:
-                        if variable in variable_dependencies:
-                            element_dependent_variables.append(variable)
+                element_dependent_variables = []
+                for variable in element["condition_variables"]:
+                    if variable in variable_dependencies:
+                        element_dependent_variables.append(variable)
 
-                    for literal in always_add_variable_dependencies:
-                        element_dependent_variables.append(literal)
+                for literal in always_add_variable_dependencies:
+                    element_dependent_variables.append(literal)
 
-                    term_string = f"{','.join(element['terms'] + element_dependent_variables)}"
+                term_string = f"{','.join(element['terms'] + element_dependent_variables)}"
 
-                    body_string = f"body_{str_type}_ag{str_id}_{element_index}({term_string}) :- {','.join(element['condition'])}."
-                    new_prg_part_set.append(body_string)
- 
+                body_string = f"body_{str_type}_ag{str_id}_{element_index}({term_string}) :- {','.join(element['condition'])}."
+                new_prg_part_set.append(body_string)
 
-            count = guard_value
-            count_predicate_name = f"{str_type}_ag{str_id}_{string_capsulation}"
 
-            if operator_type in [">=",">","<=","<"]:
-                if len(always_add_variable_dependencies) == 0:
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies)})" 
+        count = guard_value
+        count_predicate_name = f"{str_type}_ag{str_id}_{string_capsulation}"
+
+        if operator_type in [">=",">","<=","<"]:
+            if len(always_add_variable_dependencies) == 0:
+                arguments = ""
+                if len(variable_dependencies) == 0:
+                    arguments += "(1)"
                 else:
-                    # Special case if guard is variable
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies + [guard_string])})" 
+                    arguments += f"({','.join(variable_dependencies)})" 
+            else:
+                # Special case if guard is variable
+                arguments = f"({','.join(variable_dependencies + [guard_string])})" 
 
-                if operator_type == ">=" or operator_type == ">":
-                    # Monotone
-                    double_negated_count_predicate = f"not not_{count_predicate_name}{arguments}"
-                    original_rule_additional_body_literals.append(double_negated_count_predicate)
-                elif operator_type == "<=" or operator_type == "<":
-                    # Anti-Monotone
-                    triple_negated_count_predicate = f"not not not_{count_predicate_name}{arguments}"
-                    original_rule_additional_body_literals.append(triple_negated_count_predicate)
-
-                if operator_type == "<":
-                    count = count
-                elif operator_type == ">=":
-                    count = count
-                elif operator_type == ">":
-                    count = count + 1
-                elif operator_type == "<=":
-                    count = count + 1
-                else:
-                    assert(False) # Not implemented
-
-                rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name, count, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-
-            elif operator_type == "!=":
-                if len(always_add_variable_dependencies) == 0:
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies)})" 
-                else:
-                    # Special case if guard is variable
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies + [guard_string])})" 
-
+            if operator_type == ">=" or operator_type == ">":
+                # Monotone
                 double_negated_count_predicate = f"not not_{count_predicate_name}{arguments}"
                 original_rule_additional_body_literals.append(double_negated_count_predicate)
+            elif operator_type == "<=" or operator_type == "<":
+                # Anti-Monotone
+                triple_negated_count_predicate = f"not not not_{count_predicate_name}{arguments}"
+                original_rule_additional_body_literals.append(triple_negated_count_predicate)
 
-                #count = int(str(list(guard_domain)[0])) # Assuming constant
-
-                count1 = count
-                count2 = count + 1
-
-                rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_1", count1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-                rules_strings += cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_2", count2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-
-                if len(always_add_variable_dependencies) == 0:
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies)})" 
-                else:
-                    # Special case if guard is variable
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies + [str(guard_value)])})" 
-
-                intermediate_rule = f"not_{count_predicate_name}{arguments} :- not not_{count_predicate_name}_1{arguments}, not_{count_predicate_name}_2{arguments}."
-
-                rules_strings.append(intermediate_rule)
-
-            elif operator_type == "=":
-                if len(always_add_variable_dependencies) == 0:
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies)})" 
-                else:
-                    # Special case if guard is variable
-                    arguments = ""
-                    if len(variable_dependencies) == 0:
-                        arguments += "(1)"
-                    else:
-                        arguments += f"({','.join(variable_dependencies + [str(guard_string)])})" 
-                        
-                original_rule_additional_body_literals.append(f"not not_{count_predicate_name}_1{arguments}")
-                original_rule_additional_body_literals.append(f"not not not_{count_predicate_name}_2{arguments}")
-
-                count1 = count
-                count2 = count + 1
-
-                rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_1", count1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-                rules_strings += cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_2", count2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-
-
-                #rules_strings.append(intermediate_rule)
-                
+            if operator_type == "<":
+                count = count
+            elif operator_type == ">=":
+                count = count
+            elif operator_type == ">":
+                count = count + 1
+            elif operator_type == "<=":
+                count = count + 1
             else:
-                print(f"Operator Type {operator_type} currently not supported!")
-                raise Exception("Not supported operator type for aggregate!")
+                assert(False) # Not implemented
 
-            for rule_string in rules_strings:
-                new_prg_part_list.append(rule_string)
-                
+            rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name, count, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+
+        elif operator_type == "!=":
+            if len(always_add_variable_dependencies) == 0:
+                arguments = ""
+                if len(variable_dependencies) == 0:
+                    arguments += "(1)"
+                else:
+                    arguments += f"({','.join(variable_dependencies)})" 
+            else:
+                # Special case if guard is variable
+                arguments = f"({','.join(variable_dependencies + [guard_string])})" 
+
+            double_negated_count_predicate = f"not not_{count_predicate_name}{arguments}"
+            original_rule_additional_body_literals.append(double_negated_count_predicate)
+
+            #count = int(str(list(guard_domain)[0])) # Assuming constant
+
+            count1 = count
+            count2 = count + 1
+
+            rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_1", count1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+            rules_strings += cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_2", count2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+
+            if len(always_add_variable_dependencies) == 0:
+                arguments = ""
+                if len(variable_dependencies) == 0:
+                    arguments += "(1)"
+                else:
+                    arguments += f"({','.join(variable_dependencies)})" 
+            else:
+                # Special case if guard is variable
+                arguments = f"({','.join(variable_dependencies + [str(guard_value)])})" 
+
+            intermediate_rule = f"not_{count_predicate_name}{arguments} :- not not_{count_predicate_name}_1{arguments}, not_{count_predicate_name}_2{arguments}."
+
+            rules_strings.append(intermediate_rule)
+
+        elif operator_type == "=":
+            if len(always_add_variable_dependencies) == 0:
+                arguments = ""
+                if len(variable_dependencies) == 0:
+                    arguments += "(1)"
+                else:
+                    arguments += f"({','.join(variable_dependencies)})" 
+            else:
+                # Special case if guard is variable
+                arguments = f"({','.join(variable_dependencies + [str(guard_string)])})" 
+                    
+            original_rule_additional_body_literals.append(f"not not_{count_predicate_name}_1{arguments}")
+            original_rule_additional_body_literals.append(f"not not not_{count_predicate_name}_2{arguments}")
+
+            count1 = count
+            count2 = count + 1
+
+            rules_strings = cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_1", count1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+            rules_strings += cls._count_generate_bodies_and_helper_bodies(count_predicate_name + "_2", count2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+
+
+            #rules_strings.append(intermediate_rule)
+            
+        else:
+            print(f"Operator Type {operator_type} currently not supported!")
+            raise Exception("Not supported operator type for aggregate!")
+
+        for rule_string in rules_strings:
+            new_prg_part_list.append(rule_string)
+            
     @classmethod
     def _count_generate_bodies_and_helper_bodies(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies):
 
@@ -307,8 +291,6 @@ class RSPlusStarCount:
                     if len(terms[index_1]) != len(terms[index_2]):
                         continue
 
-
-
                     term_length = min(len(terms[index_1]), len(terms[index_2])) 
 
                     term_combinations = [] 
@@ -322,8 +304,11 @@ class RSPlusStarCount:
                     helper_body = f"0 != {'?'.join(term_combinations)}"
                     helper_bodies.append(helper_body)
 
-            if len(combination_variables) == 0:
-                rule_head_ending = "(1)"
+            if len(always_add_variable_dependencies) == 0:
+                if len(combination_variables) == 0:
+                    rule_head_ending = "(1)"
+                else:
+                    rule_head_ending = f"({','.join(combination_variables)})"
             else:
                 rule_head_ending = f"({','.join(combination_variables + always_add_variable_dependencies)})"
 
@@ -335,8 +320,11 @@ class RSPlusStarCount:
             # -----------------
 
         count_name_ending = ""
-        if len(variable_dependencies) == 0:
-            count_name_ending += "(1)"
+        if len(always_add_variable_dependencies) == 0:
+            if len(variable_dependencies) == 0:
+                count_name_ending += "(1)"
+            else:
+                count_name_ending += f"({','.join(variable_dependencies)})"
         else:
             count_name_ending += f"({','.join(variable_dependencies + always_add_variable_dependencies)})"
 
