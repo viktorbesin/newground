@@ -23,7 +23,7 @@ class RSPlusStarCount:
 
         original_rule_additional_body_literals = []
 
-        if number_of_elements == 1 and (operator_type == ">=" or ">") and len(list(guard_domain)) == 1:
+        if number_of_elements == 1 and (operator_type == ">=" or operator_type == ">") and len(list(guard_domain)) == 1:
             # Handle special case RM (RM from paper)
             original_rule_additional_body_literals += RMCase._handle_rm_case(aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type)
 

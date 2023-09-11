@@ -1,11 +1,12 @@
 
 from ..comparison_tools import ComparisonTools
+from ..grounding_modes import GroundingModes
 
 
 class ReplaceAggregateStrategy:
 
     @classmethod
-    def replace_aggregate_strategy(cls, aggregate, variables_dependencies_aggregate):
+    def replace_aggregate_strategy(cls, aggregate, variables_dependencies_aggregate, grounding_mode):
 
         new_program_list = [] 
         new_program_set = []
@@ -76,7 +77,9 @@ class ReplaceAggregateStrategy:
 
             new_aggregate += f" {operator} {right_guard_term}"
 
-        new_program_list.append("#program no_rules.")
+
+        if grounding_mode != GroundingModes.RewriteAggregatesNoGround:
+            new_program_list.append("#program no_rules.")
 
         return (new_program_list, [new_aggregate], list(set(new_program_set)))
 

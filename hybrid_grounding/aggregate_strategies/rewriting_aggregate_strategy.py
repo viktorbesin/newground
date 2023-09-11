@@ -12,7 +12,7 @@ from .rs_plus_star_sum import RSPlusStarSum
 class RSPlusStarRewriting:
 
     @classmethod
-    def rewriting_aggregate_strategy(cls, aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain, rule_positive_body):
+    def rewriting_aggregate_strategy(cls, aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain, rule_positive_body, grounding_mode):
 
         str_type = aggregate_dict["function"][1]
         str_id = aggregate_dict["id"] 
@@ -43,7 +43,7 @@ class RSPlusStarRewriting:
 
             string_capsulation = "left"
 
-            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type, string_capsulation, left_guard_string, rule_positive_body)
+            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type, string_capsulation, left_guard_string, rule_positive_body, )
 
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
@@ -114,8 +114,8 @@ class RSPlusStarRewriting:
         return guard_domain
 
     @classmethod
-    def rewriting_no_body_aggregate_strategy(cls, aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain, rule_positive_body):
+    def rewriting_no_body_aggregate_strategy(cls, aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain, rule_positive_body, grounding_mode):
 
-        new_prg_list, output_remaining_body, new_prg_set = cls.rewriting_aggregate_strategy(aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain, rule_positive_body)
+        new_prg_list, output_remaining_body, new_prg_set = cls.rewriting_aggregate_strategy(aggregate_index, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, domain, rule_positive_body, grounding_mode)
 
         return (new_prg_list, output_remaining_body, list(set(new_prg_set)))

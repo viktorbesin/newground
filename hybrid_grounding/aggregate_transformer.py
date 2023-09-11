@@ -11,10 +11,11 @@ from .comparison_tools import ComparisonTools
 from .aggregate_strategies.replace_aggregate_strategy import ReplaceAggregateStrategy
 from .aggregate_strategies.aggregate_mode import AggregateMode
 from .aggregate_strategies.rewriting_aggregate_strategy import RSPlusStarRewriting
+from .grounding_modes import GroundingModes
 
 class AggregateTransformer(Transformer):
     
-    def __init__(self, aggregate_mode, domain):
+    def __init__(self, aggregate_mode, domain, grounding_mode):
         self.aggregate_mode = aggregate_mode
         self.domain = domain
 
@@ -35,6 +36,8 @@ class AggregateTransformer(Transformer):
         self.in_head = False
         self.in_body = False
 
+        self.grounding_mode = grounding_mode
+
     def reset_temporary_rule_variables(self):
 
         self.cur_head = None
@@ -47,7 +50,8 @@ class AggregateTransformer(Transformer):
 
         if node.name == 'rules':
             self.rules = True
-            self.new_prg.append(str(node))
+            if self.grounding_mode != GroundingModes.RewriteAggregatesNoGround:
+                self.new_prg.append(str(node))
         else:
             self.rules = False
 
@@ -315,21 +319,21 @@ class AggregateTransformer(Transformer):
         remaining_body = []
         if self.aggregate_mode == AggregateMode.RS_STAR:
 
-            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body)
+            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body, self.grounding_mode)
 
             self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
 
         elif self.aggregate_mode == AggregateMode.RS_PLUS:
 
-            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body)
+            (program_list, remaining_body_part, program_set) = RSPlusStarRewriting.rewriting_no_body_aggregate_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body, self.grounding_mode)
 
             self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part
 
         elif self.aggregate_mode == AggregateMode.RA:
 
-            (program_list, remaining_body_part, program_set) = ReplaceAggregateStrategy.replace_aggregate_strategy(aggregate, variables_dependencies_aggregate)
+            (program_list, remaining_body_part, program_set) = ReplaceAggregateStrategy.replace_aggregate_strategy(aggregate, variables_dependencies_aggregate, self.grounding_mode)
 
             self.new_prg = self.new_prg + program_list + program_set
             remaining_body = remaining_body_part

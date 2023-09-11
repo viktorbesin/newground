@@ -10,13 +10,14 @@ from .main_transformer import MainTransformer
 from .cyclic_strategy import CyclicStrategy
 
 from .main_transformer_helpers.level_mappings_part import LevelMappingsPart
+from .grounding_modes import GroundingModes
 
 import matplotlib as plt
 import networkx as nx
 
 class HybridGrounding:
 
-    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.RA, cyclic_strategy = CyclicStrategy.ASSUME_TIGHT):
+    def __init__(self, name="", no_show=False, ground_guess=False, ground=False, output_printer = None, aggregate_mode = AggregateMode.RA, cyclic_strategy = CyclicStrategy.ASSUME_TIGHT, grounding_mode = GroundingModes.RewriteAggregatesGroundPartly):
         self.no_show = no_show
         self.ground_guess = ground_guess
         self.ground = ground
@@ -26,6 +27,7 @@ class HybridGrounding:
         self.cyclic_strategy = cyclic_strategy
 
         self.rules = False
+        self.grounding_mode = grounding_mode
 
     def start(self, contents):
 
@@ -33,22 +35,20 @@ class HybridGrounding:
         
         aggregate_transformer_output_program = self.start_aggregate_transformer(contents, domain)
 
-        print(aggregate_transformer_output_program)
-
-        #self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads)
+        if self.grounding_mode == GroundingModes.RewriteAggregatesNoGround:
+            # Only rewrite
+            self.output_printer.custom_print(aggregate_transformer_output_program)
+        else:
+            # Rewrite and ground
+            self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads)
 
     def start_aggregate_transformer(self, contents, domain):
  
-        aggregate_transformer = AggregateTransformer(self.aggregate_mode, domain)
+        aggregate_transformer = AggregateTransformer(self.aggregate_mode, domain, self.grounding_mode)
         parse_string(contents, lambda stm: aggregate_transformer(stm))
 
         shown_predicates = list(set(aggregate_transformer.shown_predicates))
         program_string = '\n'.join(shown_predicates + aggregate_transformer.new_prg)
-
-        """
-        if self.ground:
-            self.output_printer.custom_print(contents)
-        """
 
         return program_string
 
