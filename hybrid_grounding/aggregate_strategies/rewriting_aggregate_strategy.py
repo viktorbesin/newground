@@ -8,6 +8,8 @@ from .rs_plus_star_count import RSPlusStarCount
 from .count_aggregate_helper import CountAggregateHelper
 from .rs_plus_star_min_max import RSPlusStarMinMax
 from .rs_plus_star_sum import RSPlusStarSum
+from .rs_count import RSCount
+from .rs_sum import RSSum
 
 class RSPlusStarRewriting:
 
@@ -43,7 +45,7 @@ class RSPlusStarRewriting:
 
             string_capsulation = "left"
 
-            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type, string_capsulation, left_guard_string, rule_positive_body, )
+            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, left_guard_domain, operator_type, string_capsulation, left_guard_string, rule_positive_body, domain)
 
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
@@ -60,7 +62,7 @@ class RSPlusStarRewriting:
 
             string_capsulation = "right"
 
-            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, right_guard_domain, operator_type, string_capsulation, left_guard_string, rule_positive_body)
+            (new_prg_list_tmp, output_remaining_body_tmp, new_prg_set_tmp) = cls.aggregate_caller(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, right_guard_domain, operator_type, string_capsulation, left_guard_string, rule_positive_body, domain)
 
             new_prg_list += new_prg_list_tmp
             output_remaining_body += output_remaining_body_tmp
@@ -69,14 +71,23 @@ class RSPlusStarRewriting:
         return (new_prg_list, list(set(output_remaining_body)), list(set(new_prg_set)))
    
     @classmethod
-    def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body):
+    def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain):
 
         if str_type == "count":
-            new_prg_list, output_remaining_body, new_prg_set = RSPlusStarCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
+            if aggregate_mode == AggregateMode.RS_PLUS or aggregate_mode == AggregateMode.RS_STAR:
+                new_prg_list, output_remaining_body, new_prg_set = RSPlusStarCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
+            elif aggregate_mode == AggregateMode.RS:
+                new_prg_list, output_remaining_body, new_prg_set = RSCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
+
         elif str_type == "max" or str_type == "min":
             new_prg_list, output_remaining_body, new_prg_set = RSPlusStarMinMax._add_min_max_aggregate_rules(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body)
+
         elif str_type == "sum":
-            new_prg_list, output_remaining_body, new_prg_set = RSPlusStarSum._add_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
+            if aggregate_mode == AggregateMode.RS_PLUS or aggregate_mode == AggregateMode.RS_STAR:
+                new_prg_list, output_remaining_body, new_prg_set = RSPlusStarSum._add_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
+            elif aggregate_mode == AggregateMode.RS:
+                new_prg_list, output_remaining_body, new_prg_set = RSSum._add_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
+
         else:
             raise Exception("NOT IMPLMENTED AGGREGATE TYPE: " + str_type)
 

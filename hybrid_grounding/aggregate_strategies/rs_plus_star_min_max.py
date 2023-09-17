@@ -27,7 +27,7 @@ class RSPlusStarMinMax:
             # Handle special case RM (RM from paper, monotone agg., single element, single domain)
             original_rule_additional_body_literals += cls._handle_min_max_rm_case(aggregate_dict, guard_domain, operator_type)
 
-        elif aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS_PLUS: 
+        else: 
 
             if len(list(guard_domain)) == 1:
                 guard_value = int(str(list(guard_domain)[0])) # Assuming constant
@@ -108,7 +108,7 @@ class RSPlusStarMinMax:
                 if variable in variable_dependencies:
                     element_dependent_variables.append(variable)
 
-            if aggregate_mode == AggregateMode.RS_STAR:
+            if aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS:
 
                 element_predicate_name = f"body_{str_type}_ag{str_id}_{element_index}"
 
@@ -131,7 +131,7 @@ class RSPlusStarMinMax:
                     elif operator_type == "<":
                         final_guard_value = guard_value
 
-                    if aggregate_mode == AggregateMode.RS_STAR: 
+                    if aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS: 
                         rule_string = f"{head} :- {positive_body_string} {tuple_predicate_head}, {terms[0]} >= {final_guard_value}."
                     elif aggregate_mode == AggregateMode.RS_PLUS:
                         rule_string = f"{head} :- {positive_body_string} {conditions_string}, {terms[0]} >= {final_guard_value}."
@@ -143,7 +143,7 @@ class RSPlusStarMinMax:
                     final_guard_value_1 = guard_value
                     final_guard_value_2 = guard_value + 1
 
-                    if aggregate_mode == AggregateMode.RS_STAR:
+                    if aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS: 
                         rule_string_1 = f"{head_name}_1{head_terms_string} :- {positive_body_string} {tuple_predicate_head}, {terms[0]} >= {final_guard_value_1}."
                         rule_string_2 = f"{head_name}_2{head_terms_string} :- {positive_body_string} {tuple_predicate_head}, {terms[0]} >= {final_guard_value_2}."
                     
@@ -167,7 +167,7 @@ class RSPlusStarMinMax:
                     elif operator_type == "<":
                         final_guard_value = guard_value - 1
 
-                    if aggregate_mode == AggregateMode.RS_STAR: 
+                    if aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS: 
                         rule_string = f"{head} :- {positive_body_string} {tuple_predicate_head}, {terms[0]} <= {final_guard_value}."
                     elif aggregate_mode == AggregateMode.RS_PLUS:
                         rule_string = f"{head} :- {positive_body_string} {conditions_string}, {terms[0]} <= {final_guard_value}."
@@ -179,7 +179,7 @@ class RSPlusStarMinMax:
                     final_guard_value_1 = guard_value
                     final_guard_value_2 = guard_value - 1
 
-                    if aggregate_mode == AggregateMode.RS_STAR: 
+                    if aggregate_mode == AggregateMode.RS_STAR or aggregate_mode == AggregateMode.RS: 
                         rule_string_1 = f"{head_name}_1{head_terms_string} :- {positive_body_string} {tuple_predicate_head}, {terms[0]} <= {final_guard_value_1}."
                         rule_string_2 = f"{head_name}_2{head_terms_string} :- {positive_body_string} {tuple_predicate_head}, {terms[0]} <= {final_guard_value_2}."
                     elif aggregate_mode == AggregateMode.RS_PLUS: 
