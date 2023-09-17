@@ -12,6 +12,7 @@ from .aggregate_strategies.replace_aggregate_strategy import ReplaceAggregateStr
 from .aggregate_strategies.aggregate_mode import AggregateMode
 from .aggregate_strategies.rewriting_aggregate_strategy import RSPlusStarRewriting
 from .grounding_modes import GroundingModes
+from .aggregate_strategies.recursive_mode import RecursiveAggregateRewriting
 
 class AggregateTransformer(Transformer):
     
@@ -352,8 +353,10 @@ class AggregateTransformer(Transformer):
 
 
         elif self.aggregate_mode == AggregateMode.RECURSIVE:
-            print(f"Aggregate mode {self.aggregate_mode} IMPLEMENTED SOON")
-            assert(False)
+            (program_list, remaining_body_part, program_set) =  RecursiveAggregateRewriting.recursive_strategy(aggregate_index, aggregate, variables_dependencies_aggregate, self.aggregate_mode, self.cur_variable_dependencies, self.domain, self.rule_positive_body, self.grounding_mode)
+
+            self.new_prg = self.new_prg + program_list + program_set
+            remaining_body = remaining_body_part
 
         else:
             print(f"Aggregate mode {self.aggregate_mode} not implemented!")
