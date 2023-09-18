@@ -10,7 +10,7 @@ class RegressionTest:
     @classmethod
     def start(cls):
 
-        parser = argparse.ArgumentParser(prog='Regression test for Answerset Equivalence Checker', description='Checks equivalence of answersets produced by newground and clingo on all instance-encoding pairs in a subfolder.')
+        parser = argparse.ArgumentParser(prog='Regression test for Answerset Equivalence Checker', description='Checks equivalence of answersets produced by hybrid_grounding and clingo on all instance-encoding pairs in a subfolder.')
 
         parser.add_argument('folder')
         args = parser.parse_args()
@@ -70,15 +70,15 @@ class RegressionTest:
             start_time = time.time()
 
             checker = EquivChecker()
-            result, clingo_answersets, newground_answersets = checker.start(instance_file_contents, encoding_file_contents)
+            result, clingo_answersets, hybrid_grounding_answersets = checker.start(instance_file_contents, encoding_file_contents)
 
             end_time = time.time()
 
             if result:
-                print(f"[INFO] \"{sub}\" test was SUCCESSFUL, clingo-answersets: {clingo_answersets}, newground-answersets: {newground_answersets}")
+                print(f"[INFO] \"{sub}\" test was SUCCESSFUL, clingo-answersets: {clingo_answersets}, hybrid_grounding-answersets: {hybrid_grounding_answersets}")
             else:
-                print(f"[INFO] \"{sub}\" test FAILED, clingo-answersets: {clingo_answersets}, newground-answersets: {newground_answersets}")
-                failed_tests[sub] = {"clingo_answersets":clingo_answersets, "newground_answersets":newground_answersets}
+                print(f"[INFO] \"{sub}\" test FAILED, clingo-answersets: {clingo_answersets}, hybrid_grounding-answersets: {hybrid_grounding_answersets}")
+                failed_tests[sub] = {"clingo_answersets":clingo_answersets, "hybrid_grounding_answersets":hybrid_grounding_answersets}
 
             total_tests += 1
 
@@ -93,7 +93,7 @@ class RegressionTest:
         if number_failed_tests > 0:
             print(f"{number_failed_tests}/{total_tests} of executed tests failed:")
             for key in failed_tests.keys():
-                print(f"- {key} - Clingo Answersets: {failed_tests[key]['clingo_answersets']}, Newground Answersets: {failed_tests[key]['newground_answersets']}")
+                print(f"- {key} - Clingo Answersets: {failed_tests[key]['clingo_answersets']}, hybrid_grounding Answersets: {failed_tests[key]['hybrid_grounding_answersets']}")
         else:
             print(f"All executed tests were SUCCESSFUL (In total {total_tests} were conducted and {total_tests - len(skipped_tests.keys())} were executed).")
 

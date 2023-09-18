@@ -74,10 +74,7 @@ class RSPlusStarRewriting:
     def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain):
 
         if str_type == "count":
-            if aggregate_mode == AggregateMode.RS_PLUS or aggregate_mode == AggregateMode.RS_STAR:
-                new_prg_list, output_remaining_body, new_prg_set = RSPlusStarCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
-            elif aggregate_mode == AggregateMode.RS:
-                new_prg_list, output_remaining_body, new_prg_set = RSCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
+            new_prg_list, output_remaining_body, new_prg_set = RSCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
 
         elif str_type == "max" or str_type == "min":
             new_prg_list, output_remaining_body, new_prg_set = RSPlusStarMinMax._add_min_max_aggregate_rules(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body)

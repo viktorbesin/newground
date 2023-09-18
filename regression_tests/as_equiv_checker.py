@@ -4,10 +4,14 @@ import argparse
 
 import clingo
 
-from newground.newground import Newground
-from newground.default_output_printer import DefaultOutputPrinter
+from hybrid_grounding.hybrid_grounding import HybridGrounding
+from hybrid_grounding.default_output_printer import DefaultOutputPrinter
 
-from newground.aggregate_strategies.aggregate_mode import AggregateMode
+from hybrid_grounding.aggregate_strategies.aggregate_mode import AggregateMode
+
+from hybrid_grounding.cyclic_strategy import CyclicStrategy
+
+from hybrid_grounding.grounding_modes import GroundingModes
 
 def block_print():
     sys.stdout = open(os.devnull, 'w')
@@ -39,10 +43,10 @@ class EquivChecker:
 
     def __init__(self):
         self.clingo_output = []
-        self.newground_output = []
+        self.hybrid_grounding_output = []
 
         self.clingo_hashes = {}
-        self.newground_hashes = {}
+        self.hybrid_grounding_hashes = {}
 
     def on_model(self, m, output, hashes):
         symbols = m.symbols(shown=True)
@@ -56,7 +60,7 @@ class EquivChecker:
         hashes[(hash(tuple(output[cur_pos])))] = cur_pos
 
     def parse(self):
-        parser = argparse.ArgumentParser(prog='Answerset Equivalence Checker', description='Checks equivalence of answersets produced by newground and clingo.')
+        parser = argparse.ArgumentParser(prog='Answerset Equivalence Checker', description='Checks equivalence of answersets produced by hybrid_grounding and clingo.')
 
         parser.add_argument('instance')
         parser.add_argument('encoding')
@@ -81,12 +85,33 @@ class EquivChecker:
 
     def start(self, instance_file_contents, encoding_file_contents, verbose = True, one_directional_equivalence = True):
         """ 
-            one_directional_equivalence: If True, then only the direction clingo -> newground is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the newground result as well (but therefore it could be, that newground has more answersets)
+            one_directional_equivalence: If True, then only the direction clingo -> hybrid_grounding is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the hybrid_grounding result as well (but therefore it could be, that hybrid_grounding has more answersets)
         """
 
-        aggregate_modes = [("REPLACE",AggregateMode.REPLACE),("REWRITING",AggregateMode.REWRITING),("REWRITING_NO_BODY",AggregateMode.REWRITING_NO_BODY)]
+        #aggregate_modes = [("REPLACE",AggregateMode.RA),("REWRITING",AggregateMode.RS_STAR),("REWRITING_NO_BODY",AggregateMode.RS_PLUS)]
+        aggregate_modes = [
+            ("RS-STAR", AggregateMode.RS_STAR),
+            ("RS-PLUS", AggregateMode.RS_PLUS),
+            ("RS", AggregateMode.RS),
+            ("RA", AggregateMode.RA),
+            ("RECURSIVE", AggregateMode.RECURSIVE)
+            ]
+        #aggregate_modes = [("RA", AggregateMode.RA)]
+
+        grounding_mode = GroundingModes.RewriteAggregatesNoGround
+
+        if grounding_mode == GroundingModes.RewriteAggregatesNoGround:
+            print("-----------------------")
+            print(">>>> WARNING: Grounding mode is RewriteAggregateNoGround")
+            print("-----------------------")
+            print(">>>> Therefore only aggregate rewriting is checked without HybridGrounding!")
 
         works = True
+        no_show = False
+        ground_guess = False
+        ground = False
+        #cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+        cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
 
         for aggregate_mode in aggregate_modes:
 
@@ -98,43 +123,44 @@ class EquivChecker:
             ctl.ground([('base',[])], context=Context())
             ctl.solve(on_model=lambda m: self.on_model(m, self.clingo_output, self.clingo_hashes))
             
-            no_show = False
-            ground_guess = False
-            ground = False
 
             total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
 
             custom_printer = CustomOutputPrinter()
            
 
-            newground = Newground(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer, aggregate_mode = aggregate_mode[1])
-            newground.start(total_content)
+            hybrid_grounding = HybridGrounding(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer, aggregate_mode = aggregate_mode[1], cyclic_strategy=cyclic_strategy, grounding_mode=grounding_mode)
+            hybrid_grounding.start(total_content)
 
             ctl2 = clingo.Control()
             ctl2.configuration.solve.models = 0
             ctl2.add('base',[], custom_printer.get_string())
             ctl2.ground([('base',[])], context=Context())
-            ctl2.solve(on_model=lambda m: self.on_model(m, self.newground_output, self.newground_hashes))
+            ctl2.solve(on_model=lambda m: self.on_model(m, self.hybrid_grounding_output, self.hybrid_grounding_hashes))
 
 
-            if not one_directional_equivalence and len(self.clingo_output) != len(self.newground_output):
+            if not one_directional_equivalence and len(self.clingo_output) != len(self.hybrid_grounding_output):
                 works = False
             else:
                 for clingo_key in self.clingo_hashes.keys():
-                    if clingo_key not in self.newground_hashes:
+                    if clingo_key not in self.hybrid_grounding_hashes:
                         works = False
                         if verbose:
-                            print(f"[ERROR] Used Aggregate Mode: {aggregate_mode[0]} - Could not find corresponding stable model in newground for hash {clingo_key}")
+                            print(f"[ERROR] Used Aggregate Mode: {aggregate_mode[0]} - Could not find corresponding stable model in hybrid_grounding for hash {clingo_key}")
                             print(f"[ERROR] This corresponds to the answer set: ")
                             print(self.clingo_output[self.clingo_hashes[clingo_key]])
+                            print("Output of HybridGrounding:")
+                            print(self.hybrid_grounding_output)
 
-                for newground_key in self.newground_hashes.keys():
-                    if newground_key not in self.clingo_hashes:
+                for hybrid_grounding_key in self.hybrid_grounding_hashes.keys():
+                    if hybrid_grounding_key not in self.clingo_hashes:
                         works = False
                         if verbose:
-                            print(f"[ERROR] Used Aggregate Mode: {aggregate_mode[0]} - Could not find corresponding stable model in clingo for hash {newground_key}")
+                            print(f"[ERROR] Used Aggregate Mode: {aggregate_mode[0]} - Could not find corresponding stable model in clingo for hash {hybrid_grounding_key}")
                             print(f"[ERROR] This corresponds to the answer set: ")
-                            print(self.newground_output[self.newground_hashes[newground_key]])
+                            print(self.hybrid_grounding_output[self.hybrid_grounding_hashes[hybrid_grounding_key]])
+                            print("Output of HybridGrounding:")
+                            print(self.hybrid_grounding_output)
 
 
         if not works:
@@ -144,14 +170,14 @@ class EquivChecker:
                 print("[INFO] ----------------------")
                 print("[INFO] The answersets DIFFER!")
                 print(f"[INFO] Clingo produced a total of {len(self.clingo_output)}")
-                print(f"[INFO] Newground produced a total of {len(self.newground_output)}")
+                print(f"[INFO] hybrid_grounding produced a total of {len(self.hybrid_grounding_output)}")
 
-            return (False, len(self.clingo_output), len(self.newground_output))
+            return (False, len(self.clingo_output), len(self.hybrid_grounding_output))
         else: # works
             if verbose:
                 print("[INFO] The answersets are the SAME!")
 
-            return (True, len(self.clingo_output), len(self.newground_output))
+            return (True, len(self.clingo_output), len(self.hybrid_grounding_output))
 
 
 

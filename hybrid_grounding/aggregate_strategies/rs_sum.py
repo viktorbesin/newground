@@ -139,8 +139,8 @@ class RSSum:
             sum1 = sum
             sum2 = sum + 1
 
-            rules_strings = cls._sum_helper_level_2(sum_predicate_name + "_1", sum1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-            rules_strings += cls._sum_helper_level_2(sum_predicate_name + "_2", sum2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+            rules_strings = cls._sum_helper_level_2(sum_predicate_name + "_1", sum1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, skolem_constants)
+            rules_strings += cls._sum_helper_level_2(sum_predicate_name + "_2", sum2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, skolem_constants)
 
             if len(always_add_variable_dependencies) == 0:
                 arguments = ""
@@ -173,8 +173,8 @@ class RSSum:
             sum1 = sum
             sum2 = sum + 1
 
-            rules_strings = cls._sum_helper_level_2(sum_predicate_name + "_1", sum1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
-            rules_strings += cls._sum_helper_level_2(sum_predicate_name + "_2", sum2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies)
+            rules_strings = cls._sum_helper_level_2(sum_predicate_name + "_1", sum1, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, skolem_constants)
+            rules_strings += cls._sum_helper_level_2(sum_predicate_name + "_2", sum2, aggregate_dict["elements"], str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, skolem_constants)
             
         else:
             print(f"Operator Type {operator_type} currently not supported!")

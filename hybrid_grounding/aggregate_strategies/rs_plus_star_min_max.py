@@ -19,11 +19,11 @@ class RSPlusStarMinMax:
 
         original_rule_additional_body_literals = []
 
-        if number_of_elements == 1 and (operator_type == ">=" or ">") and len(list(guard_domain)) == 1 and str_type == "max":
+        if number_of_elements == 1 and (operator_type == ">=" or operator_type == ">") and len(list(guard_domain)) == 1 and str_type == "max":
             # Handle special case RM (RM from paper, monotone agg., single element, single domain)
             original_rule_additional_body_literals += cls._handle_min_max_rm_case(aggregate_dict, guard_domain, operator_type)
 
-        elif number_of_elements == 1 and (operator_type == "<=" or "<") and len(list(guard_domain)) == 1 and str_type == "min":
+        elif number_of_elements == 1 and (operator_type == "<=" or operator_type == "<") and len(list(guard_domain)) == 1 and str_type == "min":
             # Handle special case RM (RM from paper, monotone agg., single element, single domain)
             original_rule_additional_body_literals += cls._handle_min_max_rm_case(aggregate_dict, guard_domain, operator_type)
 
