@@ -418,6 +418,17 @@ class MainTransformer(Transformer):
             #body_string = f"{', '.join([str(b) for b in rule.body])},{', '.join(precs)}"
             body_string = f"{', '.join([str(b) for b in rule.body])}"
 
+            positive_body = []
+            negative_body = []
+
+            for b in rule.body:
+                if b.sign == 0:
+                    positive_body.append(b)
+                elif b.sign == 1:
+                    negative_body.append(b)
+                else:
+                    raise Exception("Unknown ast signum for literal!")
+
 
             if rule.head.ast_type == clingo.ast.ASTType.Aggregate:
                 #head_string = f"{str(rule.head)}"
@@ -441,8 +452,21 @@ class MainTransformer(Transformer):
                 self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
 
             if len(rule.body) > 0:  
-                self.printer.custom_print(f"{new_head_string} :- {body_string}.")
+                self.printer.custom_print(f"0 <= {{{new_head_string}}} <= 1 :- {body_string}.")
             else:
                 self.printer.custom_print(f"{new_head_string}.")
 
             self.printer.custom_print(f"{head_string} :- {new_head_string}.")
+
+            self.printer.custom_print(f":- {body_string}, not {head_string}.")
+
+            """
+            special_sat = f"sat_special_{new_head_name}({new_arguments})"
+            self.printer.custom_print(f":- {special_sat}.")
+            self.printer.custom_print(f"{special_sat} :- {head_string}.")
+            for b in positive_body:
+                self.printer.custom_print(f"{special_sat} :- not {str(b)}.")
+
+            for b in negative_body:
+                self.printer.custom_print(f"{special_sat} :- {str(b)}.")
+            """

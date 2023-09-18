@@ -164,7 +164,10 @@ class GenerateSatisfiabilityPart:
 
 
                 if f is head:
-                    f_name = f"{f.name}{self.current_rule_position}"
+                    # For not deriving stuff two times:
+                    #f_name = f"{f.name}{self.current_rule_position}"
+                    # Else:
+                    f_name = f"{f.name}"
                 else:
                     f_name = f"{f.name}"
 

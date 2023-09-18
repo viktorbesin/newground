@@ -423,7 +423,7 @@ class GenerateFoundednessPart:
                                 unfound_level_mapping = f"{new_unfound_atom} :-{unfound_body} not prec({head_predicate},{original_head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
 
-                                self.additional_unfounded_rules.append(f":- {new_unfound_atom}, {head_predicate}, not {original_head_predicate}.")
+                                self.additional_unfounded_rules.append(f":- {new_unfound_atom}, {head_predicate}.")
 
                     dom_list_2 = []
                     for arg in h_args:
