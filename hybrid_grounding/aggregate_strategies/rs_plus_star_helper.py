@@ -2,10 +2,11 @@ import itertools
 import clingo
 
 from ..comparison_tools import ComparisonTools
-from .rm_case import RMCase
 from .count_aggregate_helper import CountAggregateHelper
 
 from .aggregate_mode import AggregateMode
+
+from .sum_aggregate_helper import SumAggregateHelper
 
 
 class RSPlusStarHelper:
@@ -28,8 +29,9 @@ class RSPlusStarHelper:
             body_string = f"body_{str_type}_ag{str_id}_{element_index}({term_string}) :- {','.join(element['condition'])}."
             new_prg_part_set.append(body_string)
 
+
     @classmethod
-    def _rs_plus_star_count_generate_bodies_and_helper_bodies(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies):
+    def _rs_plus_star_generate_all_diff_rules(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, total_count = 0):
         """
         Generates the count-rule (alldiff-rule) for the RS-STAR and RS-PLUS aggregate-modes.
         """
@@ -59,6 +61,9 @@ class RSPlusStarHelper:
 
             helper_bodies = CountAggregateHelper.generate_all_diff_predicates(terms)
 
+            if str_type == "sum":
+                helper_bodies += SumAggregateHelper._generate_sum_up_predicates(terms, count, total_count)
+
             if len(always_add_variable_dependencies) == 0:
                 if len(combination_variables) == 0:
                     rule_head_ending = "(1)"
@@ -67,38 +72,17 @@ class RSPlusStarHelper:
             else:
                 rule_head_ending = f"({','.join(combination_variables + always_add_variable_dependencies)})"
 
-            rule_head = f"{rule_head_name}_{combination_index}{rule_head_ending}"
+            if str_type == "count":
+                rule_head = f"{rule_head_name}_{combination_index}{rule_head_ending}"
+            elif str_type == "sum":
+                rule_head = f"{rule_head_name}_{count}_{combination_index}{rule_head_ending}"
    
-            rules_head_strings.append(rule_head) 
+            rules_head_strings.append(rule_head)
             rules_strings.append(f"{rule_head} :- {','.join(bodies + helper_bodies)}.")
             # END OF FOR LOOP
             # -----------------
 
-        count_name_ending = ""
-        if len(always_add_variable_dependencies) == 0:
-            if len(variable_dependencies) == 0:
-                count_name_ending += "(1)"
-            else:
-                count_name_ending += f"({','.join(variable_dependencies)})"
-        else:
-            count_name_ending += f"({','.join(variable_dependencies + always_add_variable_dependencies)})"
-
-        spawner_functions = []
-        for variable in variable_dependencies:
-            if variable in cur_variable_dependencies:
-                cur_spawner_functions = cur_variable_dependencies[variable]
-                for function in cur_spawner_functions:
-                    spawner_functions.append(str(function))
-
-        negated_head_strings = []
-        for head_string in rules_head_strings:
-            negated_head_strings.append(f"not {head_string}")
-
-        helper_rule = f"not_{rule_head_name}{count_name_ending} :- {','.join(spawner_functions + negated_head_strings)}."
-
-        rules_strings.append(helper_rule)
-
-        return (rules_strings)
+        return (rules_strings, rules_head_strings)
 
 
     @classmethod

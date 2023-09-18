@@ -1,15 +1,8 @@
-
-import clingo
-
 from ..comparison_tools import ComparisonTools
 
 from .aggregate_mode import AggregateMode
-from .rs_plus_star_count import RSPlusStarCount
-from .count_aggregate_helper import CountAggregateHelper
-from .rs_plus_star_min_max import RSPlusStarMinMax
-from .rs_plus_star_sum import RSPlusStarSum
-from .rs_count import RSCount
-from .rs_sum import RSSum
+from .rewriting_min_max import RewritingMinMax
+from .rewriting_count_sum import RewritingCountSum
 
 class RSPlusStarRewriting:
 
@@ -73,17 +66,11 @@ class RSPlusStarRewriting:
     @classmethod
     def aggregate_caller(cls, str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain):
 
-        if str_type == "count":
-            new_prg_list, output_remaining_body, new_prg_set = RSCount._add_count_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
+        if str_type == "count" or str_type == "sum":
+            new_prg_list, output_remaining_body, new_prg_set = RewritingCountSum._add_count_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
 
         elif str_type == "max" or str_type == "min":
-            new_prg_list, output_remaining_body, new_prg_set = RSPlusStarMinMax._add_min_max_aggregate_rules(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body)
-
-        elif str_type == "sum":
-            if aggregate_mode == AggregateMode.RS_PLUS or aggregate_mode == AggregateMode.RS_STAR:
-                new_prg_list, output_remaining_body, new_prg_set = RSPlusStarSum._add_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string)
-            elif aggregate_mode == AggregateMode.RS:
-                new_prg_list, output_remaining_body, new_prg_set = RSSum._add_sum_aggregate_rules(aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body, domain)
+            new_prg_list, output_remaining_body, new_prg_set = RewritingMinMax._add_min_max_aggregate_rules(str_type, aggregate_dict, variables_dependencies_aggregate, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body)
 
         else:
             raise Exception("NOT IMPLMENTED AGGREGATE TYPE: " + str_type)

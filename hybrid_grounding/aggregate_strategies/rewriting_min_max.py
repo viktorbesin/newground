@@ -4,7 +4,7 @@ import clingo
 from ..comparison_tools import ComparisonTools
 from .aggregate_mode import AggregateMode
 
-class RSPlusStarMinMax:
+class RewritingMinMax:
 
     @classmethod
     def _add_min_max_aggregate_rules(cls, str_type, aggregate_dict, variable_dependencies, aggregate_mode, cur_variable_dependencies, guard_domain, operator_type, string_capsulation, guard_string, rule_positive_body):

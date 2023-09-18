@@ -6,6 +6,7 @@ from .rm_case import RMCase
 from .count_aggregate_helper import CountAggregateHelper
 
 from .aggregate_mode import AggregateMode
+from .sum_aggregate_helper import SumAggregateHelper
 
 
 
@@ -41,7 +42,7 @@ class RSHelper:
             new_prg_part_set.append(body_string)
 
     @classmethod
-    def _rs_count_generate_count_rule(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, skolem_constants):
+    def _rs_count_generate_count_rule(cls, rule_head_name, count, elements, str_type, str_id, variable_dependencies, aggregate_mode, cur_variable_dependencies, always_add_variable_dependencies, skolem_constants, total_count = 0):
         """
         Generates the count-rule (alldiff-rule) for the RS aggregate-mode.
         """
@@ -62,6 +63,8 @@ class RSHelper:
             bodies.append(f"body_{str_type}_ag{str_id}({terms_string})") 
 
         helper_bodies = CountAggregateHelper.generate_all_diff_predicates(terms)
+        if str_type == "sum":
+            helper_bodies += SumAggregateHelper._generate_sum_up_predicates(terms, count, total_count)
 
         if len(always_add_variable_dependencies) == 0:
             if len(variable_dependencies) == 0:

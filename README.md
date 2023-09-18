@@ -172,6 +172,8 @@ $ python3 start_regression_tests.py regression_tests/test_instances
 ```
 
 
+### Some Assumptions
 
-
+- For all RS-Rewriting strategies for an aggregate ''#agg{E} = Z'', we expect ''Z'' to either be an integer constant or a BOUND variable. 
+- For the SUM RS-Rewriting strategies we assume (>=0) values at each first term-element-head position (so for #sum{X,Y : a(X,Y),...;....} >= 5. all X-values are required to be >=0).
 
