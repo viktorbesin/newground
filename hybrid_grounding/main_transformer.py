@@ -64,6 +64,8 @@ class MainTransformer(Transformer):
         self.non_ground_rules = {}
         self.g_counter = 'A'
 
+        self.additional_foundedness_part = []
+
         self.current_rule = None
         self.current_comparison = None
 
@@ -169,7 +171,8 @@ class MainTransformer(Transformer):
                                                                   self.unfounded_rules,
                                                                   self.cyclic_strategy,
                                                                   self.rule_strongly_connected_components_heads,
-                                                                  self.program_rules)
+                                                                  self.program_rules,
+                                                                  self.additional_foundedness_part)
                 foundedness_generator.generate_foundedness_part()
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -397,11 +400,13 @@ class MainTransformer(Transformer):
 
             for scc_key in self.predicates_strongly_connected_comps.keys():
                 for pred in self.predicates_strongly_connected_comps[scc_key]:
-                    if str(pred) == str(rule.head) or str(pred) == str(rule_head.name):
+                    if str(pred) == str(rule.head) or str(pred) == str(rule_head.name) or (str(pred.name) == str(rule_head.name)):
                         found_scc_key = scc_key
                         break
-
+                
             if found_scc_key < 0:
+                print(str(rule.head))
+                print(str(rule_head.name))
                 raise Exception("COULD NOT FIND SCC KEY")
 
 
@@ -431,7 +436,7 @@ class MainTransformer(Transformer):
                 new_head_string = f"{new_head_name}({new_arguments})"
 
                 #new_head_func = Function(name=new_head_name,arguments=new_arguments)
-                new_head_func = Function(name=new_head_name,arguments=[Function(arg_) for arg_ in new_arguments])
+                new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in rule_head.arguments])
 
                 self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
 

@@ -177,6 +177,10 @@ class HybridGrounding:
 
         self.output_printer.custom_print(f"sat :- {','.join(sat_strings)}.")
 
+        additional_foundedness_set = set(transformer.additional_foundedness_part)
+        for additional_rule in additional_foundedness_set:
+            self.output_printer.custom_print(additional_rule)
+
         for key in transformer.unfounded_rules.keys():
 
             unfounded_rules_heads = transformer.unfounded_rules[key]

@@ -14,7 +14,7 @@ from ..cyclic_strategy import CyclicStrategy
 
 class GenerateFoundednessPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads, program_rules):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads, program_rules, additional_unfounded_rules):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -32,6 +32,8 @@ class GenerateFoundednessPart:
         self.cyclic_strategy = cyclic_strategy
         self.rule_strongly_restricted_components_heads = strongly_connected_components_heads
         self.program_rules = program_rules
+
+        self.additional_unfounded_rules = additional_unfounded_rules
 
     def generate_foundedness_part(self):
 
@@ -415,6 +417,13 @@ class GenerateFoundednessPart:
                                 head_predicate = f"{head.name}{self.current_rule_position}({','.join(full_head_args)})"
                                 unfound_level_mapping = f"{unfound_atom} :-{unfound_body} not prec({unfound_predicate},{head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
+
+                                original_head_predicate = f"{head.name}({','.join(full_head_args)})"
+                                new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound({','.join(full_head_args)})"
+                                unfound_level_mapping = f"{new_unfound_atom} :-{unfound_body} not prec({head_predicate},{original_head_predicate})."
+                                self.printer.custom_print(unfound_level_mapping)
+
+                                self.additional_unfounded_rules.append(f":- {new_unfound_atom}, {head_predicate}, not {original_head_predicate}.")
 
                     dom_list_2 = []
                     for arg in h_args:
