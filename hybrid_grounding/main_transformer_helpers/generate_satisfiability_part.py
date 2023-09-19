@@ -128,55 +128,50 @@ class GenerateSatisfiabilityPart:
 
     def _generate_sat_functions(self, head, covered_subsets):
 
-        for f in self.rule_literals:
-            args_len = len(f.arguments)
+        for current_function_symbol in self.rule_literals:
+            args_len = len(current_function_symbol.arguments)
             if (args_len == 0):
                 self.printer.custom_print(
-                    f"sat_r{self.current_rule_position} :-{'' if (self.rule_literals_signums[self.rule_literals.index(f)] or f is head) else ' not'} {f}.")
+                    f"sat_r{self.current_rule_position} :-{'' if (self.rule_literals_signums[self.rule_literals.index(current_function_symbol)] or current_function_symbol is head) else ' not'} {current_function_symbol}.")
                 continue
-            arguments = re.sub(r'^.*?\(', '', str(f))[:-1].split(',') # all arguments (incl. duplicates / terms)
-            var = list(dict.fromkeys(arguments)) if args_len > 0 else [] # arguments (without duplicates / incl. terms)
-            vars = list (dict.fromkeys([a for a in arguments if a in self.rule_variables])) if args_len > 0 else [] # which have to be grounded per combination
 
+            arguments = re.sub(r'^.*?\(', '', str(current_function_symbol))[:-1].split(',') # all arguments (incl. duplicates / terms)
+            current_function_variables = list (dict.fromkeys([a for a in arguments if a in self.rule_variables])) # which have to be grounded per combination
+
+
+            variable_associations = {}
             dom_list = []
-            for variable in vars:
+            index = 0
+            for variable in current_function_variables:
                 values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
                 dom_list.append(values)
+                variable_associations[variable] = index
+                index += 1
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-            for c in combinations:
-                f_args = ""
+            for current_combination in combinations:
+                current_function_arguments_string = ""
 
                 sat_atom = f"sat_r{self.current_rule_position}"
 
                 sat_body_list = []
                 sat_body_dict = {}
-                for v in var:
-                    if v in self.rule_variables:
-                        body_sat_predicate = f"r{self.current_rule_position}_{v}({c[vars.index(v)]})"
+                for argument in arguments:
+                    if argument in self.rule_variables:
+
+                        variable_index_combination = variable_associations[argument]
+                        body_sat_predicate = f"r{self.current_rule_position}_{argument}({current_combination[variable_index_combination]})"
                         sat_body_list.append(body_sat_predicate)
                         sat_body_dict[body_sat_predicate] = body_sat_predicate
 
-                        f_args += f"{c[vars.index(v)]},"
+                        current_function_arguments_string += f"{current_combination[variable_index_combination]},"
                     else:
-                        f_args += f"{v},"
+                        current_function_arguments_string += f"{argument},"
 
+                sat_body_list = list(set(sat_body_list))
 
-                if f is head:
-                    # For not deriving stuff two times:
-                    #f_name = f"{f.name}{self.current_rule_position}"
-                    # Else:
-                    f_name = f"{f.name}"
-                else:
-                    f_name = f"{f.name}"
-
-                if len(f_args) > 0:
-                    f_args = f"{f_name}({f_args[:-1]})"
-                else:
-                    f_args = f"{f_name}"
-
-                if sat_atom in covered_subsets:
+                if sat_atom in covered_subsets: #Check for covered subsets
                     possible_subsets = covered_subsets[sat_atom]
                     found = False
 
@@ -194,11 +189,23 @@ class GenerateSatisfiabilityPart:
                     if found == True:
                         continue
 
-
-                if self.rule_literals_signums[self.rule_literals.index(f)] or f is head:
-                    sat_predicate = f"{f_args}"
+                if current_function_symbol is head:
+                    # For not deriving stuff two times:
+                    # f_name = f"{f.name}{self.current_rule_position}"
+                    # Else:
+                    current_function_name = f"{current_function_symbol.name}"
                 else:
-                    sat_predicate = f"not {f_args}"
+                    current_function_name = f"{current_function_symbol.name}"
+
+                if len(current_function_arguments_string) > 0:
+                    current_function_string_representation = f"{current_function_name}({current_function_arguments_string[:-1]})"
+                else:
+                    current_function_string_representation = f"{current_function_name}"
+
+                if self.rule_literals_signums[self.rule_literals.index(current_function_symbol)] or current_function_symbol is head:
+                    sat_predicate = f"{current_function_string_representation}"
+                else:
+                    sat_predicate = f"not {current_function_string_representation}"
 
                 if len(sat_body_list) > 0:
                     body_interpretation = ",".join(sat_body_list) + ","

@@ -15,6 +15,8 @@ from hybrid_grounding.cyclic_strategy import CyclicStrategy
 
 from hybrid_grounding.grounding_modes import GroundingModes
 
+from .regression_test_mode import RegressionTestStrategy
+
 def limit_virtual_memory():
     max_virtual_memory = 1024 * 1024 * 1024 * 64 # 64GB
 
@@ -50,7 +52,8 @@ class Context:
 
 class EquivChecker:
 
-    def __init__(self):
+    def __init__(self, chosenRegressionTestMode):
+        self.chosenRegressiontestMode = chosenRegressionTestMode
         self.clingo_output = []
         self.hybrid_grounding_output = []
 
@@ -98,19 +101,25 @@ class EquivChecker:
         """
 
         #aggregate_modes = [("REPLACE",AggregateMode.RA),("REWRITING",AggregateMode.RS_STAR),("REWRITING_NO_BODY",AggregateMode.RS_PLUS)]
-        """
-        aggregate_modes = [
-            ("RS-STAR", AggregateMode.RS_STAR),
-            ("RS-PLUS", AggregateMode.RS_PLUS),
-            ("RS", AggregateMode.RS),
-            ("RA", AggregateMode.RA),
-            ("RECURSIVE", AggregateMode.RECURSIVE)
-            ]
-        """
-        aggregate_modes = [("RA", AggregateMode.RA)]
+        
+        if self.chosenRegressiontestMode == RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING:
+            aggregate_modes = [
+                ("RS-STAR", AggregateMode.RS_STAR),
+                ("RS-PLUS", AggregateMode.RS_PLUS),
+                ("RS", AggregateMode.RS),
+                ("RA", AggregateMode.RA),
+                ("RECURSIVE", AggregateMode.RECURSIVE)
+                ]
+            grounding_mode = GroundingModes.RewriteAggregatesNoGround
 
-        #grounding_mode = GroundingModes.RewriteAggregatesNoGround
-        grounding_mode = GroundingModes.RewriteAggregatesGroundPartly
+        elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING:
+            aggregate_modes = [("RA", AggregateMode.RA)]
+            grounding_mode = GroundingModes.RewriteAggregatesGroundPartly
+
+        else:
+            raise Exception("REGRESSION TEST STRATEGY NOT IMPLEMENTED")
+
+
 
         if grounding_mode == GroundingModes.RewriteAggregatesNoGround:
             print("-----------------------")

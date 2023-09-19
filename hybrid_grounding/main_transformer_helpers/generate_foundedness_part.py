@@ -210,10 +210,14 @@ class GenerateFoundednessPart:
             f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
             combination_variables = f_vars_needed + f_rem
 
+            associated_variables = {}
             dom_list = []
+            index = 0
             for variable in combination_variables:
                 values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
                 dom_list.append(values)
+                associated_variables[variable] = index
+                index = index + 1
 
             combinations = [p for p in itertools.product(*dom_list)]
 
@@ -229,7 +233,7 @@ class GenerateFoundednessPart:
                     variable_assignments[variable] = value
 
 
-                head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
+                head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed, associated_variables)
 
                 body_combination = {}
 
@@ -324,16 +328,20 @@ class GenerateFoundednessPart:
                 f_vars_needed = self._getVarsNeeded(h_vars, f_vars, f_rem, g)
                 #f_vars_needed = h_vars
 
+                associated_variables = {}
                 dom_list = []
+                index = 0
                 for variable in f_vars_needed + f_rem:
                     values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
                     dom_list.append(values)
+                    associated_variables[variable] = index
+                    index += 1
 
                 combinations = [p for p in itertools.product(*dom_list)]
 
                 for combination in combinations:
 
-                    head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed)
+                    head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args = self.generate_head_atom(combination, h_vars, h_args, f_vars_needed, associated_variables)
 
                     # ---------
                     body_combination = {}
@@ -467,7 +475,7 @@ class GenerateFoundednessPart:
         return f_vars_needed
 
 
-    def generate_head_atom(self, combination, h_vars, h_args, f_vars_needed):
+    def generate_head_atom(self, combination, h_vars, h_args, f_vars_needed, combination_associated_variables):
 
         head_combination_list_2 = []
         head_combination = {}
@@ -480,9 +488,14 @@ class GenerateFoundednessPart:
             head_counter = 0
             for h_arg in h_args:
                 if h_arg in h_vars and h_arg in f_vars_needed:
-                    head_combination[h_arg] = combination[head_counter]
-                    full_head_args.append(combination[head_counter])
-                    head_counter += 1
+
+                    combination_variable_position = combination_associated_variables[h_arg]
+                    
+                    head_combination[h_arg] = combination[combination_variable_position]
+                    full_head_args.append(combination[combination_variable_position])
+
+                    if combination_variable_position > head_counter:
+                        head_counter = combination_variable_position
 
                 elif h_arg not in h_vars:
                     head_combination[h_arg] = h_arg

@@ -4,6 +4,7 @@ import re
 import time
 
 from .as_equiv_checker import EquivChecker
+from .regression_test_mode import RegressionTestStrategy
 
 class RegressionTest:
     
@@ -13,7 +14,22 @@ class RegressionTest:
         parser = argparse.ArgumentParser(prog='Regression test for Answerset Equivalence Checker', description='Checks equivalence of answersets produced by hybrid_grounding and clingo on all instance-encoding pairs in a subfolder.')
 
         parser.add_argument('folder')
+
+        regressionTestModes = [
+            ("all-aggregates-no-rewriting",RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING),
+            ("rewriting",RegressionTestStrategy.REWRITING)
+        ]
+        parser.add_argument('--mode', choices=regressionTestModes, default=regressionTestModes[1][0])
+
         args = parser.parse_args()
+
+        chosenRegressionTestMode = None
+        for regressionTestMode in regressionTestModes:
+            if regressionTestMode[0] == args.mode:
+                chosenRegressionTestMode = regressionTestMode[1]
+
+        print(args.mode)
+        print(chosenRegressionTestMode)
 
         folder_path = args.folder 
 
@@ -68,7 +84,7 @@ class RegressionTest:
 
             start_time = time.time()
 
-            checker = EquivChecker()
+            checker = EquivChecker(chosenRegressionTestMode)
             result, clingo_answersets, hybrid_grounding_answersets = checker.start(instance_file_contents, encoding_file_contents)
 
             end_time = time.time()
