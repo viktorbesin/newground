@@ -19,10 +19,9 @@ class RegressionTest:
 
         sub_directories = []
 
-        sub_folder_pattern = re.compile("^[0-9][0-9]_test$")
-        encoding_pattern = re.compile("^encoding_[0-9][0-9]_test\.lp$")
-        instance_pattern = re.compile("^instance_[0-9][0-9]_test\.lp$")
-        
+        sub_folder_pattern = re.compile("^[0-9]{2,3}_test$")
+        encoding_pattern = re.compile("^encoding_[0-9]{2,3}_test\.lp$")
+        instance_pattern = re.compile("^instance_[0-9]{2,3}_test\.lp$")
 
         for f in os.scandir(folder_path):
             if f.is_dir():
