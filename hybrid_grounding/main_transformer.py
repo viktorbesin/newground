@@ -1,27 +1,17 @@
-import os 
-import sys
 import re
 
 import itertools
-import argparse
 import clingo
+
 from clingo import Function
-
-from clingo.ast import Transformer, Variable, parse_files, parse_string, ProgramBuilder, Rule, ComparisonOperator
-from clingo.control import Control
-
-from clingox.program import Program, ProgramObserver, Remapping
+from clingo.ast import Transformer
 
 from .main_transformer_helpers.generate_satisfiability_part import GenerateSatisfiabilityPart
 from .main_transformer_helpers.generate_foundedness_part import GenerateFoundednessPart
 from .main_transformer_helpers.guess_head_part import GuessHeadPart
 
-import networkx as nx
-
-from .comparison_tools import ComparisonTools
 from .aggregate_transformer import AggregateMode
 from .cyclic_strategy import CyclicStrategy
-
 
 class MainTransformer(Transformer):  
     def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps):
@@ -83,14 +73,11 @@ class MainTransformer(Transformer):
         self.rule_comparisons = []
         self.rule_anonymous_variables = 0
         self.rule_is_non_ground = False
-        #self.head = None
-
 
     def visit_Minimize(self, node):
         self.printer.custom_print(f"{str(node)}")
 
         return node
-
 
     def visit_Rule(self, node):
 
@@ -459,14 +446,3 @@ class MainTransformer(Transformer):
             self.printer.custom_print(f"{head_string} :- {new_head_string}.")
 
             self.printer.custom_print(f":- {body_string}, not {head_string}.")
-
-            """
-            special_sat = f"sat_special_{new_head_name}({new_arguments})"
-            self.printer.custom_print(f":- {special_sat}.")
-            self.printer.custom_print(f"{special_sat} :- {head_string}.")
-            for b in positive_body:
-                self.printer.custom_print(f"{special_sat} :- not {str(b)}.")
-
-            for b in negative_body:
-                self.printer.custom_print(f"{special_sat} :- {str(b)}.")
-            """

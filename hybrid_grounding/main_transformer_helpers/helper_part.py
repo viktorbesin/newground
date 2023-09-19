@@ -8,6 +8,10 @@ class HelperPart:
             If applicable it automatically calculates the intersection of different domains.
         """
 
+        if "0_terms" not in domain:
+            # If no domain could be inferred
+            raise Exception("A domain must exist when calling this method!")
+
         possible_domain_value_name = f"term_rule_{str(rule)}_variable_{str(variable)}"
         if possible_domain_value_name in domain:
             return domain[possible_domain_value_name]['0']

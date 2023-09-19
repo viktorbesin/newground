@@ -32,7 +32,11 @@ class HybridGrounding:
     def start(self, contents):
 
         domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads  = self.start_domain_inference(contents)
-        
+
+        if "0_terms" not in domain:
+            # No domain could be inferred, therefore return nothing.
+            return
+
         aggregate_transformer_output_program = self.start_aggregate_transformer(contents, domain)
 
         if self.grounding_mode == GroundingModes.RewriteAggregatesNoGround:
