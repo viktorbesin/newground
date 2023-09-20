@@ -131,8 +131,9 @@ class EquivChecker:
         no_show = False
         ground_guess = False
         ground = False
-        #cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
-        cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
+        cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+        #cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
+        #cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
 
         for aggregate_mode in aggregate_modes:
 

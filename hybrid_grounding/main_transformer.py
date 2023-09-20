@@ -424,6 +424,7 @@ class MainTransformer(Transformer):
 
                 if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING: 
                     new_head_name = f"{rule_head.name}{self.current_rule_position}"
+                    #new_head_name = f"{rule_head.name}'"
                 elif self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
                     new_head_name = f"{rule_head.name}"
                 

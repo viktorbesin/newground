@@ -191,9 +191,8 @@ class GenerateSatisfiabilityPart:
 
                 if current_function_symbol is head:
                     # For not deriving stuff two times:
-                    # f_name = f"{f.name}{self.current_rule_position}"
-                    # Else:
                     #current_function_name = f"{current_function_symbol.name}{self.current_rule_position}"
+                    # Else:
                     current_function_name = f"{current_function_symbol.name}"
                 else:
                     current_function_name = f"{current_function_symbol.name}"

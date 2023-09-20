@@ -127,6 +127,7 @@ class GenerateFoundednessPart:
 
 
                     head_interpretation = f"{head.name}{self.current_rule_position}"
+                    #head_interpretation = f"{head.name}'"
 
 
                     if len(head_tuple_list) > 0:
@@ -301,11 +302,13 @@ class GenerateFoundednessPart:
                 combinations_2 = [p for p in itertools.product(*dom_list_2)]
 
                 for combination_2 in combinations_2:
+                    #new_head_name = f"{head.name}{self.current_rule_position}"
+                    new_head_name = f"{head.name}"
 
                     if len(head_combination_list_2) > 0:
-                        head_string = f"{head.name}{self.current_rule_position}({','.join(list(combination_2))})"
+                        head_string = f"{new_head_name}({','.join(list(combination_2))})"
                     else:
-                        head_string = f"{head.name}{self.current_rule_position}"
+                        head_string = f"{new_head_name}"
 
                     #print(f"{head_string}/{unfound_atom}")
                     self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
@@ -420,7 +423,10 @@ class GenerateFoundednessPart:
                             relevant_bodies = self.rule_strongly_restricted_components[self.current_rule]
 
                             if rule_predicate_function in relevant_bodies:
-                                head_predicate = f"{head.name}{self.current_rule_position}({','.join(full_head_args)})"
+                                new_head_name = f"{head.name}{self.current_rule_position}"
+                                #new_head_name = f"{head.name}'"
+
+                                head_predicate = f"{new_head_name}({','.join(full_head_args)})"
                                 unfound_level_mapping = f"{unfound_atom} :-{unfound_body} not prec({unfound_predicate},{head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
 
@@ -429,6 +435,7 @@ class GenerateFoundednessPart:
                                 unfound_level_mapping = f"{new_unfound_atom} :-{unfound_body} not prec({head_predicate},{original_head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
 
+                                #self._add_atom_to_unfoundedness_check(head_predicate, new_unfound_atom)
                                 self.additional_unfounded_rules.append(f":- {new_unfound_atom}, {head_predicate}.")
 
                     dom_list_2 = []
@@ -444,12 +451,13 @@ class GenerateFoundednessPart:
                     combinations_2 = [p for p in itertools.product(*dom_list_2)]
 
                     for combination_2 in combinations_2:
-                        self.current_rule_position
+                        new_head_name = f"{head.name}{self.current_rule_position}"
+                        #new_head_name = f"{head.name}'"
                         
                         if len(list(combination_2)) > 0:
-                            head_string = f"{head.name}{self.current_rule_position}({','.join(list(combination_2))})"
+                            head_string = f"{new_head_name}({','.join(list(combination_2))})"
                         else:
-                            head_string = f"{head.name}{self.current_rule_position}"
+                            head_string = f"{new_head_name}"
 
                         self._add_atom_to_unfoundedness_check(head_string, unfound_atom)
 
