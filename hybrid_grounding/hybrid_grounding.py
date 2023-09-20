@@ -109,17 +109,6 @@ class HybridGrounding:
 
                 strongly_connected_comps_counter += 1
 
-        """
-        for strongly_rule in rule_strongly_connected_comps.keys():
-            print(strongly_rule)
-            
-            for bodies in rule_strongly_connected_comps[strongly_rule]:
-                print(bodies)
-
-        nx.draw(term_transformer.dependency_graph) 
-        plt.pyplot.savefig("test.png")
-        """
-
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
     

@@ -8,9 +8,13 @@ from .cyclic_strategy import CyclicStrategy
 from .grounding_modes import GroundingModes
 
 def main():
-    choice_tight = "assume-tight"
-    choice_level_mappings = "level-mappings"
-    choice_shared_cycle_body_predicates = "shared-cycle-body-predicates"
+
+    cyclic_choices = {
+        "TIGHT":{"cmd_line": "assume-tight", "enum_mode": CyclicStrategy.ASSUME_TIGHT},
+        "LVL-MAP":{"cmd_line": "level-mappings", "enum_mode": CyclicStrategy.LEVEL_MAPPING},
+        "SCBP":{"cmd_line": "shared-cycle-body-predicates", "enum_mode": CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES},
+        "LVL-MAP-AAAI":{"cmd_line": "level-mappings-AAAI", "enum_mode": CyclicStrategy.LEVEL_MAPPING_AAAI}
+    }
 
     aggregate_choices = {
         "RA":{"cmd_line":"RA","enum_mode":AggregateMode.RA},
@@ -32,7 +36,7 @@ def main():
                         help='Additionally ground guesses which results in (fully) grounded output. ')
     parser.add_argument('--mode', default=GroundingModes.RewriteAggregatesGroundPartly, choices=[grounding_modes_choices[key]["cmd_line"] for key in grounding_modes_choices.keys()])
     parser.add_argument('--aggregate-strategy', default=aggregate_choices["RA"]["cmd_line"], choices=[aggregate_choices[key]["cmd_line"] for key in aggregate_choices.keys()])
-    parser.add_argument('--cyclic-strategy', default=choice_tight, choices=[choice_tight, choice_level_mappings, choice_shared_cycle_body_predicates])
+    parser.add_argument('--cyclic-strategy', default=cyclic_choices["TIGHT"]["cmd_line"], choices=[cyclic_choices[key]["cmd_line"] for key in cyclic_choices.keys()])
     parser.add_argument('files', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
 
@@ -59,14 +63,11 @@ def main():
     for key in aggregate_choices.keys():
         if args.aggregate_strategy == aggregate_choices[key]["cmd_line"]:
             aggregate_strategy = aggregate_choices[key]["enum_mode"]
-    
+
     normal_strategy = None
-    if args.cyclic_strategy == choice_tight:
-        normal_strategy = CyclicStrategy.ASSUME_TIGHT
-    elif args.cyclic_strategy == choice_level_mappings:
-        normal_strategy = CyclicStrategy.LEVEL_MAPPING
-    elif args.cyclic_strategy == choice_shared_cycle_body_predicates:
-        normal_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+    for key in cyclic_choices.keys():
+        if args.cyclic_strategy == cyclic_choices[key]["cmd_line"]:
+            normal_strategy = cyclic_choices[key]["enum_mode"]
 
     contents = ""
     for f in args.files:

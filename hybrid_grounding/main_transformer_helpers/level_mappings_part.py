@@ -12,7 +12,7 @@ class LevelMappingsPart:
         self.cyclic_strategy = cyclic_strategy
                  
     def generate_level_mappings(self):
-        if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
+        if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING or self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
 
             for scc_key in self.strongly_connected_components_predicates.keys():
 

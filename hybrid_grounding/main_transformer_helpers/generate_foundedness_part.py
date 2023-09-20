@@ -414,10 +414,8 @@ class GenerateFoundednessPart:
                         self.printer.custom_print(unfound_rule)
 
 
-                    if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
-
-                        #relevant_heads = self.rule_strongly_restricted_components_heads[self.current_rule]
-
+                    if self.cyclic_strategy in [CyclicStrategy.LEVEL_MAPPING, CyclicStrategy.LEVEL_MAPPING_AAAI]:
+                        
                         if self.current_rule in self.rule_strongly_restricted_components:
                             relevant_bodies = self.rule_strongly_restricted_components[self.current_rule]
 
@@ -443,9 +441,7 @@ class GenerateFoundednessPart:
                         else:
                             dom_list_2.append([arg])
 
-
                     combinations_2 = [p for p in itertools.product(*dom_list_2)]
-                    
 
                     for combination_2 in combinations_2:
                         self.current_rule_position

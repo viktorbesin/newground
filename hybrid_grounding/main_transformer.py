@@ -83,12 +83,16 @@ class MainTransformer(Transformer):
 
         if not self.program_rules:
             self._reset_after_rule()
-            if self.cyclic_strategy != CyclicStrategy.LEVEL_MAPPING:
+            if self.cyclic_strategy not in [CyclicStrategy.LEVEL_MAPPING, CyclicStrategy.LEVEL_MAPPING_AAAI]:
                 self._outputNodeFormatConform(node)
-            elif self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
+            elif self.cyclic_strategy in [CyclicStrategy.LEVEL_MAPPING, CyclicStrategy.LEVEL_MAPPING_AAAI]:
                 if node in self.rule_strongly_restricted_components:
                     self._outputNodeFormatConformLevelMappings(node, self.rule_strongly_connected_components_heads[node], self.rule_strongly_restricted_components[node])
-                    #NO-RETURN
+                    if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
+                        return node
+                    else:
+                        #NO-RETURN -> Need for additional foundedness checks
+                        pass
                 else:
                     self._outputNodeFormatConform(node)
                     self.current_rule_position += 1
@@ -103,12 +107,11 @@ class MainTransformer(Transformer):
 
         self.visit_children(node)
 
-        # if so: handle grounding
         if self.rule_is_non_ground:
+            # if so: handle grounding
             if self.program_rules:
                 self.non_ground_rules[self.current_rule_position] = self.current_rule_position
                 
-            #self.current_rule_position += 1
             if str(node.head) != "#false":
                 head = self.rule_predicate_functions[0]
             else:
@@ -125,8 +128,8 @@ class MainTransformer(Transformer):
                                                                       self.rule_literals_signums)
                 satisfiability_generator.generate_sat_part()
 
-            # FOUND NEW
             if head is not None:
+                # FOUND AND GUESS HEAD
                 if self.program_rules:
                     guess_head_generator = GuessHeadPart(head, 
                                                                       self.current_rule_position,
@@ -396,13 +399,6 @@ class MainTransformer(Transformer):
                 print(str(rule_head.name))
                 raise Exception("COULD NOT FIND SCC KEY")
 
-
-            #precs = []
-            #for relevant_head in relevant_heads:
-            #    for relevant_body in relevant_bodies:
-            #        precs.append(f"prec({str(relevant_body)},{str(relevant_head)})")
-
-            #body_string = f"{', '.join([str(b) for b in rule.body])},{', '.join(precs)}"
             body_string = f"{', '.join([str(b) for b in rule.body])}"
 
             positive_body = []
@@ -425,24 +421,37 @@ class MainTransformer(Transformer):
                 raise Exception("NOT SUPPORTED!")
             else:
                 head_string = f"{str(rule.head).replace(';', ',')}"
-                
-                new_head_name = f"{rule_head.name}{self.current_rule_position}"
 
+                if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING: 
+                    new_head_name = f"{rule_head.name}{self.current_rule_position}"
+                elif self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
+                    new_head_name = f"{rule_head.name}"
                 
                 new_arguments = ",".join([str(argument) for argument in rule_head.arguments])
-
                 new_head_string = f"{new_head_name}({new_arguments})"
 
-                #new_head_func = Function(name=new_head_name,arguments=new_arguments)
-                new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in rule_head.arguments])
+                if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
+                    new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in rule_head.arguments])
+                    self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
 
-                self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
+            if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
+                if len(rule.body) > 0:  
+                    self.printer.custom_print(f"0 <= {{{new_head_string}}} <= 1 :- {body_string}.")
+                else:
+                    self.printer.custom_print(f"{new_head_string}.")
 
-            if len(rule.body) > 0:  
-                self.printer.custom_print(f"0 <= {{{new_head_string}}} <= 1 :- {body_string}.")
-            else:
-                self.printer.custom_print(f"{new_head_string}.")
+                self.printer.custom_print(f"{head_string} :- {new_head_string}.")
+            elif self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
 
-            self.printer.custom_print(f"{head_string} :- {new_head_string}.")
+                precs = []
+                for relevant_head in relevant_heads:
+                    for relevant_body in relevant_bodies:
+                        precs.append(f"prec({str(relevant_body)},{str(relevant_head)})")
 
+                if len(precs) > 0:
+                    self.printer.custom_print(f"{head_string} :- {body_string},{','.join(precs)}.")
+                else:
+                    self.printer.custom_print(f"{head_string} :- {body_string}.")
+
+            # Add satisfiability check for both method
             self.printer.custom_print(f":- {body_string}, not {head_string}.")
