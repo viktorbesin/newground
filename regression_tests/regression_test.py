@@ -19,7 +19,7 @@ class RegressionTest:
             ("all-aggregates-no-rewriting",RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING),
             ("rewriting",RegressionTestStrategy.REWRITING)
         ]
-        parser.add_argument('--mode', choices=regressionTestModes, default=regressionTestModes[1][0])
+        parser.add_argument('--mode', choices=[regressionTestMode[0] for regressionTestMode in regressionTestModes], default=regressionTestModes[1][0])
 
         args = parser.parse_args()
 
