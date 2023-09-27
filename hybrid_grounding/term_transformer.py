@@ -46,6 +46,8 @@ class TermTransformer(Transformer):
         self.dependency_graph_node_rule_heads_lookup = {}
         self.dependency_graph_node_rules_part_lookup = {}
 
+        self.rules_functions_lookup = {}
+
         self._node_signum = None
         self._head_aggregate_element = False
 
@@ -308,6 +310,17 @@ class TermTransformer(Transformer):
 
         if self.current_rule is not None:
             self.dependency_graph_update(node, self.current_rule)
+
+        if self.current_rule is not None:
+            if self.current_rule not in self.rules_functions_lookup:
+                self.rules_functions_lookup[self.current_rule] = {'head':[],'body':[]}
+
+            if self.in_head == True and self._head_aggregate_element == False:
+                self.rules_functions_lookup[self.current_rule]['head'].append(node)
+
+            if self.in_body == True or self._head_aggregate_element == True:
+                if self._node_signum == 0:
+                    self.rules_functions_lookup[self.current_rule]['body'].append(node)
 
 
         self._reset_temporary_function_variables()

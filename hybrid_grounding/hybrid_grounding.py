@@ -31,7 +31,7 @@ class HybridGrounding:
 
     def start(self, contents):
 
-        domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads  = self.start_domain_inference(contents)
+        domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads, scc_rule_functions_scc_lookup  = self.start_domain_inference(contents)
 
         if "0_terms" not in domain:
             # No domain could be inferred, therefore return nothing.
@@ -44,7 +44,7 @@ class HybridGrounding:
             self.output_printer.custom_print(aggregate_transformer_output_program)
         else:
             # Rewrite and ground
-            self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads)
+            self.start_main_transformation(aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads, scc_rule_functions_scc_lookup)
 
     def start_aggregate_transformer(self, contents, domain):
  
@@ -72,6 +72,7 @@ class HybridGrounding:
         predicates_strongly_connected_comps = {}
         rule_strongly_connected_comps = {}
         rule_head_strongly_connected_comps = {}
+        scc_rule_functions_scc_lookup = {}
 
         for strongly_connected_comp in strongly_connected_comps:
             if len(strongly_connected_comp) > 1:
@@ -92,22 +93,85 @@ class HybridGrounding:
                 predicates_strongly_connected_comps[strongly_connected_comps_counter] = []
 
                 for node in strongly_connected_comp:
-                    for rule in term_transformer.dependency_graph_node_rule_bodies_lookup[node].keys():
-                        if rule not in rule_strongly_connected_comps:
-                            rule_strongly_connected_comps[rule] = []
-
-                        rule_strongly_connected_comps[rule] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
-
-                        predicates_strongly_connected_comps[strongly_connected_comps_counter] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
 
                     for rule in term_transformer.dependency_graph_node_rule_heads_lookup[node].keys():
-                        if rule not in rule_head_strongly_connected_comps:
-                            rule_head_strongly_connected_comps[rule] = []
+                        print(rule)
 
-                        rule_head_strongly_connected_comps[rule] += term_transformer.dependency_graph_node_rule_heads_lookup[node][rule]
+                        if rule in term_transformer.rules_functions_lookup:
+                            functions_rule = term_transformer.rules_functions_lookup[rule]
 
+                            relevant_heads = []
+                            relevant_bodies = []
+
+                            head_functions_rule = functions_rule['head']
+                            for head_function in head_functions_rule:
+                                #head_counter = self.dependency_graph_rule_node_lookup[str(rule.head)]
+                                if str(head_function.name) in term_transformer.dependency_graph_rule_node_lookup:
+                                    looked_up_value = term_transformer.dependency_graph_rule_node_lookup[head_function.name]
+
+                                    if looked_up_value in strongly_connected_comp:
+                                        relevant_heads.append(head_function)
+
+                            body_functions_rule = functions_rule['body']
+                            for body_function in body_functions_rule:
+                                #head_counter = self.dependency_graph_rule_node_lookup[str(rule.head)]
+                                if str(body_function.name) in term_transformer.dependency_graph_rule_node_lookup:
+                                    looked_up_value = term_transformer.dependency_graph_rule_node_lookup[body_function.name]
+
+                                    if looked_up_value in strongly_connected_comp:
+                                        relevant_bodies.append(body_function)
+
+                            if len(relevant_bodies) == 0 or len(relevant_heads) == 0:
+                                continue
+
+                            scc_rule_functions_scc_lookup[rule] = {'body':relevant_bodies,'head':relevant_heads,'scc':strongly_connected_comp,'scc_key':strongly_connected_comps_counter}
+                                    
+                            if rule not in rule_strongly_connected_comps:
+                                rule_strongly_connected_comps[rule] = []
+
+                            #rule_strongly_connected_comps[rule] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
+                            rule_strongly_connected_comps[rule] += relevant_bodies
+                            #predicates_strongly_connected_comps[strongly_connected_comps_counter] += term_transformer.dependency_graph_node_rule_bodies_lookup[node][rule]
+                            predicates_strongly_connected_comps[strongly_connected_comps_counter] += relevant_bodies
+
+                    for rule in term_transformer.dependency_graph_node_rule_heads_lookup[node].keys():
+
+                        if rule in term_transformer.rules_functions_lookup:
+                            functions_rule = term_transformer.rules_functions_lookup[rule]
+
+                            relevant_heads = []
+                            relevant_bodies = []
+
+                            head_functions_rule = functions_rule['head']
+                            for head_function in head_functions_rule:
+                                #head_counter = self.dependency_graph_rule_node_lookup[str(rule.head)]
+                                if str(head_function.name) in term_transformer.dependency_graph_rule_node_lookup:
+                                    looked_up_value = term_transformer.dependency_graph_rule_node_lookup[head_function.name]
+
+                                    if looked_up_value in strongly_connected_comp:
+                                        relevant_heads.append(head_function)
+
+                            body_functions_rule = functions_rule['body']
+                            for body_function in body_functions_rule:
+                                #head_counter = self.dependency_graph_rule_node_lookup[str(rule.head)]
+                                if str(body_function.name) in term_transformer.dependency_graph_rule_node_lookup:
+                                    looked_up_value = term_transformer.dependency_graph_rule_node_lookup[body_function.name]
+
+                                    if looked_up_value in strongly_connected_comp:
+                                        relevant_bodies.append(body_function)
+
+                            if len(relevant_bodies) == 0 or len(relevant_heads) == 0:
+                                continue
+
+                            scc_rule_functions_scc_lookup[rule] = {'body':relevant_bodies,'head':relevant_heads,'scc':strongly_connected_comp,'scc_key':strongly_connected_comps_counter}
+                                    
+                            if rule not in rule_head_strongly_connected_comps:
+                                rule_head_strongly_connected_comps[rule] = []
+
+                            rule_head_strongly_connected_comps[rule] += relevant_heads
 
                 strongly_connected_comps_counter += 1
+
 
         new_domain_hash = hash(str(domain))
         old_domain_hash = None
@@ -125,10 +189,10 @@ class HybridGrounding:
 
             new_domain_hash = hash(str(domain))
 
-        return (domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_head_strongly_connected_comps)
+        return (domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_head_strongly_connected_comps, scc_rule_functions_scc_lookup)
        
 
-    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads):
+    def start_main_transformation(self, aggregate_transformer_output_program, domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads, scc_rule_functions_scc_lookup):
 
         ctl = Control()
         with ProgramBuilder(ctl) as program_builder:
@@ -139,12 +203,13 @@ class HybridGrounding:
                                           rule_strongly_connected_comps,
                                           self.cyclic_strategy,
                                           rule_strongly_connected_comps_heads,
-                                          predicates_strongly_connected_comps
+                                          predicates_strongly_connected_comps,
+                                          scc_rule_functions_scc_lookup
                                           )
 
             parse_string(aggregate_transformer_output_program, lambda stm: program_builder.add(transformer(stm)))
 
-            level_mappings_part = LevelMappingsPart(self.output_printer, domain, predicates_strongly_connected_comps, self.ground_guess, self.cyclic_strategy)
+            level_mappings_part = LevelMappingsPart(self.output_printer, domain, predicates_strongly_connected_comps, self.ground_guess, self.cyclic_strategy, scc_rule_functions_scc_lookup)
             level_mappings_part.generate_level_mappings()
 
             if len(transformer.non_ground_rules.keys()) > 0:

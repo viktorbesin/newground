@@ -12,7 +12,7 @@ from ..cyclic_strategy import CyclicStrategy
 
 class GuessHeadPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy,predicates_strongly_connected_comps):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy,predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -29,6 +29,7 @@ class GuessHeadPart:
         self.unfounded_rules = unfounded_rules
         self.cyclic_strategy = cyclic_strategy
         self.predicates_strongly_connected_comps = predicates_strongly_connected_comps
+        self.scc_rule_functions_scc_lookup = scc_rule_functions_scc_lookup
                  
     def guess_head(self):
 
@@ -84,6 +85,11 @@ class GuessHeadPart:
                 self.printer.custom_print(f"{{{new_head}}} {cyclic_behavior_arguments}")
 
 
+            if self.current_rule in self.scc_rule_functions_scc_lookup:
+                new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in self.rule_head.arguments])
+                self.scc_rule_functions_scc_lookup[self.current_rule]['head'].append(new_head_func)
+
+            """
             # Simple search for SCC KEY
             found_scc_key = -1
 
@@ -96,6 +102,7 @@ class GuessHeadPart:
             if found_scc_key >= 0:
                 new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in self.rule_head.arguments])
                 self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
+            """
             
             self.printer.custom_print(f"{str(self.rule_head)} :- {new_head}.")
 

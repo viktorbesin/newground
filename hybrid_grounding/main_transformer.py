@@ -14,7 +14,7 @@ from .aggregate_transformer import AggregateMode
 from .cyclic_strategy import CyclicStrategy
 
 class MainTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps):
+    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
                                           
         self.program_rules = False
         self.program_count = False
@@ -65,6 +65,7 @@ class MainTransformer(Transformer):
         self.rule_strongly_restricted_components = rule_strongly_restricted_components
         self.rule_strongly_connected_components_heads = rule_strongly_connected_comps_heads
         self.predicates_strongly_connected_comps = predicates_strongly_connected_comps
+        self.scc_rule_functions_scc_lookup = scc_rule_functions_scc_lookup
 
     def _reset_after_rule(self):
         self.rule_variables = []
@@ -144,7 +145,9 @@ class MainTransformer(Transformer):
                                                                       self.ground_guess,
                                                                       self.unfounded_rules,
                                                                       self.cyclic_strategy,
-                                                                      self.predicates_strongly_connected_comps)
+                                                                      self.predicates_strongly_connected_comps,
+                                                                      self.scc_rule_functions_scc_lookup
+                                                                      )
                     guess_head_generator.guess_head()
 
                 foundedness_generator = GenerateFoundednessPart(head, 
@@ -434,6 +437,9 @@ class MainTransformer(Transformer):
                 if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
                     new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in rule_head.arguments])
                     self.predicates_strongly_connected_comps[found_scc_key].append(new_head_func)
+
+                    if rule in self.scc_rule_functions_scc_lookup:
+                        self.scc_rule_functions_scc_lookup[rule]['head'].append(new_head_func)
 
             if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
                 if len(rule.body) > 0:  
