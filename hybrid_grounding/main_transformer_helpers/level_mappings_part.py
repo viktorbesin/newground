@@ -1,3 +1,4 @@
+from clingo import Function
 
 from ..cyclic_strategy import CyclicStrategy
 
@@ -31,6 +32,8 @@ class LevelMappingsPart:
                 #scc = self.strongly_connected_components_predicates[scc_key]
 
                 # The following few lines make the nodes unique according to their name
+                # Sort them
+                # And create unique variable names
                 scc = list(set(scc_predicates_per_scc_key[scc_key]))
                 scc_ = {}
                 for predicate in scc:
@@ -38,6 +41,19 @@ class LevelMappingsPart:
                 scc = []
                 for key in scc_.keys():
                     scc.append(scc_[key])
+
+                scc.sort(key=lambda element: str(element))
+
+                new_scc = []
+                for item in scc:
+                    head_name = item.name
+
+                    arguments = []
+                    for arg_index in range(len(item.arguments)):
+                        arguments.append(Function("X" + str(arg_index)))
+                    new_scc.append(Function(name=head_name,arguments=arguments))
+
+                scc = new_scc
 
                 if self.ground_guess:
                     raise Exception("not implemented")
