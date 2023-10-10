@@ -17,7 +17,8 @@ class RegressionTest:
 
         regressionTestModes = [
             ("all-aggregates-no-rewriting",RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING),
-            ("rewriting",RegressionTestStrategy.REWRITING)
+            ("rewriting",RegressionTestStrategy.REWRITING),
+            ("fully-grounded", RegressionTestStrategy.FULLY_GROUNDED)
         ]
         parser.add_argument('--mode', choices=[regressionTestMode[0] for regressionTestMode in regressionTestModes], default=regressionTestModes[1][0])
 
@@ -27,9 +28,6 @@ class RegressionTest:
         for regressionTestMode in regressionTestModes:
             if regressionTestMode[0] == args.mode:
                 chosenRegressionTestMode = regressionTestMode[1]
-
-        print(args.mode)
-        print(chosenRegressionTestMode)
 
         folder_path = args.folder 
 

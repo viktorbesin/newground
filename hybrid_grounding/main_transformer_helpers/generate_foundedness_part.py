@@ -126,7 +126,8 @@ class GenerateFoundednessPart:
                         argument_list = []
                         for argument in head_arguments:
                             if argument in reachable_head_variables_from_not_head_variable[not_head_variable]:
-                                argument_list.append(combination[reachable_head_variables_from_not_head_variable[not_head_variable].index(a)])
+                                #argument_list.append(combination[reachable_head_variables_from_not_head_variable[not_head_variable].index(argument)])
+                                argument_list.append(combination[dom_list_lookup[argument]])
                             else:
                                 argument_list.append(argument)
                         head_interpretation += f"({','.join(argument_list)})"
@@ -134,8 +135,7 @@ class GenerateFoundednessPart:
                     remaining_head_values = []
                     for variable in head_arguments_no_duplicates:
                         if variable in reachable_head_variables_from_not_head_variable[not_head_variable]:
-                            remaining_head_values.append(combination[dom_list[dom_list_lookup[variable]]])
-
+                            remaining_head_values.append(combination[dom_list_lookup[variable]])
                     
                     not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
 
@@ -162,7 +162,6 @@ class GenerateFoundednessPart:
                     elif len(reachable_head_variables_from_not_head_variable[not_head_variable]) == 0:  # removed all
                         self.printer.custom_print(f"1{{{not_variable_interpretations}}}1.")
                     else:  # removed some
-
                         dom_list = []
                         dom_list_lookup = {}
 
@@ -190,7 +189,7 @@ class GenerateFoundednessPart:
                             head_interpretations.append(current_head_interpretation)
 
                         for head_interpretation in head_interpretations:
-                            self.printer.custom_print(f"1{{{not_variable_interpretations}}}1 :- {head_interpretations}.")
+                            self.printer.custom_print(f"1{{{not_variable_interpretations}}}1 :- {head_interpretation}.")
 
 
                     """

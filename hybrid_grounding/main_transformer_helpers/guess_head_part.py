@@ -94,7 +94,7 @@ class GuessHeadPart:
             grounded_predicates.append(f"{predicate.name}{parsed_predicate_arguments}")
                         
         if len(grounded_predicates) > 0:
-            parsed_grounded_predicates = f":- {','.join(grounded_predicates)}"
+            parsed_grounded_predicates = f":- {','.join(grounded_predicates)}."
         else:
             parsed_grounded_predicates = "."
 

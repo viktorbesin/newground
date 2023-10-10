@@ -27,6 +27,9 @@ class HybridGrounding:
         self.rules = False
         self.grounding_mode = grounding_mode
 
+        if self.grounding_mode == GroundingModes.RewriteAggregatesGroundFully:
+            self.ground_guess = True
+
     def start(self, contents):
 
         domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads, scc_rule_functions_scc_lookup  = self.start_domain_inference(contents)
@@ -55,7 +58,7 @@ class HybridGrounding:
         return program_string
 
     def start_domain_inference(self, combined_inputs):
-        
+
         term_transformer = TermTransformer(self.output_printer, self.no_show)
         parse_string(combined_inputs, lambda stm: term_transformer(stm))
 
@@ -185,7 +188,6 @@ class HybridGrounding:
 
                 for node in strongly_connected_comp:
                     for rule in term_transformer.dependency_graph_node_rule_heads_lookup[node].keys():
-                        print(rule)
 
                         if rule in term_transformer.rules_functions_lookup:
                             functions_rule = term_transformer.rules_functions_lookup[rule]

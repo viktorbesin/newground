@@ -116,6 +116,10 @@ class EquivChecker:
             aggregate_modes = [("RA", AggregateMode.RA)]
             grounding_mode = GroundingModes.RewriteAggregatesGroundPartly
 
+        elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED:
+            aggregate_modes = [("RA", AggregateMode.RA)]
+            grounding_mode = GroundingModes.RewriteAggregatesGroundFully
+
         else:
             raise Exception("REGRESSION TEST STRATEGY NOT IMPLEMENTED")
 
@@ -131,9 +135,9 @@ class EquivChecker:
         no_show = False
         ground_guess = False
         ground = False
-        #cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+        cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
         #cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
-        cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
+        #cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
 
         for aggregate_mode in aggregate_modes:
 
@@ -148,15 +152,16 @@ class EquivChecker:
             """
 
             combined_file_input = instance_file_contents + encoding_file_contents
+            total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
             self.start_clingo(combined_file_input, self.clingo_output, self.clingo_hashes)
 
 
-            total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
+
             custom_printer = CustomOutputPrinter()
 
-            hybrid_grounding = HybridGrounding(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer, aggregate_mode = aggregate_mode[1], cyclic_strategy=cyclic_strategy, grounding_mode=grounding_mode)
+            hybrid_grounding = HybridGrounding(no_show = no_show, ground_guess = ground_guess, output_printer = custom_printer, aggregate_mode = aggregate_mode[1], cyclic_strategy=cyclic_strategy, grounding_mode=grounding_mode)
             hybrid_grounding.start(total_content)
-
+            
             self.start_clingo(custom_printer.get_string(), self.hybrid_grounding_output, self.hybrid_grounding_hashes)
 
             """
@@ -209,14 +214,14 @@ class EquivChecker:
             return (True, len(self.clingo_output), len(self.hybrid_grounding_output))
         
     
-    def start_clingo(self, program_input, output, hashes, timeout=15):
+    def start_clingo(self, program_input, output, hashes, timeout=1800):
 
         arguments = ["./clingo", "--project", "--model=0"]
 
         try:
             #p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
             p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
-            (ret_vals_encoded, error_vals_encoded) = p.communicate(input=bytes(program_input, "ascii"), timeout = int(10))
+            (ret_vals_encoded, error_vals_encoded) = p.communicate(input=bytes(program_input, "ascii"), timeout = timeout)
 
             decoded_string = ret_vals_encoded.decode()
 
