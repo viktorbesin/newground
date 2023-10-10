@@ -49,22 +49,29 @@ class GenerateFoundednessPart:
 
         g_r = {}
 
-        # path checking
+        # Generate Graph for performance improvement
         graph = nx.Graph()
-        for f in self.rule_literals:
-            f_args_len = len(f.arguments)
-            f_args = re.sub(r'^.*?\(', '', str(f))[:-1].split(',')  # all arguments (incl. duplicates / terms)
-            if f != self.rule_head and f_args_len > 0:
-                f_vars = list(dict.fromkeys([a for a in f_args if a in self.rule_variables]))  # which have to be grounded per combination
-                for v1 in f_vars:
-                    for v2 in f_vars:
-                        graph.add_edge(v1,v2)
+        for literal in self.rule_literals:
+            literal_arguments_length = len(literal.arguments)
+            literal_arguments = re.sub(r'^.*?\(', '', str(literal))[:-1].split(',')  # all arguments (incl. duplicates / terms)
+            if literal != self.rule_head and literal_arguments_length > 0:
+                #f_vars = list(dict.fromkeys([a for a in f_args if a in self.rule_variables]))  # which have to be grounded per combination
+                literal_variables = []
+                for argument in literal_arguments:
+                    if argument in self.rule_variables:
+                        literal_variables.append(argument)
 
-        for comp in self.rule_comparisons:
+                literal_variables = list(set(literal_variables))
 
-            left = comp.term
-            assert(len(comp.guards) <= 1)
-            right = comp.guards[0].term
+                for variable_1 in literal_variables:
+                    for variable_2 in literal_variables:
+                        graph.add_edge(variable_1,variable_2)
+
+        for comparison in self.rule_comparisons:
+
+            left = comparison.term
+            assert(len(comparison.guards) <= 1) # Assume top level one guard
+            right = comparison.guards[0].term
 
             unparsed_f_args = ComparisonTools.get_arguments_from_operation(left) + ComparisonTools.get_arguments_from_operation(right)
             f_vars = []
@@ -73,9 +80,9 @@ class GenerateFoundednessPart:
                 if f_arg in self.rule_variables:
                     f_vars.append(f_arg)
             
-            for v1 in f_vars:
-                for v2 in f_vars:
-                    graph.add_edge(v1, v2) 
+            for variable_1 in f_vars:
+                for variable_2 in f_vars:
+                    graph.add_edge(variable_1, variable_2) 
 
         self._generate_foundedness_head(self.rule_head, variables_not_in_head, graph, g_r, h_vars, h_args, h_args_len, h_args_nd)
 
@@ -87,106 +94,182 @@ class GenerateFoundednessPart:
         self._generate_foundedness_functions(self.rule_head, variables_not_in_head, h_vars, h_args, graph, covered_subsets)
 
 
-    def _generate_foundedness_head(self, head, variables_not_in_head, graph, graph_variable_dict, head_variables, head_arguments, length_of_head_arguments, head_arguments_no_duplicates):
+    def _generate_foundedness_head(self, head, variables_not_in_head, graph, reachable_head_variables_from_not_head_variable, head_variables, head_arguments, length_of_head_arguments, head_arguments_no_duplicates):
         # ---------------------------------------------
         # REM -> is for the ''remaining'' variables that do not occur in the head
         # The next part is about the introduction of the ''remaining'' variables
 
         for not_head_variable in variables_not_in_head:
-            graph_variable_dict[not_head_variable] = []
-            for n in nx.dfs_postorder_nodes(graph, source=not_head_variable):
-                if n in head_variables:
-                    graph_variable_dict[not_head_variable].append(n)
+            reachable_head_variables_from_not_head_variable[not_head_variable] = []
+            for node in nx.dfs_postorder_nodes(graph, source=not_head_variable):
+                if node in head_variables:
+                    reachable_head_variables_from_not_head_variable[not_head_variable].append(node)
 
             dom_list = []
             dom_list_lookup = {}
             index = 0
-            for variable in graph_variable_dict[not_head_variable]:
-                values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
-                dom_list.append(values)
+            for variable in reachable_head_variables_from_not_head_variable[not_head_variable]:
+                not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                dom_list.append(not_head_variable_values)
                 dom_list_lookup[variable] = index
 
                 index += 1
 
             combinations = [p for p in itertools.product(*dom_list)]
 
-           
             for combination in combinations:
                 if not self.ground_guess:
-                    #head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
-
-                    head_tuple_list = []
-                    partly_head_tuple_list = []
-
-                    for head_argument in head_arguments:
-                        if head_argument in head_variables and head_argument in graph_variable_dict[not_head_variable]:
-
-                            combination_value = combination[dom_list_lookup[head_argument]]
-
-                            head_tuple_list.append(combination_value)
-                            partly_head_tuple_list.append(combination_value)
-                        elif head_argument not in head_variables:
-                            head_tuple_list.append(head_argument)
-                            partly_head_tuple_list.append(head_argument)
-                        else:
-                            head_tuple_list.append(head_argument)
-
-
-                    head_interpretation = f"{head.name}{self.current_rule_position}"
-                    #head_interpretation = f"{head.name}'"
-
-
-                    if len(head_tuple_list) > 0:
-                        head_tuple_interpretation = ','.join(head_tuple_list)
-                        head_interpretation += f"({head_tuple_interpretation})"
-
-                    if str(self.current_rule_position) in self.safe_variables_rules and str(not_head_variable) in self.safe_variables_rules[str(self.current_rule_position)]:
-
-                        values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
-                        for value in values:
-                            self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{not_head_variable}({value}).")
-
-                        domain_string = f"domain_rule_{self.current_rule_position}_variable_{not_head_variable}({not_head_variable})"
-                    else:
-                        domain_string = f"dom({not_head_variable})"
-
-
-                    domains = []
-                    for variable in head_variables:
-                        domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
-
-                    """
-                    if len(domains) > 0:
-                        self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
-                    else:
-                        self.printer.custom_print(f"{{{head}}}.")
-                    """
-
-                    rem_tuple_list = [not_head_variable] + partly_head_tuple_list
-                    rem_tuple_interpretation = ','.join(rem_tuple_list)
-
-
-                    if len(graph_variable_dict[not_head_variable]) == 0:
-                        self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}({rem_tuple_interpretation}):{domain_string}}}<=1.")
-                    else:
-                        self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head_interpretation}.")
-
+                    self._generate_foundedness_head_not_ground(head_arguments, head_variables, reachable_head_variables_from_not_head_variable, not_head_variable, combination, dom_list_lookup, head)
                 else:
-                    head_interpretation = f"{head.name}" + (
-                        f"({','.join([combination[graph_variable_dict[not_head_variable].index(a)] if a in graph_variable_dict[not_head_variable] else a for a in head_arguments])})" if length_of_head_arguments > 0 else "")
-                    rem_interpretation = ','.join([combination[graph_variable_dict[not_head_variable].index(v)] for v in head_arguments_no_duplicates if v in graph_variable_dict[not_head_variable]])
+                    head_interpretation = f"{head.name}"
+                    if length_of_head_arguments > 0:
+                        argument_list = []
+                        for argument in head_arguments:
+                            if argument in reachable_head_variables_from_not_head_variable[not_head_variable]:
+                                argument_list.append(combination[reachable_head_variables_from_not_head_variable[not_head_variable].index(a)])
+                            else:
+                                argument_list.append(argument)
+                        head_interpretation += f"({','.join(argument_list)})"
+
+                    remaining_head_values = []
+                    for variable in head_arguments_no_duplicates:
+                        if variable in reachable_head_variables_from_not_head_variable[not_head_variable]:
+                            remaining_head_values.append(combination[dom_list[dom_list_lookup[variable]]])
+
+                    
+                    not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
+
+                    not_variable_interpretations = []
+                    for value in not_head_variable_values:
+
+                        name = f"r{self.current_rule_position}f_{not_head_variable}"
+                        if length_of_head_arguments > 0:
+                            arguments = f"({value}{','.join(remaining_head_values)})"
+                        else:
+                            arguments = f"({value})"
+
+                        not_variable_interpretations.append(f"{name}{arguments}")
+                    
+                    not_variable_interpretations = ';'.join(not_variable_interpretations)
+
+                    not_reached_head_variables = []
+                    for variable in head_variables:
+                        if variable not in reachable_head_variables_from_not_head_variable[not_head_variable]:
+                            not_reached_head_variables.append(variable)
+
+                    if len(head_variables) == len(reachable_head_variables_from_not_head_variable[not_head_variable]):  # removed none
+                        self.printer.custom_print(f"1{{{not_variable_interpretations}}}1 :- {head_interpretation}.")
+                    elif len(reachable_head_variables_from_not_head_variable[not_head_variable]) == 0:  # removed all
+                        self.printer.custom_print(f"1{{{not_variable_interpretations}}}1.")
+                    else:  # removed some
+
+                        dom_list = []
+                        dom_list_lookup = {}
+
+                        index = 0
+                        for variable in not_reached_head_variables:
+                            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                            dom_list.append(values)
+                            dom_list_lookup[variable] = index
+                            index += 1
+
+                        combinations_for_not_reached_variables = [p for p in itertools.product(*dom_list)]
+
+                        head_interpretations = []
+                        for combination_not_reached_variable in combinations_for_not_reached_variables:
+
+                            head_arguments_not_reached = []
+
+                            for argument in head_arguments:
+                                if argument in not_reached_head_variables:
+                                    head_arguments_not_reached.append(combination_not_reached_variable[dom_list_lookup[variable]])
+                                else:
+                                    head_arguments_not_reached.append(combination[dom_list_lookup[variable]])
+
+                            current_head_interpretation = f"{head.name}({','.join(head_arguments_not_reached)})"
+                            head_interpretations.append(current_head_interpretation)
+
+                        for head_interpretation in head_interpretations:
+                            self.printer.custom_print(f"1{{{not_variable_interpretations}}}1 :- {head_interpretations}.")
+
+
+                    """
+                    #rem_interpretation = ','.join([combination[reachable_head_variables_from_not_head_variable[not_head_variable].index(v)] for v in head_arguments_no_duplicates if v in reachable_head_variables_from_not_head_variable[not_head_variable]])
+                    mis_vars  = [v for v in head_variables if v not in reachable_head_variables_from_not_head_variable[not_head_variable]]
                     rem_interpretations = ';'.join([f"r{self.current_rule_position}f_{not_head_variable}({v}{','+rem_interpretation if length_of_head_arguments>0 else ''})" for v in (self.sub_doms[not_head_variable] if not_head_variable in self.sub_doms else self.terms)])
-                    mis_vars  = [v for v in head_variables if v not in graph_variable_dict[not_head_variable]]
-                    if len(head_variables) == len(graph_variable_dict[not_head_variable]):  # removed none
+                    if len(head_variables) == len(reachable_head_variables_from_not_head_variable[not_head_variable]):  # removed none
                         self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {head_interpretation}.")
-                    elif len(graph_variable_dict[not_head_variable]) == 0:  # removed all
+                    elif len(reachable_head_variables_from_not_head_variable[not_head_variable]) == 0:  # removed all
                         self.printer.custom_print(f"1{{{rem_interpretations}}}1.")
                     else:  # removed some
                         dom_list = [self.sub_doms[v] if v in self.sub_doms else self.terms for v in mis_vars]
-                        combinations_2 = [p for p in itertools.product(*dom_list)]
-                        h_interpretations = [f"{head.name}({','.join(c2[mis_vars.index(a)] if a in mis_vars else combination[graph_variable_dict[not_head_variable].index(a)] for a in head_arguments)})" for c2 in combinations_2]
+                        combinations_for_not_reached_variables = [p for p in itertools.product(*dom_list)]
+                        h_interpretations = [f"{head.name}({','.join(c2[mis_vars.index(a)] if a in mis_vars else combination[reachable_head_variables_from_not_head_variable[not_head_variable].index(a)] for a in head_arguments)})" for c2 in combinations_for_not_reached_variables]
                         for hi in h_interpretations:
                             self.printer.custom_print(f"1{{{rem_interpretations}}}1 :- {hi}.")
+                    """
+
+    def _generate_foundedness_head_not_ground(self, head_arguments, head_variables, graph_variable_dict, not_head_variable, combination, dom_list_lookup, head):
+        # assume self.ground_guess == False
+
+        #head_interpretation = f"{head.name}" + (f"({','.join([c[g_r[r].index(a)] if a in g_r[r] else a  for a in h_args])})" if h_args_len > 0 else "")
+
+        head_tuple_list = []
+        partly_head_tuple_list = []
+
+        for head_argument in head_arguments:
+            if head_argument in head_variables and head_argument in graph_variable_dict[not_head_variable]:
+
+                combination_value = combination[dom_list_lookup[head_argument]]
+
+                head_tuple_list.append(combination_value)
+                partly_head_tuple_list.append(combination_value)
+            elif head_argument not in head_variables:
+                head_tuple_list.append(head_argument)
+                partly_head_tuple_list.append(head_argument)
+            else:
+                head_tuple_list.append(head_argument)
+
+
+        head_interpretation = f"{head.name}{self.current_rule_position}"
+        #head_interpretation = f"{head.name}'"
+
+
+        if len(head_tuple_list) > 0:
+            head_tuple_interpretation = ','.join(head_tuple_list)
+            head_interpretation += f"({head_tuple_interpretation})"
+
+        if str(self.current_rule_position) in self.safe_variables_rules and str(not_head_variable) in self.safe_variables_rules[str(self.current_rule_position)]:
+
+            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
+            for value in values:
+                self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{not_head_variable}({value}).")
+
+            domain_string = f"domain_rule_{self.current_rule_position}_variable_{not_head_variable}({not_head_variable})"
+        else:
+            domain_string = f"dom({not_head_variable})"
+
+
+        domains = []
+        for variable in head_variables:
+            domains.append(f"domain_rule_{self.current_rule_position}_variable_{variable}({variable})")
+
+        """
+        if len(domains) > 0:
+            self.printer.custom_print(f"{{{head} : {','.join(domains)}}}.")
+        else:
+            self.printer.custom_print(f"{{{head}}}.")
+        """
+
+        rem_tuple_list = [not_head_variable] + partly_head_tuple_list
+        rem_tuple_interpretation = ','.join(rem_tuple_list)
+
+
+        if len(graph_variable_dict[not_head_variable]) == 0:
+            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}({rem_tuple_interpretation}):{domain_string}}}<=1.")
+        else:
+            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head_interpretation}.")
+
 
 
 
@@ -311,7 +394,7 @@ class GenerateFoundednessPart:
                     #new_head_name = f"{head.name}{self.current_rule_position}"
                     new_head_name = f"{head.name}"
 
-                    if len(head_combination_list_2) > 0:
+                    if len(head_combination_list_2) > 0 and len(list(combination_2)) > 0 and len((''.join(combination_2)).strip()) > 0:
                         head_string = f"{new_head_name}({','.join(list(combination_2))})"
                     else:
                         head_string = f"{new_head_name}"
@@ -368,7 +451,10 @@ class GenerateFoundednessPart:
                     unfound_body_list = []
                     for v in f_args_nd:
                         if v in rem:
-                            body_combination_tmp = [body_combination[v]] + head_combination_list_2
+                            if len((''.join(head_combination_list_2)).strip()) > 0:
+                                body_combination_tmp = [body_combination[v]] + head_combination_list_2
+                            else:
+                                body_combination_tmp = [body_combination[v]]
                             body_predicate = f"r{self.current_rule_position}f_{v}({','.join(body_combination_tmp)})"
                             unfound_body_list.append(body_predicate)
                             unfound_body_dict[body_predicate] = body_predicate
@@ -437,7 +523,11 @@ class GenerateFoundednessPart:
                                 self.printer.custom_print(unfound_level_mapping)
 
                                 original_head_predicate = f"{head.name}({','.join(full_head_args)})"
-                                new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound({','.join(full_head_args)})"
+                                if len(full_head_args) > 0:
+                                    new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound({','.join(full_head_args)})"
+                                else:
+                                    new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound_"
+
                                 unfound_level_mapping = f"{new_unfound_atom} :-{unfound_body} not prec({head_predicate},{original_head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
 
@@ -460,7 +550,7 @@ class GenerateFoundednessPart:
                         new_head_name = f"{head.name}{self.current_rule_position}"
                         #new_head_name = f"{head.name}'"
                         
-                        if len(list(combination_2)) > 0:
+                        if len(list(combination_2)) > 0 and len(list(combination_2)) > 0 and len((''.join(combination_2)).strip()) > 0:
                             head_string = f"{new_head_name}({','.join(list(combination_2))})"
                         else:
                             head_string = f"{new_head_name}"
@@ -519,7 +609,7 @@ class GenerateFoundednessPart:
                 if h_arg in head_combination:
                     head_combination_list_2.append(head_combination[h_arg])
 
-            if len(head_combination_list_2) > 0:
+            if len(head_combination_list_2) > 0 and len(list(head_combination_list_2)) > 0 and len((''.join(head_combination_list_2)).strip()) > 0:
                 unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
             else:
                 unfound_atom = f"r{self.current_rule_position}_unfound_"
@@ -531,13 +621,17 @@ class GenerateFoundednessPart:
                 head_combination_list_2.append(h_arg)
                 head_combination[h_arg] = h_arg
                 full_head_args.append(h_arg)
-                
-            unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
+
+            
+            if len(list(head_combination_list_2)) > 0 and len((''.join(head_combination_list_2)).strip()) > 0:
+                unfound_atom = f"r{self.current_rule_position}_unfound({','.join(head_combination_list_2)})"
+            else:
+                unfound_atom = f"r{self.current_rule_position}_unfound_"
 
             not_head_counter = 0
 
         else:
-            unfound_atom = f"r{self.current_rule_position}_unfound"
+            unfound_atom = f"r{self.current_rule_position}_unfound_"
             not_head_counter = 0
 
         return (head_combination, head_combination_list_2, unfound_atom, not_head_counter, full_head_args)
