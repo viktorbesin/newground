@@ -14,7 +14,7 @@ from .aggregate_transformer import AggregateMode
 from .cyclic_strategy import CyclicStrategy
 
 class MainTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, ground, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
+    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
                                           
         self.program_rules = False
         self.program_count = False
@@ -31,10 +31,7 @@ class MainTransformer(Transformer):
         self.ng_heads = ng_heads
         #self.sub_doms = sub_doms
 
-        # TODO -> Difference between ground_guess and ground_entire_output?
-        # -> Possible solution: Enum with ''grounding-strength'' -> from efficiency, to ground everything?
-        self.ground_guess = ground_guess
-        self.ground_entire_output = ground
+        self.ground_entire_output = ground_guess
 
         self.printer = printer
         self.cyclic_strategy = cyclic_strategy
@@ -142,7 +139,7 @@ class MainTransformer(Transformer):
                                                                       self.rule_literals_signums,
                                                                       self.current_rule,
                                                                       self.rule_strongly_restricted_components,
-                                                                      self.ground_guess,
+                                                                      self.ground_entire_output,
                                                                       self.unfounded_rules,
                                                                       self.cyclic_strategy,
                                                                       self.predicates_strongly_connected_comps,
@@ -160,7 +157,7 @@ class MainTransformer(Transformer):
                                                                   self.rule_literals_signums,
                                                                   self.current_rule,
                                                                   self.rule_strongly_restricted_components,
-                                                                  self.ground_guess,
+                                                                  self.ground_entire_output,
                                                                   self.unfounded_rules,
                                                                   self.cyclic_strategy,
                                                                   self.rule_strongly_connected_components_heads,

@@ -32,23 +32,17 @@ def main():
 
     parser = argparse.ArgumentParser(prog='hybrid_grounding', usage='%(prog)s [files]')
     parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
-    parser.add_argument('--ground-guess', action='store_true',
-                        help='Additionally ground guesses which results in (fully) grounded output. ')
     parser.add_argument('--mode', default=GroundingModes.RewriteAggregatesGroundPartly, choices=[grounding_modes_choices[key]["cmd_line"] for key in grounding_modes_choices.keys()])
     parser.add_argument('--aggregate-strategy', default=aggregate_choices["RA"]["cmd_line"], choices=[aggregate_choices[key]["cmd_line"] for key in aggregate_choices.keys()])
     parser.add_argument('--cyclic-strategy', default=cyclic_choices["TIGHT"]["cmd_line"], choices=[cyclic_choices[key]["cmd_line"] for key in cyclic_choices.keys()])
     parser.add_argument('files', type=argparse.FileType('r'), nargs='+')
     args = parser.parse_args()
 
-    no_show = False
     ground_guess = False
-    ground = False
+    no_show = False
     if args.no_show:
         sys.argv.remove('--no-show')
         no_show = True
-    if args.ground_guess:
-        sys.argv.remove('--ground-guess')
-        ground_guess = True
 
     grounding_mode = None
     for key in grounding_modes_choices.keys():
@@ -56,7 +50,6 @@ def main():
             grounding_mode = grounding_modes_choices[key]["enum_mode"]
 
     if grounding_mode and grounding_mode == GroundingModes.RewriteAggregatesGroundFully:
-        ground = True
         ground_guess = True
 
     aggregate_strategy = None
@@ -73,7 +66,7 @@ def main():
     for f in args.files:
         contents += f.read()
 
-    hybrid_grounding = HybridGrounding(sys.argv[0], no_show=no_show, ground_guess = ground_guess, ground = ground, output_printer = DefaultOutputPrinter(), aggregate_mode = aggregate_strategy, cyclic_strategy = normal_strategy, grounding_mode = grounding_mode)
+    hybrid_grounding = HybridGrounding(sys.argv[0], no_show=no_show, ground_guess = ground_guess, output_printer = DefaultOutputPrinter(), aggregate_mode = aggregate_strategy, cyclic_strategy = normal_strategy, grounding_mode = grounding_mode)
     hybrid_grounding.start(contents)
 
 
