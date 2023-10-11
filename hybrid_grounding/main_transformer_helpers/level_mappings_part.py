@@ -1,3 +1,5 @@
+import itertools
+
 from clingo import Function
 
 from ..cyclic_strategy import CyclicStrategy
@@ -26,7 +28,6 @@ class LevelMappingsPart:
 
                 scc_predicates_per_scc_key[dic['scc_key']] += dic['body']
                 scc_predicates_per_scc_key[dic['scc_key']] += dic['head']
-
 
             #for scc_key in self.strongly_connected_components_predicates.keys():
             for scc_key in scc_predicates_per_scc_key.keys():
@@ -57,30 +58,127 @@ class LevelMappingsPart:
 
                 scc = new_scc
 
-                if self.ground_guess:
-                    raise Exception("not implemented")
-                else:
-
-                    # Create rules (20)
-                    for index_1 in range(len(scc)):
-                        for index_2 in range(index_1 + 1, len(scc)):
-                        #for index_2 in range(len(scc)):
-                            #    if index_1 == index_2:
-                            #        continue
-
+                # Create rules (20)
+                for index_1 in range(len(scc)):
+                    for index_2 in range(index_1 + 1, len(scc)):
+                        if self.ground_guess:
+                            self.generate_ground_precs(scc, index_1, index_2)
+                        else:
                             self.generate_non_ground_precs(generated_domains, scc, index_1, index_2)
 
-                    # Create rules (21)
-                    for index_1 in range(len(scc)):
-                        for index_2 in range(len(scc)):
-                            if index_1 == index_2:
+                # Create rules (21)
+                for index_1 in range(len(scc)):
+                    for index_2 in range(len(scc)):
+                        if index_1 == index_2:
+                            continue
+
+                        for index_3 in range(len(scc)):
+                            if index_1 == index_3 or index_2 == index_3:
                                 continue
-
-                            for index_3 in range(len(scc)):
-                                if index_1 == index_3 or index_2 == index_3:
-                                    continue
-
+                            
+                            if self.ground_guess:
+                                self.generate_ground_transitivity(scc, index_1, index_2, index_3)
+                            else:
                                 self.generate_non_ground_transitivity(generated_domains, scc, index_1, index_2, index_3)
+
+                            
+    def generate_ground_precs(self, scc, index_1, index_2):
+        p1 = scc[index_1]
+        p2 = scc[index_2]
+
+        dom_list = []
+        
+        self.add_predicate_domains_to_dom_list(p1, dom_list)
+        self.add_predicate_domains_to_dom_list(p2, dom_list)
+        
+        combinations = [p for p in itertools.product(*dom_list)]
+
+        p1_arg_length = len(p1.arguments)
+
+        for combination in combinations:
+
+            p1_arguments = []
+            p2_arguments = []
+            for index in range(len(combination)):
+                if index < p1_arg_length:
+                    p1_arguments.append(combination[index])
+                else:
+                    p2_arguments.append(combination[index])
+
+            if len(p1_arguments) > 0:
+                p1_parsed_arguments = "(" + ",".join(p1_arguments) + ")"
+            else:
+                p1_parsed_arguments = ""
+            p1_string = p1.name + p1_parsed_arguments
+
+            if len(p2_arguments) > 0:
+                p2_parsed_arguments = "(" + ",".join(p2_arguments) + ")"
+            else:
+                p2_parsed_arguments = ""
+            p2_string = p2.name + p2_parsed_arguments
+
+            self.printer.custom_print(f"1 <= {{prec({p1_string},{p2_string});prec({p2_string},{p1_string})}} <= 1.")
+               
+
+    def add_predicate_domains_to_dom_list(self, predicate, dom_list):
+        if predicate.name in self.domain_lookup_dict:
+            domain_dict = self.domain_lookup_dict[predicate.name]
+            for index in range(len(domain_dict.keys())):
+                dom_list.append(domain_dict[str(index)])
+        else:
+            for argument in predicate.arguments:
+                dom_list.append(self.domain_lookup_dict["0_terms"])
+
+    def generate_ground_transitivity(self, scc, index_1, index_2, index_3):
+        
+        p1 = scc[index_1]
+        p2 = scc[index_2]
+        p3 = scc[index_3]
+
+        dom_list = []
+        
+        self.add_predicate_domains_to_dom_list(p1, dom_list)
+        self.add_predicate_domains_to_dom_list(p2, dom_list)
+        self.add_predicate_domains_to_dom_list(p3, dom_list)
+        
+        combinations = [p for p in itertools.product(*dom_list)]
+
+        p1_arg_length = len(p1.arguments)
+        p2_arg_length = len(p2.arguments)
+
+        for combination in combinations:
+
+            p1_arguments = []
+            p2_arguments = []
+            p3_arguments = []
+
+            for index in range(len(combination)):
+                if index < p1_arg_length:
+                    p1_arguments.append(combination[index])
+                elif index < (p1_arg_length + p2_arg_length):
+                    p2_arguments.append(combination[index])
+                else:
+                    p3_arguments.append(combination[index])
+
+            if len(p1_arguments) > 0:
+                p1_parsed_arguments = "(" + ",".join(p1_arguments) + ")"
+            else:
+                p1_parsed_arguments = ""
+            p1_string = p1.name + p1_parsed_arguments
+
+            if len(p2_arguments) > 0:
+                p2_parsed_arguments = "(" + ",".join(p2_arguments) + ")"
+            else:
+                p2_parsed_arguments = ""
+            p2_string = p2.name + p2_parsed_arguments
+            
+            if len(p3_arguments) > 0:
+                p3_parsed_arguments = "(" + ",".join(p3_arguments) + ")"
+            else:
+                p3_parsed_arguments = ""
+            p3_string = p3.name + p3_parsed_arguments
+
+            self.printer.custom_print(f":- prec({p1_string},{p2_string}), prec({p2_string},{p3_string}), prec({p3_string},{p1_string}).")
 
     def generate_non_ground_transitivity(self, generated_domains, scc, index_1, index_2, index_3):
 

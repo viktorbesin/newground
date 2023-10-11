@@ -43,6 +43,10 @@ class GuessHeadPart:
             self.do_ground_guess(new_head_name)
         else:
             self.non_ground_guess(new_head_name, new_head)
+            
+        if self.current_rule in self.scc_rule_functions_scc_lookup:
+            new_head_func = Function(name=new_head_name,arguments=[Function(str(f"X{index}")) for index in range(len(self.rule_head.arguments))])
+            self.scc_rule_functions_scc_lookup[self.current_rule]['head'].append(new_head_func)
 
     def do_ground_guess(self, new_head_name):
     
@@ -75,6 +79,7 @@ class GuessHeadPart:
 
             else:
                 self.printer.custom_print(f"{{{';'.join(possible_head_guesses)}}}.")
+                
 
     def print_grounded_head_guess_for_shared_cycle_body_predicates(self, body_dom_list_lookup, body_combination, possible_head_guesses):
         grounded_predicates = []
@@ -175,9 +180,4 @@ class GuessHeadPart:
         else:
             self.printer.custom_print(f"{{{new_head}}} {cyclic_behavior_arguments}")
 
-
-        if self.current_rule in self.scc_rule_functions_scc_lookup:
-            new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in self.rule_head.arguments])
-            self.scc_rule_functions_scc_lookup[self.current_rule]['head'].append(new_head_func)
-            
         self.printer.custom_print(f"{str(self.rule_head)} :- {new_head}.")
