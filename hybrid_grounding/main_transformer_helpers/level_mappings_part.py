@@ -12,9 +12,11 @@ class LevelMappingsPart:
         self.ground_guess = ground_guess
         self.cyclic_strategy = cyclic_strategy
         self.scc_rule_functions_scc_lookup = scc_rule_functions_scc_lookup
-                 
+
     def generate_level_mappings(self):
         if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING or self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
+
+            generated_domains = {}
 
             scc_predicates_per_scc_key = {}
             for rule in self.scc_rule_functions_scc_lookup.keys():
@@ -65,24 +67,8 @@ class LevelMappingsPart:
                         #for index_2 in range(len(scc)):
                             #    if index_1 == index_2:
                             #        continue
-                            p1 = str(scc[index_1])
-                            p2 = str(scc[index_2])
 
-                            variables_p1 = ((p1.split("(")[1])[:-1]).split(",")
-                            new_variables_p1 = [variable + "_1" for variable in variables_p1]
-                            #new_variables_p1 = [variable for variable in variables_p1]
-
-                            variables_p2 = ((p2.split("(")[1])[:-1]).split(",")
-                            new_variables_p2 = [variable + "_2" for variable in variables_p2]
-                            #new_variables_p2 = [variable for variable in variables_p2]
-
-                            np1 = scc[index_1].name + "(" + ",".join(new_variables_p1) + ")"
-                            np2 = scc[index_2].name + "(" + ",".join(new_variables_p2) + ")"
-
-                            doms1 = [f"dom({var})" for var in new_variables_p1]
-                            doms2 = [f"dom({var})" for var in new_variables_p2]
-
-                            self.printer.custom_print(f"1 <= {{prec({np1},{np2});prec({np2},{np1})}} <= 1 :- {','.join(doms1)}, {','.join(doms2)}.")
+                            self.generate_non_ground_precs(generated_domains, scc, index_1, index_2)
 
                     # Create rules (21)
                     for index_1 in range(len(scc)):
@@ -94,28 +80,62 @@ class LevelMappingsPart:
                                 if index_1 == index_3 or index_2 == index_3:
                                     continue
 
-                                p1 = str(scc[index_1])
-                                p2 = str(scc[index_2])
-                                p3 = str(scc[index_3])
+                                self.generate_non_ground_transitivity(generated_domains, scc, index_1, index_2, index_3)
 
-                                variables_p1 = ((p1.split("(")[1])[:-1]).split(",")
-                                new_variables_p1 = [variable + "_1" for variable in variables_p1]
-                                #new_variables_p1 = [variable for variable in variables_p1]
+    def generate_non_ground_transitivity(self, generated_domains, scc, index_1, index_2, index_3):
 
-                                variables_p2 = ((p2.split("(")[1])[:-1]).split(",")
-                                new_variables_p2 = [variable + "_2" for variable in variables_p2]
-                                #new_variables_p2 = [variable for variable in variables_p2]
+        p1 = scc[index_1]
+        p2 = scc[index_2]
+        p3 = scc[index_3]
 
-                                variables_p3 = ((p3.split("(")[1])[:-1]).split(",")
-                                new_variables_p3 = [variable + "_3" for variable in variables_p3]
-                                #new_variables_p3 = [variable for variable in variables_p3]
+        doms1, predicate_1 = self.generate_doms_predicate(p1, "1")
+        doms2, predicate_2 = self.generate_doms_predicate(p2, "2")
+        doms3, predicate_3 = self.generate_doms_predicate(p3, "3")
 
-                                np1 = scc[index_1].name + "(" + ",".join(new_variables_p1) + ")"
-                                np2 = scc[index_2].name + "(" + ",".join(new_variables_p2) + ")"
-                                np3 = scc[index_3].name + "(" + ",".join(new_variables_p3) + ")"
+        self.generate_domain_for_predicate(generated_domains, p1)
+        self.generate_domain_for_predicate(generated_domains, p2)
+        self.generate_domain_for_predicate(generated_domains, p3)
+
+        domain_body = f"{','.join(doms1)}, {','.join(doms2)}, {','.join(doms3)}"
+        self.printer.custom_print(f":- {domain_body}, prec({predicate_1},{predicate_2}), prec({predicate_2},{predicate_3}), prec({predicate_3},{predicate_1}).")
+
+    def generate_non_ground_precs(self, generated_domains, scc, index_1, index_2):
+        p1 = scc[index_1]
+        p2 = scc[index_2]
+
+        doms1, predicate_1 = self.generate_doms_predicate(p1, "1")
+        doms2, predicate_2 = self.generate_doms_predicate(p2, "2")
+
+        self.generate_domain_for_predicate(generated_domains, p1)
+        self.generate_domain_for_predicate(generated_domains, p2)
+
+        body = f"{','.join(doms1)}, {','.join(doms2)}"
+
+        self.printer.custom_print(f"1 <= {{prec({predicate_1},{predicate_2});prec({predicate_2},{predicate_1})}} <= 1 :- {body}.")
+
+    def generate_doms_predicate(self, predicate, string_postfix):
+        doms = []
+        new_variables_predicate = []
+        index = 0
+        for variable in predicate.arguments:
+            variable_name = f"{variable}_{string_postfix}"
+            new_variables_predicate.append(variable_name)
+
+            if predicate.name in self.domain_lookup_dict:
+                doms.append(f"dom_{predicate.name}_{index}({variable_name})")
+            else:
+                doms.append(f"dom({variable_name})")
+
+            index += 1
+        string_predicate = predicate.name + "(" + ",".join(new_variables_predicate) + ")"
+        return doms,string_predicate
+
+    def generate_domain_for_predicate(self, generated_domains, predicate):
+        if predicate.name in self.domain_lookup_dict and predicate.name not in generated_domains:
+            generated_domains[predicate.name] = True
                                 
-                                doms1 = [f"dom({var})" for var in new_variables_p1]
-                                doms2 = [f"dom({var})" for var in new_variables_p2]
-                                doms3 = [f"dom({var})" for var in new_variables_p3]
-
-                                self.printer.custom_print(f":- {','.join(doms1)}, {','.join(doms2)}, {','.join(doms3)}, prec({np1},{np2}), prec({np2},{np3}), prec({np3},{np1}).")
+            dom_dict = self.domain_lookup_dict[predicate.name]
+            for index in range(len(dom_dict.keys())):
+                variable_domain = dom_dict[str(index)]
+                for value in variable_domain:
+                    self.printer.custom_print(f"dom_{predicate.name}_{index}({value}).")

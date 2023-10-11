@@ -522,8 +522,9 @@ class GenerateFoundednessPart:
                                 self.printer.custom_print(unfound_level_mapping)
 
                                 original_head_predicate = f"{head.name}({','.join(full_head_args)})"
-                                if len(full_head_args) > 0:
-                                    new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound({','.join(full_head_args)})"
+
+                                if len(unfound_predicate_args) > 0:
+                                    new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound({','.join(unfound_predicate_args)})"
                                 else:
                                     new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound_"
 
