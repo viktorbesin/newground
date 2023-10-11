@@ -17,8 +17,14 @@ class RegressionTest:
 
         regressionTestModes = [
             ("all-aggregates-no-rewriting",RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING),
-            ("rewriting",RegressionTestStrategy.REWRITING),
-            ("fully-grounded", RegressionTestStrategy.FULLY_GROUNDED)
+            ("rewriting-tight",RegressionTestStrategy.REWRITING_TIGHT),
+            ("rewriting-shared-cycle",RegressionTestStrategy.REWRITING_SHARED_CYCLE),
+            ("rewriting-level-mappings-1",RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI),
+            ("rewriting-level-mappings-2",RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS),
+            ("fully-grounded-tight", RegressionTestStrategy.FULLY_GROUNDED_TIGHT),
+            ("fully-grounded-shared-cycle", RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE),
+            ("fully-grounded-level-mappings-1", RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI),
+            ("fully-grounded-level-mappings-2", RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS),
         ]
         parser.add_argument('--mode', choices=[regressionTestMode[0] for regressionTestMode in regressionTestModes], default=regressionTestModes[1][0])
 

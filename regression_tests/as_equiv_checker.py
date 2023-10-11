@@ -100,6 +100,9 @@ class EquivChecker:
             one_directional_equivalence: If True, then only the direction clingo -> hybrid_grounding is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the hybrid_grounding result as well (but therefore it could be, that hybrid_grounding has more answersets)
         """
 
+        test = RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING
+        print(test)
+
         #aggregate_modes = [("REPLACE",AggregateMode.RA),("REWRITING",AggregateMode.RS_STAR),("REWRITING_NO_BODY",AggregateMode.RS_PLUS)]
         
         if self.chosenRegressiontestMode == RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING:
@@ -112,18 +115,36 @@ class EquivChecker:
                 ]
             grounding_mode = GroundingModes.RewriteAggregatesNoGround
 
-        elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING:
+        elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_TIGHT or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_SHARED_CYCLE or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS: 
             aggregate_modes = [("RA", AggregateMode.RA)]
             grounding_mode = GroundingModes.RewriteAggregatesGroundPartly
+            ground_guess = False
 
-        elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED:
+            if self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_TIGHT:
+                cyclic_strategy = CyclicStrategy.ASSUME_TIGHT
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_SHARED_CYCLE:
+                cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI:
+                cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS:
+                cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
+
+        elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_TIGHT or  self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE or self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI or self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS:
+        
             aggregate_modes = [("RA", AggregateMode.RA)]
             grounding_mode = GroundingModes.RewriteAggregatesGroundFully
+            ground_guess = True
 
+            if self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_TIGHT:
+                cyclic_strategy = CyclicStrategy.ASSUME_TIGHT
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE:
+                cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI:
+                cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS:
+                cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
         else:
             raise Exception("REGRESSION TEST STRATEGY NOT IMPLEMENTED")
-
-
 
         if grounding_mode == GroundingModes.RewriteAggregatesNoGround:
             print("-----------------------")
@@ -133,11 +154,6 @@ class EquivChecker:
 
         works = True
         no_show = False
-        ground_guess = False
-        ground = False
-        cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
-        #cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
-        #cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
 
         for aggregate_mode in aggregate_modes:
 
@@ -216,7 +232,7 @@ class EquivChecker:
     
     def start_clingo(self, program_input, output, hashes, timeout=1800):
 
-        arguments = ["./clingo", "--project", "--model=0"]
+        arguments = ["clingo", "--project", "--model=0"]
 
         try:
             #p = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=limit_virtual_memory)       
