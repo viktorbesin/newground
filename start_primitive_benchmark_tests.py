@@ -8,8 +8,8 @@ import tempfile
 
 import clingo
 
-from newground.newground import Newground
-from newground.default_output_printer import DefaultOutputPrinter
+from hybrid_grounding.hybrid_grounding import HybridGrounding
+from hybrid_grounding.default_output_printer import DefaultOutputPrinter
 
 from start_benchmark_tests import Benchmark
 
@@ -42,10 +42,10 @@ class PrimitiveBenchmark:
 
     def __init__(self):
         self.clingo_output = []
-        self.newground_output = []
+        self.hybrid_grounding_output = []
 
         self.clingo_hashes = {}
-        self.newground_hashes = {}
+        self.hybrid_grounding_hashes = {}
 
     def on_model(self, m, output, hashes):
         symbols = m.symbols(shown=True)
@@ -59,7 +59,7 @@ class PrimitiveBenchmark:
         hashes[(hash(tuple(output[cur_pos])))] = cur_pos
 
     def parse(self):
-        parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks Newground vs. Clingo (total grounding + solving time).')
+        parser = argparse.ArgumentParser(prog='Primitive Benchmark', description='Benchmarks hybrid_grounding vs. Clingo (total grounding + solving time).')
 
         parser.add_argument('instance')
         parser.add_argument('encoding')
@@ -86,12 +86,12 @@ class PrimitiveBenchmark:
 
         #gringo_clingo_timeout_occured, gringo_clingo_duration, gringo_duration, gringo_grounding_file_size  = Benchmark.clingo_benchmark(instance_file_contents, encoding_file_contents, config, 1800)
         idlv_clingo_timeout_occured, idlv_clingo_duration, idlv_duration, idlv_grounding_file_size = Benchmark.idlv_benchmark(instance_file_contents, encoding_file_contents, config, 1800)
-        newground_idlv_clingo_timeout_occured, newground_idlv_clingo_duration, newground_idlv_duration, newground_idlv_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, 1800, grounder = "IDLV")
-        newground_gringo_clingo_timeout_occured, newground_gringo_clingo_duration, newground_gringo_duration, newground_gringo_grounding_file_size = Benchmark.newground_benchmark(instance_file_contents, encoding_file_contents, config, 1800, grounder = "GRINGO")
+        hybrid_grounding_idlv_clingo_timeout_occured, hybrid_grounding_idlv_clingo_duration, hybrid_grounding_idlv_duration, hybrid_grounding_idlv_grounding_file_size = Benchmark.hybrid_grounding_benchmark(instance_file_contents, encoding_file_contents, config, 1800, grounder = "IDLV")
+        hybrid_grounding_gringo_clingo_timeout_occured, hybrid_grounding_gringo_clingo_duration, hybrid_grounding_gringo_duration, hybrid_grounding_gringo_grounding_file_size = Benchmark.hybrid_grounding_benchmark(instance_file_contents, encoding_file_contents, config, 1800, grounder = "GRINGO")
  
         print(f"[INFO] - <<<<<<<<<<>>>>>>>>>>")
-        print(f"[INFO] - Newground-IDLV needed {newground_idlv_clingo_duration} seconds!")
-        print(f"[INFO] - Newground-GRINGO needed {newground_gringo_clingo_duration} seconds!")
+        print(f"[INFO] - hybrid_grounding-IDLV needed {hybrid_grounding_idlv_clingo_duration} seconds!")
+        print(f"[INFO] - hybrid_grounding-GRINGO needed {hybrid_grounding_gringo_clingo_duration} seconds!")
         #print(f"[INFO] - Clingo needed {gringo_clingo_duration} seconds!")       
         print(f"[INFO] - IDLV needed {idlv_clingo_duration} seconds!")       
 
@@ -118,15 +118,15 @@ class PrimitiveBenchmark:
 
         custom_printer = CustomOutputPrinter()
       
-        newground_start_time = time.time()   
+        hybrid_grounding_start_time = time.time()   
 
         
-        newground = Newground(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer)
-        newground.start(total_content)
+        hybrid_grounding = HybridGrounding(no_show = no_show, ground_guess = ground_guess, ground = ground, output_printer = custom_printer)
+        hybrid_grounding.start(total_content)
 
-        newground_end_time = time.time()   
-        newground_duration_0 = newground_end_time - newground_start_time
-        print(f"[INFO] - Newground duration 0:{newground_duration_0}")
+        hybrid_grounding_end_time = time.time()   
+        hybrid_grounding_duration_0 = hybrid_grounding_end_time - hybrid_grounding_start_time
+        print(f"[INFO] - hybrid_grounding duration 0:{hybrid_grounding_duration_0}")
 
         output_string = custom_printer.get_string()
 
@@ -135,18 +135,18 @@ class PrimitiveBenchmark:
         with open(temp_file.name, "w") as f:
             f.write(output_string)
 
-        newground_start_time = time.time()   
+        hybrid_grounding_start_time = time.time()   
 
         subprocess.run(["./clingo",f"{temp_file.name}"])       
 
-        newground_end_time = time.time()   
-        newground_duration_1 = newground_end_time - newground_start_time
-        print(f"[INFO] - Newground duration 1:{newground_duration_1}")
+        hybrid_grounding_end_time = time.time()   
+        hybrid_grounding_duration_1 = hybrid_grounding_end_time - hybrid_grounding_start_time
+        print(f"[INFO] - hybrid_grounding duration 1:{hybrid_grounding_duration_1}")
 
-        newground_total_duration = newground_duration_0 + newground_duration_1
+        hybrid_grounding_total_duration = hybrid_grounding_duration_0 + hybrid_grounding_duration_1
 
         print(f"[INFO] - <<<<<<<<<<>>>>>>>>>>")
-        print(f"[INFO] - Newground needed {newground_total_duration} seconds!")
+        print(f"[INFO] - hybrid_grounding needed {hybrid_grounding_total_duration} seconds!")
         print(f"[INFO] - Clingo needed {clingo_duration} seconds!")
         """
 
