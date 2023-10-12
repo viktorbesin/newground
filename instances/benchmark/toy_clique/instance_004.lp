@@ -1,1 +1,0 @@
-vertex(1).vertex(2).vertex(3).edge(2,1).edge(2,2).edge(3,1).

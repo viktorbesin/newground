@@ -682,7 +682,7 @@ def _addToSubdom(sub_doms, var, value):
         sub_doms[var].append(value)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog='newground', usage='%(prog)s [files]')
+    parser = argparse.ArgumentParser(prog='hybrid_grounding', usage='%(prog)s [files]')
     parser.add_argument('--no-show', action='store_true', help='Do not print #show-statements to avoid compatibility issues. ')
     parser.add_argument('--ground-guess', action='store_true',
                         help='Additionally ground guesses which results in (fully) grounded output. ')
