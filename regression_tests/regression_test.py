@@ -2,6 +2,7 @@ import argparse
 import os
 import re
 import time
+import sys
 
 from .as_equiv_checker import EquivChecker
 from .regression_test_mode import RegressionTestStrategy
@@ -13,10 +14,30 @@ class RegressionTest:
 
         parser = argparse.ArgumentParser(prog='Regression test for Answerset Equivalence Checker', description='Checks equivalence of answersets produced by hybrid_grounding and clingo on all instance-encoding pairs in a subfolder.')
 
-        parser.add_argument('folder')
+        all_test = "test-all"
+        rewriting_modes = [
+            RegressionTestStrategy.REWRITING_SHARED_CYCLE,
+            RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS,
+            RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI,
+            RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS,
+            RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI,
+            RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE,
+        ]
+
+        aggregate_modes = [
+            RegressionTestStrategy.AGGREGATES_RS_PLUS,
+            RegressionTestStrategy.AGGREGATES_RS_STAR,
+            RegressionTestStrategy.AGGREGATES_RA,
+            RegressionTestStrategy.AGGREGATES_RS,
+            RegressionTestStrategy.AGGREGATES_RECURSIVE
+        ]
 
         regressionTestModes = [
-            ("all-aggregates-no-rewriting",RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING),
+            ("aggregates-rs-star",RegressionTestStrategy.AGGREGATES_RS_STAR),
+            ("aggregates-rs-plus",RegressionTestStrategy.AGGREGATES_RS_PLUS),
+            ("aggregates-rs",RegressionTestStrategy.AGGREGATES_RS),
+            ("aggregates-ra",RegressionTestStrategy.AGGREGATES_RA),
+            ("aggregates-recursive",RegressionTestStrategy.AGGREGATES_RECURSIVE),
             ("rewriting-tight",RegressionTestStrategy.REWRITING_TIGHT),
             ("rewriting-shared-cycle",RegressionTestStrategy.REWRITING_SHARED_CYCLE),
             ("rewriting-level-mappings-1",RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI),
@@ -26,7 +47,8 @@ class RegressionTest:
             ("fully-grounded-level-mappings-1", RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI),
             ("fully-grounded-level-mappings-2", RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS),
         ]
-        parser.add_argument('--mode', choices=[regressionTestMode[0] for regressionTestMode in regressionTestModes], default=regressionTestModes[1][0])
+        parser.add_argument('--mode', choices=[regressionTestMode[0] for regressionTestMode in regressionTestModes] + [all_test], default=regressionTestModes[1][0])
+        parser.add_argument('--folder', default="__DEFAULT__")
 
         args = parser.parse_args()
 
@@ -34,9 +56,67 @@ class RegressionTest:
         for regressionTestMode in regressionTestModes:
             if regressionTestMode[0] == args.mode:
                 chosenRegressionTestMode = regressionTestMode[1]
+        
+        if args.mode == all_test:
+            chosenRegressionTestMode = all_test
 
         folder_path = args.folder 
 
+        if chosenRegressionTestMode != all_test:
+            if folder_path == "__DEFAULT__" and chosenRegressionTestMode in rewriting_modes:
+                folder_path = os.path.join("regression_tests","hybrid_grounding_tests")
+            elif folder_path == "__DEFAULT__" and chosenRegressionTestMode in aggregate_modes:
+                folder_path = os.path.join("regression_tests","aggregate_tests")
+
+            tests_successfull = cls.regression_test_a_strategy_helper(chosenRegressionTestMode, folder_path)
+
+            if tests_successfull is True:
+                sys.exit(0)
+            else:
+                sys.exit(1)
+        else:
+
+            tests_successfull = True
+
+            for aggregate_strategy in aggregate_modes:
+                if folder_path == "__DEFAULT__" and aggregate_strategy in aggregate_modes:
+                    aggregates_folder = os.path.join("regression_tests","aggregate_tests")
+                else:
+                    aggregates_folder = folder_path
+
+                test_successful = cls.regression_test_a_strategy_helper(aggregate_strategy, aggregates_folder)
+                if not test_successful:
+                    strategy_index = regressionTestModes.index(lambda element : element[1] == aggregate_strategy)
+                    strategy_string = regressionTestModes[strategy_index][0]
+                    print("---------------------------------------------")
+                    print(f"The following aggregate-strategy FAILED (responded with an error): {strategy_string}")
+                    print("---------------------------------------------")
+
+                tests_successfull = tests_successfull and test_successful
+
+            for rewriting_strategy in rewriting_modes:
+                if folder_path == "__DEFAULT__" and rewriting_strategy in rewriting_modes:
+                    rewriting_folder = os.path.join("regression_tests","hybrid_grounding_tests")
+                else:
+                    rewriting_folder = folder_path
+
+                test_successful = cls.regression_test_a_strategy_helper(rewriting_strategy, rewriting_folder)
+                if not test_successful:
+                    strategy_index = regressionTestModes.index(lambda element : element[1] == rewriting_strategy)
+                    strategy_string = regressionTestModes[strategy_index][0]
+                    print("---------------------------------------------")
+                    print(f"The following rewriting-strategy FAILED (responded with an error): {strategy_string}")
+                    print("---------------------------------------------")
+
+                tests_successfull = tests_successfull and test_successful
+
+            if tests_successfull:
+                sys.exit(0)
+            else:
+                sys.exit(1)
+
+    @classmethod
+    def regression_test_a_strategy_helper(cls, chosenRegressionTestMode, folder_path):
         sub_directories = []
 
         sub_folder_pattern = re.compile("^[0-9]{2,3}_test$")
@@ -50,6 +130,10 @@ class RegressionTest:
       
         sub_directories.sort()
 
+        return cls.regression_test_a_strategy(chosenRegressionTestMode, folder_path, sub_directories, encoding_pattern, instance_pattern)
+
+    @classmethod
+    def regression_test_a_strategy(cls, chosenRegressionTestMode, folder_path, sub_directories, encoding_pattern, instance_pattern):
         total_tests = 0
         failed_tests = {}
         skipped_tests = {}
@@ -69,9 +153,6 @@ class RegressionTest:
                         encoding_file_name = str(f.name)
                     if instance_pattern.match(str(f.name)):
                         instance_file_name = str(f.name)
-
-            
-
 
             if not encoding_file_name:
                 print(f"[ERROR] - Could not find encoding-file for sub folder: {sub}.")
@@ -125,5 +206,9 @@ class RegressionTest:
         print("############")
         print("<<<<---->>>>")
 
+        if number_failed_tests == 0:
+            return True
+        else:
+            return False
         
 

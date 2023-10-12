@@ -100,34 +100,61 @@ class EquivChecker:
             one_directional_equivalence: If True, then only the direction clingo -> hybrid_grounding is checked, i.e. it must be the case, that for each answer set in the clingo result, there must be one in the hybrid_grounding result as well (but therefore it could be, that hybrid_grounding has more answersets)
         """
 
-        test = RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING
-        print(test)
+        regression_test_strategy_string = ""
 
-        #aggregate_modes = [("REPLACE",AggregateMode.RA),("REWRITING",AggregateMode.RS_STAR),("REWRITING_NO_BODY",AggregateMode.RS_PLUS)]
-        
-        if self.chosenRegressiontestMode == RegressionTestStrategy.ALL_AGGREGATES_NO_REWRITING:
-            aggregate_modes = [
-                ("RS-STAR", AggregateMode.RS_STAR),
-                ("RS-PLUS", AggregateMode.RS_PLUS),
-                ("RS", AggregateMode.RS),
-                ("RA", AggregateMode.RA),
-                ("RECURSIVE", AggregateMode.RECURSIVE)
-                ]
+        if self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS_STAR or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS_PLUS or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RA or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RECURSIVE:
             grounding_mode = GroundingModes.RewriteAggregatesNoGround
+            cyclic_strategy = CyclicStrategy.ASSUME_TIGHT
+            ground_guess = False
+
+            regression_test_strategy_string = "Checking Aggregates "
+
+            if self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS_STAR:
+                aggregate_modes = [
+                    ("RS-STAR", AggregateMode.RS_STAR)
+                ]
+                regression_test_strategy_string += "with RS-STAR strategy"
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS_PLUS:
+                aggregate_modes = [
+                    ("RS-PLUS", AggregateMode.RS_PLUS)
+                ]
+                regression_test_strategy_string += "with RS-PLUS strategy"
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS:
+                aggregate_modes = [
+                    ("RS", AggregateMode.RS)
+                ]
+                regression_test_strategy_string += "with RS strategy"
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RA:
+                aggregate_modes = [
+                    ("RA", AggregateMode.RA)
+                ]
+                regression_test_strategy_string += "with RA strategy"
+            elif self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RECURSIVE:
+                aggregate_modes = [
+                    ("RECURSIVE", AggregateMode.RECURSIVE)
+                ]
+                regression_test_strategy_string += "with Recursive strategy"
+
 
         elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_TIGHT or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_SHARED_CYCLE or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS: 
             aggregate_modes = [("RA", AggregateMode.RA)]
             grounding_mode = GroundingModes.RewriteAggregatesGroundPartly
             ground_guess = False
 
+            regression_test_strategy_string = "Checking HybridGrounding with partly rewriting "
+
             if self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_TIGHT:
                 cyclic_strategy = CyclicStrategy.ASSUME_TIGHT
+                regression_test_strategy_string += " with the assumption of tight programs."
             elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_SHARED_CYCLE:
                 cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+                regression_test_strategy_string += " with the rewriting-shared-cycle strategy for normal programs."
             elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI:
                 cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
+                regression_test_strategy_string += " with the level-mappings rewriting 1."
             elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS:
                 cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
+                regression_test_strategy_string += " with the level-mappings rewriting 2."
 
         elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_TIGHT or  self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE or self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI or self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS:
         
@@ -135,22 +162,26 @@ class EquivChecker:
             grounding_mode = GroundingModes.RewriteAggregatesGroundFully
             ground_guess = True
 
+            regression_test_strategy_string = "Checking HybridGrounding with fully rewriting "
+
             if self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_TIGHT:
                 cyclic_strategy = CyclicStrategy.ASSUME_TIGHT
+                regression_test_strategy_string += " with the assumption of tight programs."
             elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE:
                 cyclic_strategy = CyclicStrategy.SHARED_CYCLE_BODY_PREDICATES
+                regression_test_strategy_string += " with the rewriting-shared-cycle strategy for normal programs."
             elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI:
                 cyclic_strategy = CyclicStrategy.LEVEL_MAPPING_AAAI
+                regression_test_strategy_string += " with the level-mappings rewriting 1."
             elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS:
                 cyclic_strategy = CyclicStrategy.LEVEL_MAPPING
+                regression_test_strategy_string += " with the level-mappings rewriting 2."
         else:
             raise Exception("REGRESSION TEST STRATEGY NOT IMPLEMENTED")
 
-        if grounding_mode == GroundingModes.RewriteAggregatesNoGround:
-            print("-----------------------")
-            print(">>>> WARNING: Grounding mode is RewriteAggregateNoGround")
-            print("-----------------------")
-            print(">>>> Therefore only aggregate rewriting is checked without HybridGrounding!")
+        print("<<<<<<<<<<>>>>>>>>>>")
+        print(f"---- {regression_test_strategy_string} ----")
+        print("<<<<<<<<<<>>>>>>>>>>")
 
         works = True
         no_show = False
@@ -159,19 +190,9 @@ class EquivChecker:
 
             print(f"[INFO] Checking current test with aggregate strategy: {aggregate_mode[0]}")
 
-            """ 
-            ctl = clingo.Control()
-            ctl.configuration.solve.models = 0
-            ctl.add('base',[], instance_file_contents + encoding_file_contents)
-            ctl.ground([('base',[])], context=Context())
-            ctl.solve(on_model=lambda m: self.on_model(m, self.clingo_output, self.clingo_hashes))
-            """
-
             combined_file_input = instance_file_contents + encoding_file_contents
             total_content = instance_file_contents + "\n#program rules.\n" + encoding_file_contents
             self.start_clingo(combined_file_input, self.clingo_output, self.clingo_hashes)
-
-
 
             custom_printer = CustomOutputPrinter()
 
@@ -179,15 +200,6 @@ class EquivChecker:
             hybrid_grounding.start(total_content)
             
             self.start_clingo(custom_printer.get_string(), self.hybrid_grounding_output, self.hybrid_grounding_hashes)
-
-            """
-            ctl2 = clingo.Control()
-            ctl2.configuration.solve.models = 0
-            ctl2.add('base',[], custom_printer.get_string())
-            ctl2.ground([('base',[])], context=Context())
-            ctl2.solve(on_model=lambda m: self.on_model(m, self.hybrid_grounding_output, self.hybrid_grounding_hashes))
-            """
-
 
             if not one_directional_equivalence and len(self.clingo_output) != len(self.hybrid_grounding_output):
                 works = False
