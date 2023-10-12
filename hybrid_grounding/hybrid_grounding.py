@@ -11,7 +11,6 @@ from .cyclic_strategy import CyclicStrategy
 from .main_transformer_helpers.level_mappings_part import LevelMappingsPart
 from .grounding_modes import GroundingModes
 
-import matplotlib as plt
 import networkx as nx
 
 class HybridGrounding:
