@@ -2,7 +2,7 @@
 class HelperPart:
 
     @classmethod
-    def get_domain_values_from_rule_variable(cls, rule, variable, domain, safe_variables_rules):
+    def get_domain_values_from_rule_variable(cls, rule, variable, domain, safe_variables_rules, rule_variables_predicates = {}):
         """ 
             Provided a rule number and a variable in that rule, one gets the domain of this variable.
             If applicable it automatically calculates the intersection of different domains.
@@ -15,6 +15,27 @@ class HelperPart:
         possible_domain_value_name = f"term_rule_{str(rule)}_variable_{str(variable)}"
         if possible_domain_value_name in domain:
             return domain[possible_domain_value_name]['0']
+        
+        if len(rule_variables_predicates.keys()) > 0:
+            if variable in rule_variables_predicates:
+                respective_predicates = rule_variables_predicates[variable]
+                total_domain = None
+                for respective_predicate in respective_predicates:
+                    respective_predicate_name = respective_predicate[0].name 
+                    respective_predicate_position = respective_predicate[1]
+
+                    if respective_predicate_name not in domain or str(respective_predicate_position) not in domain[respective_predicate_name]:
+                        continue
+
+                    cur_domain = domain[respective_predicate_name][str(respective_predicate_position)]
+
+                    if total_domain:
+                        total_domain = total_domain.intersection(set(cur_domain))
+                    else:
+                        total_domain = set(cur_domain)
+
+                if total_domain is not None:
+                    return list(total_domain)
 
         if str(rule) not in safe_variables_rules:
             return domain["0_terms"]

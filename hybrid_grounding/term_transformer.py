@@ -19,7 +19,7 @@ class TermTransformer(Transformer):
         self.ng_heads = {}
         self.ng = False
         self.show = False
-        self.shows = {}
+        self.shown_predicates = {}
         self.no_show = no_show
         self.printer = printer
 
@@ -296,12 +296,11 @@ class TermTransformer(Transformer):
 
         self.current_function = node
 
-        # shows
         #if not str(node.name).startswith('_dom_'):
-        if node.name in self.shows:
-            self.shows[node.name].add(len(node.arguments))
+        if node.name in self.shown_predicates:
+            self.shown_predicates[node.name].add(len(node.arguments))
         else:
-            self.shows[node.name] = {len(node.arguments)}
+            self.shown_predicates[node.name] = {len(node.arguments)}
 
         self.visit_children(node)
 

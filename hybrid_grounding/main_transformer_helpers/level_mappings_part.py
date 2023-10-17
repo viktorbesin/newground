@@ -54,7 +54,11 @@ class LevelMappingsPart:
                     arguments = []
                     for arg_index in range(len(item.arguments)):
                         arguments.append(Function("X" + str(arg_index)))
-                    new_scc.append(Function(name=head_name,arguments=arguments))
+                    
+                    if len(arguments) > 0:
+                        new_scc.append(Function(name=head_name,arguments=arguments))
+                    else:
+                        new_scc.append(Function(name=head_name))
 
                 scc = new_scc
 
@@ -127,7 +131,11 @@ class LevelMappingsPart:
                 dom_list.append(domain_dict[str(index)])
         else:
             for argument in predicate.arguments:
-                dom_list.append(self.domain_lookup_dict["0_terms"])
+                
+                if "0_terms" in self.domain_lookup_dict:
+                    dom_list.append(self.domain_lookup_dict["0_terms"])
+                else:
+                    dom_list.append([])
 
     def generate_ground_transitivity(self, scc, index_1, index_2, index_3):
         
@@ -194,8 +202,24 @@ class LevelMappingsPart:
         self.generate_domain_for_predicate(generated_domains, p2)
         self.generate_domain_for_predicate(generated_domains, p3)
 
-        domain_body = f"{','.join(doms1)}, {','.join(doms2)}, {','.join(doms3)}"
-        self.printer.custom_print(f":- {domain_body}, prec({predicate_1},{predicate_2}), prec({predicate_2},{predicate_3}), prec({predicate_3},{predicate_1}).")
+        if len(doms1) > 0 and len(doms2) > 0 and len(doms3) > 0:
+            domain_body = f" {','.join(doms1)}, {','.join(doms2)}, {','.join(doms3)}, "
+        elif len(doms1) > 0 and len(doms2) > 0:
+            domain_body = f" {','.join(doms1)}, {','.join(doms2)}, "
+        elif len(doms1) > 0 and len(doms3) > 0:
+            domain_body = f" {','.join(doms1)}, {','.join(doms3)}, "
+        elif len(doms2) > 0 and len(doms3) > 0:
+            domain_body = f" {','.join(doms2)}, {','.join(doms3)}, "
+        elif len(doms1) > 0:
+            domain_body = f" {','.join(doms1)}, "
+        elif len(doms2) > 0:
+            domain_body = f" {','.join(doms2)}, "
+        elif len(doms3) > 0:
+            domain_body = f" {','.join(doms3)}, "
+        else:
+            domain_body = f" "
+
+        self.printer.custom_print(f":-{domain_body}prec({predicate_1},{predicate_2}), prec({predicate_2},{predicate_3}), prec({predicate_3},{predicate_1}).")
 
     def generate_non_ground_precs(self, generated_domains, scc, index_1, index_2):
         p1 = scc[index_1]
@@ -207,9 +231,17 @@ class LevelMappingsPart:
         self.generate_domain_for_predicate(generated_domains, p1)
         self.generate_domain_for_predicate(generated_domains, p2)
 
-        body = f"{','.join(doms1)}, {','.join(doms2)}"
+        if len(doms1) > 0 and len(doms2) > 0:
+            body = f" :- {','.join(doms1)}, {','.join(doms2)}."
+        elif len(doms1) > 0:
+            body = f" :- {','.join(doms1)}."
+        elif len(doms2) > 0:
+            body = f" :- {','.join(doms2)}."
+        else:
+            body = "."
 
-        self.printer.custom_print(f"1 <= {{prec({predicate_1},{predicate_2});prec({predicate_2},{predicate_1})}} <= 1 :- {body}.")
+    
+        self.printer.custom_print(f"1 <= {{prec({predicate_1},{predicate_2});prec({predicate_2},{predicate_1})}} <= 1{body}")
 
     def generate_doms_predicate(self, predicate, string_postfix):
         doms = []
@@ -225,7 +257,12 @@ class LevelMappingsPart:
                 doms.append(f"dom({variable_name})")
 
             index += 1
-        string_predicate = predicate.name + "(" + ",".join(new_variables_predicate) + ")"
+
+        if len(new_variables_predicate) > 0:
+            string_predicate = predicate.name + "(" + ",".join(new_variables_predicate) + ")"
+        else:
+            string_predicate = predicate.name
+
         return doms,string_predicate
 
     def generate_domain_for_predicate(self, generated_domains, predicate):

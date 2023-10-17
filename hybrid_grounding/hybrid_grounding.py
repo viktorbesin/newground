@@ -33,7 +33,7 @@ class HybridGrounding:
 
         domain, safe_variables, term_transformer, rule_strongly_connected_comps, predicates_strongly_connected_comps, rule_strongly_connected_comps_heads, scc_rule_functions_scc_lookup  = self.start_domain_inference(contents)
 
-        if "0_terms" not in domain:
+        if "0_terms" not in domain and len(domain.keys()) > 0:
             # No domain could be inferred, therefore return nothing.
             return
 
@@ -91,7 +91,7 @@ class HybridGrounding:
         ctl = Control()
         with ProgramBuilder(ctl) as program_builder:
             transformer = MainTransformer(program_builder, term_transformer.terms, term_transformer.facts,
-                                          term_transformer.ng_heads, term_transformer.shows,
+                                          term_transformer.ng_heads, term_transformer.shown_predicates,
                                           self.ground_guess, self.output_printer,
                                           domain, safe_variables, self.aggregate_mode,
                                           rule_strongly_connected_comps,
@@ -106,9 +106,7 @@ class HybridGrounding:
             level_mappings_part = LevelMappingsPart(self.output_printer, domain, predicates_strongly_connected_comps, self.ground_guess, self.cyclic_strategy, scc_rule_functions_scc_lookup)
             level_mappings_part.generate_level_mappings()
 
-            if len(transformer.non_ground_rules.keys()) > 0:
-
-
+            if len(transformer.non_ground_rules.keys()) > 0 or len(transformer.shown_predicates.keys()) > 0:
                 self.global_main_transformations(program_builder, transformer, term_transformer)
 
     def global_main_transformations(self, program_builder, transformer, term_transformer):
@@ -122,7 +120,10 @@ class HybridGrounding:
             sat_strings.append(f"sat_r{non_ground_rule_key}")
 
 
-        self.output_printer.custom_print(f"sat :- {','.join(sat_strings)}.")
+        if len(sat_strings) > 0:
+            self.output_printer.custom_print(f"sat :- {','.join(sat_strings)}.")
+        else:
+            self.output_printer.custom_print(f"sat.")
 
         additional_foundedness_set = set(transformer.additional_foundedness_part)
         for additional_rule in additional_foundedness_set:
@@ -155,8 +156,8 @@ class HybridGrounding:
 
         if not self.no_show:
             if not term_transformer.show:
-                for f in transformer.shows.keys():
-                    for l in transformer.shows[f]:
+                for f in transformer.shown_predicates.keys():
+                    for l in transformer.shown_predicates[f]:
                         self.output_printer.custom_print(f"#show {f}/{l}.")
 
     def compute_scc_data_structures(self, term_transformer):
@@ -169,6 +170,7 @@ class HybridGrounding:
         scc_rule_functions_scc_lookup = {}
 
         for strongly_connected_comp in strongly_connected_comps:
+
             if len(strongly_connected_comp) > 1:
                 occurs_in_pi_t = False
                 occurs_in_pi_c = False
@@ -261,6 +263,7 @@ class HybridGrounding:
                             rule_head_strongly_connected_comps[rule] += relevant_heads
 
                 strongly_connected_comps_counter += 1
+
         return predicates_strongly_connected_comps,rule_strongly_connected_comps,rule_head_strongly_connected_comps,scc_rule_functions_scc_lookup
        
 

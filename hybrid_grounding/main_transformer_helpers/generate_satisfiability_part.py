@@ -9,7 +9,7 @@ from .helper_part import HelperPart
 
 class GenerateSatisfiabilityPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, rule_variables_predicates): 
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -20,6 +20,7 @@ class GenerateSatisfiabilityPart:
         self.rule_comparisons = rule_comparisons
         self.rule_literals = rule_literals
         self.rule_literals_signums = rule_literals_signums
+        self.rule_variables_predicates = rule_variables_predicates
 
 
     def generate_sat_part(self):
@@ -37,7 +38,7 @@ class GenerateSatisfiabilityPart:
         # domaining per rule variable
         for variable in self.rule_variables: # variables
 
-            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
+            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules, self.rule_variables_predicates) 
 
             disjunction = ""
 
@@ -76,7 +77,7 @@ class GenerateSatisfiabilityPart:
             for variable in vars:
                 if str(self.current_rule_position) in self.safe_variables_rules and variable in self.safe_variables_rules[str(self.current_rule_position)]:
 
-                    domain = HelperPart.get_domain_values_from_rule_variable(str(self.current_rule_position), variable, self.domain_lookup_dict, self.safe_variables_rules)
+                    domain = HelperPart.get_domain_values_from_rule_variable(str(self.current_rule_position), variable, self.domain_lookup_dict, self.safe_variables_rules, self.rule_variables_predicates)
                         
                     dom_list.append(domain)
                 else:
@@ -143,7 +144,7 @@ class GenerateSatisfiabilityPart:
             dom_list = []
             index = 0
             for variable in current_function_variables:
-                values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules, self.rule_variables_predicates) 
                 dom_list.append(values)
                 variable_associations[variable] = index
                 index += 1

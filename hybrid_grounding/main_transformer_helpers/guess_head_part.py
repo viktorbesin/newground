@@ -12,7 +12,7 @@ from ..cyclic_strategy import CyclicStrategy
 
 class GuessHeadPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy,predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_literals, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy,predicates_strongly_connected_comps, scc_rule_functions_scc_lookup, rule_variables_predicates):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -30,6 +30,7 @@ class GuessHeadPart:
         self.cyclic_strategy = cyclic_strategy
         self.predicates_strongly_connected_comps = predicates_strongly_connected_comps
         self.scc_rule_functions_scc_lookup = scc_rule_functions_scc_lookup
+        self.rule_variables_predicates = rule_variables_predicates
                  
     def guess_head(self):
 
@@ -37,7 +38,10 @@ class GuessHeadPart:
         #new_head_name = f"{self.rule_head.name}'"
         new_arguments = ",".join([str(argument) for argument in self.rule_head.arguments])
 
-        new_head = f"{new_head_name}({new_arguments})"
+        if len(new_arguments) > 0:
+            new_head = f"{new_head_name}({new_arguments})"
+        else:
+            new_head = f"{new_head_name}"
 
         if self.ground_guess:  
             self.do_ground_guess(new_head_name)
@@ -45,7 +49,11 @@ class GuessHeadPart:
             self.non_ground_guess(new_head_name, new_head)
             
         if self.current_rule in self.scc_rule_functions_scc_lookup:
-            new_head_func = Function(name=new_head_name,arguments=[Function(str(f"X{index}")) for index in range(len(self.rule_head.arguments))])
+            if len(new_arguments) > 0:
+                new_head_func = Function(name=new_head_name,arguments=[Function(str(f"X{index}")) for index in range(len(self.rule_head.arguments))])
+            else:
+                new_head_func = Function(name=new_head_name)
+
             self.scc_rule_functions_scc_lookup[self.current_rule]['head'].append(new_head_func)
 
     def do_ground_guess(self, new_head_name):
@@ -55,7 +63,7 @@ class GuessHeadPart:
             for predicate in self.rule_strongly_connected_components[self.current_rule]:
                 for argument in [str(argument) for argument in predicate.arguments]:
                     if argument in self.rule_variables:
-                        body_dom_dict[argument] = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, argument, self.domain_lookup_dict, self.safe_variables_rules)
+                        body_dom_dict[argument] = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, argument, self.domain_lookup_dict, self.safe_variables_rules, self.rule_variables_predicates)
                     else:
                         body_dom_dict[argument] = [argument]
 
@@ -113,7 +121,7 @@ class GuessHeadPart:
                 continue
 
             if str(argument) in self.rule_variables:
-                head_dom_dict[argument] = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, argument, self.domain_lookup_dict, self.safe_variables_rules)
+                head_dom_dict[argument] = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, argument, self.domain_lookup_dict, self.safe_variables_rules, self.rule_variables_predicates)
             else:
                 head_dom_dict[argument] = [argument]
 

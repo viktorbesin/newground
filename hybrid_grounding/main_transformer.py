@@ -14,7 +14,7 @@ from .aggregate_transformer import AggregateMode
 from .cyclic_strategy import CyclicStrategy
 
 class MainTransformer(Transformer):  
-    def __init__(self, bld, terms, facts, ng_heads, shows, ground_guess, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
+    def __init__(self, bld, terms, facts, ng_heads, shown_predicates, ground_guess, printer, domain, safe_variables_rules, aggregate_mode, rule_strongly_restricted_components, cyclic_strategy, rule_strongly_connected_comps_heads, predicates_strongly_connected_comps, scc_rule_functions_scc_lookup):
                                           
         self.program_rules = False
         self.program_count = False
@@ -41,10 +41,11 @@ class MainTransformer(Transformer):
 
         self.rule_anonymous_variables = 0
         self.rule_variables = []
+        self.rule_variables_predicates = {}
         self.rule_predicate_functions = []
         self.rule_literals_signums = []
         self.rule_comparisons = []
-        self.shows = shows
+        self.shown_predicates = shown_predicates
         self.foundness ={}
         self.f = {}
         self.counter = 0
@@ -55,6 +56,8 @@ class MainTransformer(Transformer):
 
         self.current_rule = None
         self.current_comparison = None
+        self.current_predicate = None
+        self.current_predicate_variable_position = 0
 
         self.unfounded_rules = {}
         self.current_rule_position = 0
@@ -71,6 +74,10 @@ class MainTransformer(Transformer):
         self.rule_comparisons = []
         self.rule_anonymous_variables = 0
         self.rule_is_non_ground = False
+        self.rule_variables_predicates = {}
+
+        self.current_predicate = None
+        self.current_predicate_variable_position = 0
 
     def visit_Minimize(self, node):
         self.printer.custom_print(f"{str(node)}")
@@ -83,10 +90,13 @@ class MainTransformer(Transformer):
             self._reset_after_rule()
             if self.cyclic_strategy not in [CyclicStrategy.LEVEL_MAPPING, CyclicStrategy.LEVEL_MAPPING_AAAI]:
                 self._outputNodeFormatConform(node)
+                self.current_rule_position += 1
+                return node
             elif self.cyclic_strategy in [CyclicStrategy.LEVEL_MAPPING, CyclicStrategy.LEVEL_MAPPING_AAAI]:
                 if node in self.rule_strongly_restricted_components:
                     self._outputNodeFormatConformLevelMappings(node, self.rule_strongly_connected_components_heads[node], self.rule_strongly_restricted_components[node])
                     if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING_AAAI:
+                        self.current_rule_position += 1
                         return node
                     else:
                         #NO-RETURN -> Need for additional foundedness checks
@@ -107,6 +117,12 @@ class MainTransformer(Transformer):
 
         if self.rule_is_non_ground:
             # if so: handle grounding
+
+            if len(self.domain.keys()) == 0:
+                self._reset_after_rule()
+                self.current_rule_position += 1
+                return node
+
             if self.program_rules:
                 self.non_ground_rules[self.current_rule_position] = self.current_rule_position
                 
@@ -123,7 +139,9 @@ class MainTransformer(Transformer):
                                                                       self.rule_variables,
                                                                       self.rule_comparisons,
                                                                       self.rule_predicate_functions,
-                                                                      self.rule_literals_signums)
+                                                                      self.rule_literals_signums,
+                                                                      self.rule_variables_predicates,
+                                                                      )
                 satisfiability_generator.generate_sat_part()
 
             if head is not None:
@@ -143,7 +161,8 @@ class MainTransformer(Transformer):
                                                                       self.unfounded_rules,
                                                                       self.cyclic_strategy,
                                                                       self.predicates_strongly_connected_comps,
-                                                                      self.scc_rule_functions_scc_lookup
+                                                                      self.scc_rule_functions_scc_lookup,
+                                                                      self.rule_variables_predicates,
                                                                       )
                     guess_head_generator.guess_head()
 
@@ -162,7 +181,9 @@ class MainTransformer(Transformer):
                                                                   self.cyclic_strategy,
                                                                   self.rule_strongly_connected_components_heads,
                                                                   self.program_rules,
-                                                                  self.additional_foundedness_part)
+                                                                  self.additional_foundedness_part,
+                                                                  self.rule_variables_predicates,
+                                                                  )
                 foundedness_generator.generate_foundedness_part()
 
         else: # found-check for ground-rules (if needed) (pred, arity, combinations, rule, indices)
@@ -205,29 +226,45 @@ class MainTransformer(Transformer):
     def visit_Function(self, node):
 
         if not self.current_comparison:
-            # shows
-            if node.name in self.shows:
-                self.shows[node.name].add(len(node.arguments))
+            self.current_predicate = node
+            if node.name in self.shown_predicates:
+                self.shown_predicates[node.name].add(len(node.arguments))
             else:
-                self.shows[node.name] = {len(node.arguments)}
+                self.shown_predicates[node.name] = {len(node.arguments)}
 
             node = node.update(**self.visit_children(node))
             self.rule_predicate_functions.append(node)
+            self.current_predicate = None
+            self.current_predicate_variable_position = 0
 
         return node
 
     def visit_Variable(self, node):
         self.rule_is_non_ground = True
-        if (str(node) not in self.rule_variables) and str(node) not in self.terms:
-            self.rule_variables.append(str(node))
+    
+        if str(node) == '_':
+            to_add_variable = f"Anon{self.rule_anonymous_variables}"
+            node = node.update(name=to_add_variable)
+            self.rule_anonymous_variables += 1
+        else:
+            to_add_variable = str(node)
 
-            if str(node) == '_':
-                node = node.update(name=f"Anon{self.rule_anonymous_variables}")
-                self.rule_anonymous_variables += 1
+        if (str(node) not in self.rule_variables) and str(node) not in self.terms:
+            self.rule_variables.append(to_add_variable)
+
+        if self.current_predicate is not None:
+            if to_add_variable not in self.rule_variables_predicates:
+                self.rule_variables_predicates[to_add_variable] = [] 
+            self.rule_variables_predicates[to_add_variable].append((self.current_predicate, self.current_predicate_variable_position))
+            
+            self.current_predicate_variable_position += 1
 
         return node
 
     def visit_SymbolicTerm(self, node):
+        if self.current_predicate is not None:
+            self.current_predicate_variable_position += 1
+            
         return node
 
     def visit_Program(self, node):
@@ -429,7 +466,10 @@ class MainTransformer(Transformer):
                     new_head_name = f"{rule_head.name}"
                 
                 new_arguments = ",".join([str(argument) for argument in rule_head.arguments])
-                new_head_string = f"{new_head_name}({new_arguments})"
+                if len(new_arguments) > 0:
+                    new_head_string = f"{new_head_name}({new_arguments})"
+                else:
+                    new_head_string = f"{new_head_name}"
 
                 if self.cyclic_strategy == CyclicStrategy.LEVEL_MAPPING:
                     new_head_func = Function(name=new_head_name,arguments=[Function(str(arg_)) for arg_ in rule_head.arguments])

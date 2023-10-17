@@ -14,7 +14,7 @@ from ..cyclic_strategy import CyclicStrategy
 
 class GenerateFoundednessPart:
 
-    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads, program_rules, additional_unfounded_rules):
+    def __init__(self, rule_head, current_rule_position, custom_printer, domain_lookup_dict, safe_variables_rules, rule_variables, rule_comparisons, rule_predicate_functions, rule_literals_signums, current_rule, strongly_connected_components, ground_guess, unfounded_rules, cyclic_strategy, strongly_connected_components_heads, program_rules, additional_unfounded_rules, rule_variables_predicates):
 
         self.rule_head = rule_head
         self.current_rule_position = current_rule_position
@@ -32,6 +32,7 @@ class GenerateFoundednessPart:
         self.cyclic_strategy = cyclic_strategy
         self.rule_strongly_restricted_components_heads = strongly_connected_components_heads
         self.program_rules = program_rules
+        self.rule_variables_predicates = rule_variables_predicates
 
         self.additional_unfounded_rules = additional_unfounded_rules
 
@@ -44,8 +45,13 @@ class GenerateFoundednessPart:
         h_vars = list(dict.fromkeys(
             [a for a in h_args if a in self.rule_variables]))  # which have to be grounded per combination
 
-        variables_not_in_head = [v for v in self.rule_variables if
-               v not in h_vars]  # remaining variables not included in head atom (without facts)
+
+        variables_not_in_head = []
+        for variable in self.rule_variables:
+            if variable != "_" and variable not in h_vars:
+                variables_not_in_head.append(variable)
+        #variables_not_in_head = [v for v in self.rule_variables if
+        #       v not in h_vars]  # remaining variables not included in head atom (without facts)
 
         g_r = {}
 
@@ -109,7 +115,7 @@ class GenerateFoundednessPart:
             dom_list_lookup = {}
             index = 0
             for variable in reachable_head_variables_from_not_head_variable[not_head_variable]:
-                not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
                 dom_list.append(not_head_variable_values)
                 dom_list_lookup[variable] = index
 
@@ -137,14 +143,14 @@ class GenerateFoundednessPart:
                         if variable in reachable_head_variables_from_not_head_variable[not_head_variable]:
                             remaining_head_values.append(combination[dom_list_lookup[variable]])
                     
-                    not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                    not_head_variable_values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules, self.rule_variables_predicates) 
 
                     not_variable_interpretations = []
                     for value in not_head_variable_values:
 
                         name = f"r{self.current_rule_position}f_{not_head_variable}"
-                        if length_of_head_arguments > 0:
-                            arguments = f"({value}{','.join(remaining_head_values)})"
+                        if len(remaining_head_values) > 0:
+                            arguments = f"({value},{','.join(remaining_head_values)})"
                         else:
                             arguments = f"({value})"
 
@@ -167,7 +173,7 @@ class GenerateFoundednessPart:
 
                         index = 0
                         for variable in not_reached_head_variables:
-                            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
                             dom_list.append(values)
                             dom_list_lookup[variable] = index
                             index += 1
@@ -238,9 +244,9 @@ class GenerateFoundednessPart:
             head_tuple_interpretation = ','.join(head_tuple_list)
             head_interpretation += f"({head_tuple_interpretation})"
 
-        if str(self.current_rule_position) in self.safe_variables_rules and str(not_head_variable) in self.safe_variables_rules[str(self.current_rule_position)]:
+        if str(self.current_rule_position) in self.safe_variables_rules and (str(not_head_variable) in self.safe_variables_rules[str(self.current_rule_position)] or str(not_head_variable) in self.rule_variables_predicates):
 
-            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules) 
+            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, not_head_variable, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
             for value in values:
                 self.printer.custom_print(f"domain_rule_{self.current_rule_position}_variable_{not_head_variable}({value}).")
 
@@ -261,13 +267,18 @@ class GenerateFoundednessPart:
         """
 
         rem_tuple_list = [not_head_variable] + partly_head_tuple_list
-        rem_tuple_interpretation = ','.join(rem_tuple_list)
+
+        if len(rem_tuple_list) > 0:
+            rem_tuple_list = [item for item in rem_tuple_list if len(item) > 0]
+            rem_tuple_interpretation = f"({','.join(rem_tuple_list)})"
+        else:
+            rem_tuple_interpretation = f""
 
 
         if len(graph_variable_dict[not_head_variable]) == 0:
-            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}({rem_tuple_interpretation}):{domain_string}}}<=1.")
+            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}{rem_tuple_interpretation}:{domain_string}}}<=1.")
         else:
-            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}({rem_tuple_interpretation}):{domain_string}}}<=1 :- {head_interpretation}.")
+            self.printer.custom_print(f"1<={{r{self.current_rule_position}f_{not_head_variable}{rem_tuple_interpretation}:{domain_string}}}<=1 :- {head_interpretation}.")
 
 
 
@@ -303,7 +314,7 @@ class GenerateFoundednessPart:
             dom_list = []
             index = 0
             for variable in combination_variables:
-                values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
                 dom_list.append(values)
                 associated_variables[variable] = index
                 index = index + 1
@@ -328,9 +339,13 @@ class GenerateFoundednessPart:
 
                 for f_arg in arguments:
                     if f_arg in h_vars and f_arg in f_vars_needed: # Variables in head
-                        body_combination[f_arg] = head_combination[f_arg]
+                        associated_index = associated_variables[f_arg]
+                        body_combination[f_arg] = combination[associated_index]
+                        #body_combination[f_arg] = head_combination[f_arg]
                     elif f_arg in f_vars: # Not in head variables
-                        body_combination[f_arg] = (combination[not_head_counter])
+                        associated_index = associated_variables[f_arg]
+                        body_combination[f_arg] = combination[associated_index]
+                        #body_combination[f_arg] = (combination[not_head_counter])
                         not_head_counter += 1
                     else: # Static
                         body_combination[f_arg] = f_arg 
@@ -380,7 +395,7 @@ class GenerateFoundednessPart:
                 dom_list_2 = []
                 for arg in h_args:
                     if arg in h_vars and arg not in head_combination: 
-                        values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, arg, self.domain_lookup_dict, self.safe_variables_rules) 
+                        values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, arg, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
                         dom_list_2.append(values)
                     elif arg in h_vars and arg in head_combination:
                         dom_list_2.append([head_combination[arg]])
@@ -406,6 +421,7 @@ class GenerateFoundednessPart:
     def _generate_foundedness_functions(self, head, rem, h_vars, h_args, g, covered_subsets):
         # -------------------------------------------
         # over every body-atom
+
         for rule_predicate_function in self.rule_literals:
             if rule_predicate_function != head:
 
@@ -423,7 +439,7 @@ class GenerateFoundednessPart:
                 dom_list = []
                 index = 0
                 for variable in f_vars_needed + f_rem:
-                    values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules) 
+                    values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, variable, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
                     dom_list.append(values)
                     associated_variables[variable] = index
                     index += 1
@@ -437,12 +453,18 @@ class GenerateFoundednessPart:
                     # ---------
                     body_combination = {}
 
+
                     for f_arg in f_args:
                         if f_arg in h_vars and f_arg in f_vars_needed: # Variables in head
-                            body_combination[f_arg] = head_combination[f_arg]
+                            associated_index = associated_variables[f_arg]
+                            body_combination[f_arg] = combination[associated_index]
+                            #body_combination[f_arg] = head_combination[f_arg]
                         elif f_arg in f_vars: # Not in head variables
-                            body_combination[f_arg] = (combination[not_head_counter])
-                            not_head_counter += 1
+                            if f_arg in associated_variables:
+                                associated_index = associated_variables[f_arg]
+                                body_combination[f_arg] = combination[associated_index]
+                            else:
+                                body_combination[f_arg] = f_arg
                         else: # Static
                             body_combination[f_arg] = f_arg 
 
@@ -517,12 +539,21 @@ class GenerateFoundednessPart:
                                 new_head_name = f"{head.name}{self.current_rule_position}"
                                 #new_head_name = f"{head.name}'"
 
-                                head_predicate = f"{new_head_name}({','.join(full_head_args)})"
+                                full_head_args = [argument for argument in full_head_args if argument != ""]
+                                if len(full_head_args) > 0:
+                                    head_predicate = f"{new_head_name}({','.join(full_head_args)})"
+                                else:
+                                    head_predicate = f"{new_head_name}"
+
                                 unfound_level_mapping = f"{unfound_atom} :-{unfound_body} not prec({unfound_predicate},{head_predicate})."
                                 self.printer.custom_print(unfound_level_mapping)
 
-                                original_head_predicate = f"{head.name}({','.join(full_head_args)})"
+                                if len(full_head_args) > 0:
+                                    original_head_predicate = f"{head.name}({','.join(full_head_args)})"
+                                else:
+                                    original_head_predicate = f"{head.name}"
 
+                                unfound_predicate_args = [argument for argument in unfound_predicate_args if argument != "_"]
                                 if len(unfound_predicate_args) > 0:
                                     new_unfound_atom = f"r{self.current_rule_position}_{self.current_rule_position}_unfound({','.join(unfound_predicate_args)})"
                                 else:
@@ -537,7 +568,7 @@ class GenerateFoundednessPart:
                     dom_list_2 = []
                     for arg in h_args:
                         if arg in h_vars and arg not in head_combination: 
-                            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, arg, self.domain_lookup_dict, self.safe_variables_rules) 
+                            values = HelperPart.get_domain_values_from_rule_variable(self.current_rule_position, arg, self.domain_lookup_dict, self.safe_variables_rules,self.rule_variables_predicates) 
                             dom_list_2.append(values)
                         elif arg in h_vars and arg in head_combination:
                             dom_list_2.append([head_combination[arg]])
