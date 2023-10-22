@@ -103,7 +103,7 @@ class EquivChecker:
         regression_test_strategy_string = ""
 
         if self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS_STAR or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS_PLUS or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RS or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RA or self.chosenRegressiontestMode == RegressionTestStrategy.AGGREGATES_RECURSIVE:
-            grounding_mode = GroundingModes.RewriteAggregatesNoGround
+            grounding_mode = GroundingModes.REWRITE_AGGREGATES_NO_GROUND
             cyclic_strategy = CyclicStrategy.ASSUME_TIGHT
             ground_guess = False
 
@@ -138,7 +138,7 @@ class EquivChecker:
 
         elif self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_TIGHT or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_SHARED_CYCLE or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS_AAAI or self.chosenRegressiontestMode == RegressionTestStrategy.REWRITING_LEVEL_MAPPINGS: 
             aggregate_modes = [("RA", AggregateMode.RA)]
-            grounding_mode = GroundingModes.RewriteAggregatesGroundPartly
+            grounding_mode = GroundingModes.REWRITE_AGGREGATES_GROUND_PARTLY
             ground_guess = False
 
             regression_test_strategy_string = "Checking HybridGrounding with partly rewriting "
@@ -159,7 +159,7 @@ class EquivChecker:
         elif self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_TIGHT or  self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_SHARED_CYCLE or self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS_AAAI or self.chosenRegressiontestMode == RegressionTestStrategy.FULLY_GROUNDED_LEVEL_MAPPINGS:
         
             aggregate_modes = [("RA", AggregateMode.RA)]
-            grounding_mode = GroundingModes.RewriteAggregatesGroundFully
+            grounding_mode = GroundingModes.REWRITE_AGGREGATES_GROUND_FULLY
             ground_guess = True
 
             regression_test_strategy_string = "Checking HybridGrounding with fully rewriting "
