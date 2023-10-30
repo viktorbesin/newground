@@ -1,4 +1,4 @@
-Welcome to hybrid-grounding's documentation!
+Installation Guide
 ============================================
 
 Installation Guide

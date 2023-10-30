@@ -1,5 +1,5 @@
-hybrid_grounding
-================
+Hybrid Grounding Code Documentation
+===================================
 
 .. toctree::
    :maxdepth: 4

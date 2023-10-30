@@ -3,6 +3,7 @@
 The comparison tools module is used as a helper module,
 for various parts of the transformer.
 It is useful for domain inference, instantiations, calculations, etc.
+
 """
 
 import clingo
@@ -13,13 +14,15 @@ class ComparisonTools:
     The comparison tools module is used as a helper module,
     for various parts of the transformer.
     It is useful for domain inference, instantiations, calculations, etc.
+
     """
 
     @classmethod
     def get_comp_operator(cls, comp):
         """
-        @comp - The AST representation of the comparison operator.
-        returns the string representation (or false, if not implemented).
+        Returns the string representation (or false, if not implemented).
+
+        :comp: The AST representation of the comparison operator.
         """
         if comp is int(clingo.ast.ComparisonOperator.Equal):
             return "="
@@ -39,10 +42,11 @@ class ComparisonTools:
     @classmethod
     def comparison_handlings(cls, comp, c1, c2):
         """
-        @comp - The AST representation of the comparison operator.
-        @c1 - The left side of the comparison (AST).
-        @c2 - The right side of the comparison (AST).
-        returns a string representation of the comparison operation (or false if not implemented).
+        Returns a string representation of the comparison operation (or false if not implemented).
+
+        :comp: The AST representation of the comparison operator.
+        :c1: The left side of the comparison (AST).
+        :c2: The right side of the comparison (AST).
         """
         if comp is int(clingo.ast.ComparisonOperator.Equal):
             return f"{c1} = {c2}"
@@ -62,10 +66,11 @@ class ComparisonTools:
     @classmethod
     def compare_terms(cls, comp, c1, c2):
         """
-        @comp - The AST representation of the comparison operator.
-        @c1 - The left side of the comparison (Python-value - assumed int).
-        @c2 - The right side of the comparison (Python-value - assumed int):
-        returns the computed boolean value of the comparison.
+        Returns the computed boolean value of the comparison.
+
+        :comp: The AST representation of the comparison operator.
+        :c1: The left side of the comparison (Python-value - assumed int).
+        :c2: The right side of the comparison (Python-value - assumed int).
         """
         if comp is int(clingo.ast.ComparisonOperator.Equal):  # == 5
             return c1 == c2
@@ -85,10 +90,10 @@ class ComparisonTools:
     @classmethod
     def get_arguments_from_operation(cls, root):
         """
-        @root - A AST operation/term.
         Given a root ast term, it computes all arguments from an operation.
-        Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lastly ''Y''
-            -> then combines together)
+        Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lastly ''Y'', then combines together)
+
+        :root: A AST operation/term.
         """
 
         if root.ast_type is clingo.ast.ASTType.BinaryOperation:
@@ -117,9 +122,10 @@ class ComparisonTools:
     @classmethod
     def instantiate_operation(cls, root, variable_assignments):
         """
-        @root - An AST operation/term.
-        @variable_assignment - A variable-value dict.
         Instantiates a operation and returns the corresponding string.
+
+        :root: An AST operation/term.
+        :variable_assignment: A variable-value dict.
         """
 
         if root.ast_type is clingo.ast.ASTType.BinaryOperation:
@@ -213,11 +219,10 @@ class ComparisonTools:
     @classmethod
     def generate_domain(cls, variable_assignments, operation):
         """
-        variable_assignments, corresponds to the domains of the variables,
-        and operation is the actual comparison operation.
+        If a variable is inducing in a comparison, this method creates its domain.
 
-        If a variable is inducing in a comparison,
-        this method creates its domain.
+        :variable_assignments: Corresponds to the domains of the variables.
+        :operation: Comparison operator  (Clingo AST).
         """
         if operation.ast_type == clingo.ast.ASTType.SymbolicAtom:
             return [str(operation.symbol)]
@@ -244,9 +249,10 @@ class ComparisonTools:
     @classmethod
     def generate_unary_operator_domain(cls, operator_type, domain):
         """
-        @operator_type - AST type of unary-operator.
-        @domain - the domain dict.
         Computes the resulting domain, of the operation.
+
+        :operator_type: AST type of unary-operator.
+        :domain: the domain dict.
         """
         if operator_type == int(clingo.ast.UnaryOperator.Minus):
             return cls.apply_unary_operation(domain, lambda d: -d)
@@ -263,10 +269,11 @@ class ComparisonTools:
     @classmethod
     def generate_binary_operator_domain(cls, operator_type, left_domain, right_domain):
         """
-        @operator_type - AST type of binary-operator.
-        @left_domain - Domain of the left part of the binary-operation.
-        @right_domain - Domain of the right part of the binary operation.
         Computes the resulting domain, of the operation.
+
+        :operator_type: AST type of binary-operator.
+        :left_domain: Domain of the left part of the binary-operation.
+        :right_domain: Domain of the right part of the binary operation.
         """
         if operator_type == int(clingo.ast.BinaryOperator.XOr):
             return cls.apply_binary_operation(
@@ -313,10 +320,11 @@ class ComparisonTools:
     @classmethod
     def evaluate_binary_operation(cls, operator_type, left_value, right_value):
         """
-        @operator_type - AST operator type.
-        @left_value - Python value (int).
-        @right_value - Python value (int).
         Computes the resulting value after applying the operation.
+
+        :operator_type: AST operator type.
+        :left_value: Python value (int).
+        :right_value: Python value (int).
         """
         if operator_type == int(clingo.ast.BinaryOperator.XOr):
             return int(left_value) ^ int(right_value)
@@ -345,9 +353,10 @@ class ComparisonTools:
     @classmethod
     def evaluate_operation(cls, operation, variable_assignments):
         """
-        @operation - AST operation.
-        @variable_assignment - Variable assignment dict.
         Computes a tree-traversal and the resulting value of the whole operation.
+
+        :operation: AST operation.
+        :variable_assignment: Variable assignment dict.
         """
         if operation.ast_type == clingo.ast.ASTType.SymbolicAtom:
             return str(operation.symbol)
@@ -380,9 +389,10 @@ class ComparisonTools:
     @classmethod
     def apply_unary_operation(cls, domain, unary_operation):
         """
-        @domain - Domain-list.
-        @unary_operation - Unary AST operation.
         Compute the new domain.
+
+        :domain: Domain-list.
+        :unary_operation: Unary AST operation.
         """
         new_domain = {}
 
@@ -397,10 +407,11 @@ class ComparisonTools:
     @classmethod
     def apply_binary_operation(cls, left_domain, right_domain, binary_operation):
         """
-        @left_domain - Domain-list.
-        @right_domain - Domain-list.
-        @binary_operation - Binary AST operation.
         Compute the new domain.
+
+        :left_domain: Domain-list.
+        :right_domain: Domain-list.
+        :binary_operation: Binary AST operation.
         """
         new_domain = {}
 
@@ -416,9 +427,10 @@ class ComparisonTools:
     @classmethod
     def aggregate_count_special_variable_getter(cls, binary_operation):
         """
-        @binary_operation - AST binary-operation
         Special method for count-aggregate, for increased performance.
         Deprecated.
+        
+        :binary_operation: AST binary-operation
         """
         if (
             binary_operation.ast_type is clingo.ast.ASTType.BinaryOperation
