@@ -1,15 +1,23 @@
-SETUP_FILE = setup.py
 APPLICATION_NAME = hybrid_grounding
 
+install:
+	python -m pip install .
 
-compile:
-	pip uninstall $(APPLICATION_NAME) -y
-	python $(SETUP_FILE) install
+install-doc:
+	python -m pip install .[doc]
 
-clean:
-	pip uninstall $(APPLICATION_NAME) -y
+install-format:
+	python -m pip install .[format]
 
-format:
-	pylint hybrid_grounding
+install-lint-flake8:
+	python -m pip install .[lint_flake8]
 
+install-lint-pylint:
+	python -m pip install .[lint_pylint]
+
+install-all:
+	python -m pip install .[doc,format,lint_flake8,lint_pylint]
+
+uninstall:
+	python -m pip uninstall $(APPLICATION_NAME)
 

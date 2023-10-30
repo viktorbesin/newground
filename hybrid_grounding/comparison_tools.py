@@ -91,7 +91,8 @@ class ComparisonTools:
     def get_arguments_from_operation(cls, root):
         """
         Given a root ast term, it computes all arguments from an operation.
-        Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lastly ''Y'', then combines together)
+        Performs a tree traversal of an operation (e.g. X+Y -> first ''+'', then ''X'' and lastly ''Y'',
+        then combines together)
 
         :root: A AST operation/term.
         """
@@ -429,7 +430,7 @@ class ComparisonTools:
         """
         Special method for count-aggregate, for increased performance.
         Deprecated.
-        
+
         :binary_operation: AST binary-operation
         """
         if (
