@@ -1,3 +1,5 @@
+.. _domain-transformer-reference:
+
 hybrid\_grounding.domain\_transformer module
 ============================================
 

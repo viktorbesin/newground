@@ -22,7 +22,7 @@ If you are new to this protype be sure to check-out the :ref:`installation-refer
 
    installation
    how_to_use
-   theory
+   how_it_works
    modules
 
 

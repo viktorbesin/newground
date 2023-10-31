@@ -22,6 +22,12 @@ The set of answer sets from the rewritten program is A(R(Pi)), which is a set an
 It is then checked, that each answer set q in A(Pi), has an equvalent in A(R(Pi)), and vice versa.
 Equivalence meaning here, that the answer sets exactly match.
 
+Setup
+--------
+
+In order to be able to test the regression tests, you need to be able to execute clingo from the command line (depending on your OS this might differ how to do this).
+In more detail, the ``subprocess.Popen`` class is used, where clingo is passed as an argument.
+
 Regression test script Synopsis
 -----------------------------------
 

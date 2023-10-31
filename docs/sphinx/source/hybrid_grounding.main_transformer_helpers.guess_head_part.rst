@@ -1,3 +1,5 @@
+.. _hybrid-grounding-main-transformer-helper-guess-head-part-reference:
+
 hybrid\_grounding.main\_transformer\_helpers.guess\_head\_part module
 =====================================================================
 

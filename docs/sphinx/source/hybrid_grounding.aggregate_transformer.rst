@@ -1,3 +1,5 @@
+.. _hybrid-grounding-aggregate-transformer-reference:
+
 hybrid\_grounding.aggregate\_transformer module
 ===============================================
 

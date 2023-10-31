@@ -1,3 +1,5 @@
+.. _hybrid-grounding-main-transformer:
+
 hybrid\_grounding.main\_transformer module
 ==========================================
 
