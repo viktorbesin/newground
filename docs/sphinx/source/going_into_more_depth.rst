@@ -58,7 +58,8 @@ By entering enter, you are able to choose from a variety of options:
 Positional Arguments
 ^^^^^^^^^^^^^^^^^^^^^
 
-Consists of the **files** (input-files).
+Consists of the **files** (input-files) argument.
+Other (optional) arguments are listed below in subsections.
 
 Help
 ^^^^^
@@ -76,8 +77,7 @@ Aggregate-Strategy
 Specifies the used aggregate-rewriting strategy, s.t. Hybrid-Grounding can be used in conjunction with aggregates.
 The possible modes are:
 
-1. (Default) *RA*: Performs a light rewriting, meaning that the aggregates are not fully rewritten, therefore,
-aggregates are still present in the output program, although their elements are replaced, s.t. their elements can be grounded by Hybrid-Grounding.
+1. (Default) *RA*: Performs a light rewriting, meaning that the aggregates are not fully rewritten, therefore, aggregates are still present in the output program, although their elements are replaced, s.t. their elements can be grounded by Hybrid-Grounding.
 2. *RS*: The standard rewriting method that fully rewrites the aggregates. It facilitates results, which enable one to efficiently rewrite certain classes of aggregates.
 3. *RS-PLUS*: In certain contexts, this method outperforms the *RS* method.
 4. *RS-STAR*: A method primarily used to understand the *RS-PLUS* method, and is a hybrid between *RS* and *RS-PLUS*. 
@@ -101,8 +101,7 @@ Mode
 
 Defines the general mode of operation of the program.
 
-1. (Default) *rewrite-aggregates-ground-partly*: Aggregates are rewritten, and the Hybrid-Grounding reduction is performed, 
-although the reduction uses some improvements that are only possible, when not the whole output is grounded (therefore delegating some effort to a traditional grounder).
+1. (Default) *rewrite-aggregates-ground-partly*: Aggregates are rewritten, and the Hybrid-Grounding reduction is performed, although the reduction uses some improvements that are only possible, when not the whole output is grounded (therefore delegating some effort to a traditional grounder).
 2. *rewrite-aggregates-no-ground*: Aggregates are rewritten, but no reduction is performed, i.e., not using Hybrid-Grounding.
 3. *rewrite-aggregates-ground-fully*: Aggregates are rewritten, and additionally fully performs the reduction s.t. the output is a fully grounded program.
 

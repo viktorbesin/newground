@@ -64,7 +64,7 @@ You can directly save the output to disk by e.g.:
 
     $ hybrid_grounding test.lp > output.lp
 
-By e.g. using clingo_ (or idlv_), you can convince youself that the answer-sets are the same.
+By e.g. using clingo_ (or idlv_), you can convince yourself that the answer-sets are the same.
 Note that the answer-sets are equal with respect to the intersection of the output of the BDG-reduction with the predicates of the original program.
 To simulate this behavior we use the *--project* option, together with the *show* statements from the output.
 
