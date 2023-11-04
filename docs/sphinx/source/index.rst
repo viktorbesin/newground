@@ -7,7 +7,7 @@ Hybrid-Grounding Documentation
 ============================================
 
 This prototype (Hybrid-Grounding) is the implementation of a reduction from **non-ground** logic programs to **disjunctive** logic programs using Body-decoupled Grounding.
-If you want to know the documetation of **Newground**, or **NAGG**, no need to leave, you are also at the right place!
+If you want to know the documetation of **Newground**, no need to leave, you are also at the right place!
 The Hybrid-Grounding prototype is the next stage in the development for a unified Body-decoupled Grounding prototype.
 
 The source code can be found in the GitHub repository Hybrid-Grounding_ (or the Fork Hybrid-Grounding-Fork_).
