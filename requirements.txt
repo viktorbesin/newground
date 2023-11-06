@@ -1,4 +1,4 @@
 future-fstrings
-clingo>=5.5.0
+clingo>=5.6.2
 clingox
 networkx

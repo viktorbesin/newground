@@ -1,1 +1,0 @@
-- The instances were created with the genEnergies and genEnergy generators in the ''generators'' folder, with the command ''python genEnergies.py 4 3 100 600 1500 0 2500''
