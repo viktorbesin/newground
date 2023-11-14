@@ -1,6 +1,6 @@
 # pylint: disable=C0103,R0913,R1720
 """
-Transforms a program according to hybrid-grounding.
+Transforms a program according to newground.
 """
 
 import re
@@ -20,7 +20,7 @@ from .main_transformer_helpers.guess_head_part import GuessHeadPart
 
 class MainTransformer(Transformer):
     """
-    Transforms a program according to hybrid-grounding.
+    Transforms a program according to newground.
     """
 
     def __init__(

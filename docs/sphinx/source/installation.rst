@@ -3,7 +3,7 @@
 Installation Guide
 ============================================
 
-By following this guide you will be able to install the Hybrid-Grounding prototype.
+By following this guide you will be able to install the newground prototype.
 
 Requirements
 ------------
@@ -21,7 +21,7 @@ General Installation
 -----------------------
 
 
-For using the Hybrid-Grounding prototype an installation is not required, but recommended, as all dependencies are automatically installed.
+For using the newground prototype an installation is not required, but recommended, as all dependencies are automatically installed.
 
 General Installation Method
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -44,14 +44,14 @@ Check the installation:
 
 .. code-block:: console
 
-    $ hybrid_grounding --help
+    $ newground --help
 
 Which output should be:
 
 .. code-block:: console
 
-    $ hybrid_grounding --help
-    usage: hybrid_grounding [files]
+    $ newground --help
+    usage: newground [files]
 
     positional arguments:
       files
@@ -67,19 +67,19 @@ Which output should be:
 General Installation via make
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you have the *make* environment installed, you can use it to install Hybrid-Grounding.
+If you have the *make* environment installed, you can use it to install newground.
 To install the general version, execute the following command.
 
 .. code-block:: console
 
     $ make install
 
-Check if Hybrid-Grounding was correctly installed:
+Check if newground was correctly installed:
 
 .. code-block:: console
 
-    $ hybrid_grounding --help
-    usage: hybrid_grounding [files]
+    $ newground --help
+    usage: newground [files]
 
     positional arguments:
       files
@@ -96,11 +96,11 @@ Check if Hybrid-Grounding was correctly installed:
 Uninstall
 ---------
 
-Although we would be very sad, if you would do it, you can uninstall Hybrid-Gounding with the following command:
+Although we would be very sad, if you would do it, you can uninstall Newground with the following command:
 
 .. code-block:: console
 
-    $ python -m pip uninstall hybrid_grounding
+    $ python -m pip uninstall newground
 
 Or by using make:
 
@@ -159,7 +159,7 @@ This can be done in the following way:
 Autoformatting with nox
 """"""""""""""""""""""""
 
-For autoformatting the hybrid_grounding directory, use:
+For autoformatting the newground directory, use:
 
 .. code-block:: console
 
@@ -274,8 +274,8 @@ And then directly call the prototype script:
 
 .. code-block:: console
     
-    $ python start_hybrid_grounding.py --help
-    usage: hybrid_grounding [files]
+    $ python start_newground.py --help
+    usage: newground [files]
 
     positional arguments:
       files

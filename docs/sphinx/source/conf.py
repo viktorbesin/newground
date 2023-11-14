@@ -9,7 +9,7 @@ import os
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'hybrid-grounding'
+project = 'newground'
 copyright = '2023, Alexander Beiser, Markus Hecher, Kaan Unalan, Stefan Woltran, Viktor Besin'
 author = 'Alexander Beiser, Markus Hecher, Kaan Unalan, Stefan Woltran, Viktor Besin'
 release = '1.0.0'

@@ -7,8 +7,8 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   hybrid_grounding.aggregate_strategies
-   hybrid_grounding.main_transformer_helpers
+   newground.aggregate_strategies
+   newground.main_transformer_helpers
 
 Submodules
 ----------
@@ -16,20 +16,20 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   hybrid_grounding.aggregate_transformer
-   hybrid_grounding.comparison_tools
-   hybrid_grounding.cyclic_strategy
-   hybrid_grounding.default_output_printer
-   hybrid_grounding.domain_transformer
-   hybrid_grounding.grounding_modes
-   hybrid_grounding.hybrid_grounding
-   hybrid_grounding.main_transformer
-   hybrid_grounding.term_transformer
+   newground.aggregate_transformer
+   newground.comparison_tools
+   newground.cyclic_strategy
+   newground.default_output_printer
+   newground.domain_transformer
+   newground.grounding_modes
+   newground.newground
+   newground.main_transformer
+   newground.term_transformer
 
 Module contents
 ---------------
 
-.. automodule:: hybrid_grounding
+.. automodule:: newground
    :members:
    :undoc-members:
    :show-inheritance:

@@ -1,0 +1,3 @@
+"""
+Newground helper module
+"""

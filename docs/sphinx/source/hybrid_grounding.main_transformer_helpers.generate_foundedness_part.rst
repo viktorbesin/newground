@@ -1,9 +1,9 @@
-.. _hybrid-grounding-main-transformer-helpers-generate-foundedness-part-reference:
+.. _newground-main-transformer-helpers-generate-foundedness-part-reference:
 
 hybrid\_grounding.main\_transformer\_helpers.generate\_foundedness\_part module
 ===============================================================================
 
-.. automodule:: hybrid_grounding.main_transformer_helpers.generate_foundedness_part
+.. automodule:: newground.main_transformer_helpers.generate_foundedness_part
    :members:
    :undoc-members:
    :show-inheritance:

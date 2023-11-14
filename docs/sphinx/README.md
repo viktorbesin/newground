@@ -5,7 +5,7 @@ sphinx-build -M html source/ build/ -a
 
 Update-API-DOC:
 ```
-sphinx-apidoc -o source/ ../../hybrid_grounding -e
+sphinx-apidoc -o source/ ../../newground -e
 ```
 
 Start-LOCAL Development Server:

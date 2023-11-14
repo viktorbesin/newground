@@ -12,7 +12,7 @@ class RegressionTest:
     @classmethod
     def start(cls):
 
-        parser = argparse.ArgumentParser(prog='Regression test for Answerset Equivalence Checker', description='Checks equivalence of answersets produced by hybrid_grounding and clingo on all instance-encoding pairs in a subfolder.')
+        parser = argparse.ArgumentParser(prog='Regression test for Answerset Equivalence Checker', description='Checks equivalence of answersets produced by newground and clingo on all instance-encoding pairs in a subfolder.')
 
         all_test = "test-all"
         rewriting_modes = [
@@ -64,7 +64,7 @@ class RegressionTest:
 
         if chosenRegressionTestMode != all_test:
             if folder_path == "__DEFAULT__" and chosenRegressionTestMode in rewriting_modes:
-                folder_path = os.path.join("regression_tests","hybrid_grounding_tests")
+                folder_path = os.path.join("regression_tests","tight_non_tight_tests")
             elif folder_path == "__DEFAULT__" and chosenRegressionTestMode in aggregate_modes:
                 folder_path = os.path.join("regression_tests","aggregate_tests")
 
@@ -96,7 +96,7 @@ class RegressionTest:
 
             for rewriting_strategy in rewriting_modes:
                 if folder_path == "__DEFAULT__" and rewriting_strategy in rewriting_modes:
-                    rewriting_folder = os.path.join("regression_tests","hybrid_grounding_tests")
+                    rewriting_folder = os.path.join("regression_tests","newground_tests")
                 else:
                     rewriting_folder = folder_path
 
@@ -170,15 +170,15 @@ class RegressionTest:
             start_time = time.time()
 
             checker = EquivChecker(chosenRegressionTestMode)
-            result, clingo_answersets, hybrid_grounding_answersets = checker.start(instance_file_contents, encoding_file_contents)
+            result, clingo_answersets, newground_answersets = checker.start(instance_file_contents, encoding_file_contents)
 
             end_time = time.time()
 
             if result:
-                print(f"[INFO] \"{sub}\" test was SUCCESSFUL, clingo-answersets: {clingo_answersets}, hybrid_grounding-answersets: {hybrid_grounding_answersets}")
+                print(f"[INFO] \"{sub}\" test was SUCCESSFUL, clingo-answersets: {clingo_answersets}, newground-answersets: {newground_answersets}")
             else:
-                print(f"[INFO] \"{sub}\" test FAILED, clingo-answersets: {clingo_answersets}, hybrid_grounding-answersets: {hybrid_grounding_answersets}")
-                failed_tests[sub] = {"clingo_answersets":clingo_answersets, "hybrid_grounding_answersets":hybrid_grounding_answersets}
+                print(f"[INFO] \"{sub}\" test FAILED, clingo-answersets: {clingo_answersets}, newground-answersets: {newground_answersets}")
+                failed_tests[sub] = {"clingo_answersets":clingo_answersets, "newground_answersets":newground_answersets}
 
             total_tests += 1
 
@@ -193,7 +193,7 @@ class RegressionTest:
         if number_failed_tests > 0:
             print(f"{number_failed_tests}/{total_tests} of executed tests failed:")
             for key in failed_tests.keys():
-                print(f"- {key} - Clingo Answersets: {failed_tests[key]['clingo_answersets']}, hybrid_grounding Answersets: {failed_tests[key]['hybrid_grounding_answersets']}")
+                print(f"- {key} - Clingo Answersets: {failed_tests[key]['clingo_answersets']}, newground Answersets: {failed_tests[key]['newground_answersets']}")
         else:
             print(f"All executed tests were SUCCESSFUL (In total {total_tests} were conducted and {total_tests - len(skipped_tests.keys())} were executed).")
 

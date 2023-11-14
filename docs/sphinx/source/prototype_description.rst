@@ -21,19 +21,19 @@ Abstract Description of the Prototype
 -----------------------------------------
 
 Generally speaking, the prototype has three main parts, where each part corresponds roughly to a **transformer** from the **clingo** AST_ library.
-Such a **transformer** traverses the AST and enables us to edit the program, and retrieve necessary information, needed for grounding the program with Hybrid-Gounding.
+Such a **transformer** traverses the AST and enables us to edit the program, and retrieve necessary information, needed for grounding the program with Newground.
 So the three main parts are:
 
 1. Domain Inference
     - Consists of two transformers. 
-    - First transformer (:ref:`hybrid-grounding-term-transformer-reference`): Gets the domain of all facts, and additionally creates datastructures needed for analyzing the SCCs for non-tight ASP.
+    - First transformer (:ref:`newground-term-transformer-reference`): Gets the domain of all facts, and additionally creates datastructures needed for analyzing the SCCs for non-tight ASP.
     - Second transformer (:ref:`domain-transformer-reference`): Given a domain, a single call computes the next step of the domain (i.e., passing domain to head for each rule). Is called until a fixed point is reached.
 2. Aggregate Rewriting
     - Rewrites aggregates according to the methods specified in the relevant literature.
-    - Consists of one transformer (:ref:`hybrid-grounding-aggregate-transformer-reference`)
+    - Consists of one transformer (:ref:`newground-aggregate-transformer-reference`)
 3. Applying the Reduction
     - Grounds a given program wrt to the domain and/or aggregate rewritings.
-    - Consists of one transformer (:ref:`hybrid-grounding-main-transformer`)
+    - Consists of one transformer (:ref:`newground-main-transformer`)
 
 Transformer 101
 ^^^^^^^^^^^^^^^^^
@@ -127,7 +127,7 @@ Aggregate Rewriting
 
 The aggregate-transformer checks whether an aggregate occurs in a rule.
 If so, then the selected aggregate rewriting technique is used, for each aggregate in the rule.
-The individual strategies can be found in the package ``hybrid_grounding.aggregate_strategies``.
+The individual strategies can be found in the package ``newground.aggregate_strategies``.
 
 
 Main Transformer (Applying the Reduction)
@@ -140,13 +140,13 @@ Additionally, the handling of a ground and non-ground rule can be distinguished,
 where the non-ground rule is the standard case.
 Then the reduction consists of the three main parts, as specified in the publications:
 
-1. SAT check (:ref:`hybrid-grounding-main-transformer-helpers-generate-satisfiability-reference`)
+1. SAT check (:ref:`newground-main-transformer-helpers-generate-satisfiability-reference`)
 
-2. Guessing the head (:ref:`hybrid-grounding-main-transformer-helper-guess-head-part-reference`)
+2. Guessing the head (:ref:`newground-main-transformer-helper-guess-head-part-reference`)
 
-3. (Un)foundedness (:ref:`hybrid-grounding-main-transformer-helpers-generate-foundedness-part-reference`)
+3. (Un)foundedness (:ref:`newground-main-transformer-helpers-generate-foundedness-part-reference`)
 
 Additionally, one has to note that the global-rewritings for the reduction (e.g. ``:- not sat.``) are largely done in the ``MainTransformer`` class,
-with the exception of the *Level-Mappings*, which are processed in :ref:`hybrid-grounding-main-transformer-helpers-level-mappings-part-reference`.
+with the exception of the *Level-Mappings*, which are processed in :ref:`newground-main-transformer-helpers-level-mappings-part-reference`.
 
 .. _AST: https://potassco.org/clingo/python-api/current/clingo/ast.html

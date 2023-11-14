@@ -14,8 +14,8 @@ At the moment, the following syntax is accepted in general:
 
 However it is important to note that **different** techniques exist, both for the normal (non-tight) ASP case, as the aggregate case.
 
-Using the theoretical results that one can ground parts of a program by traditional means and parts by Body-decoupled Grounding (resulting in Hybrid-Grounding), 
-one separates these two parts with the **#program rules.** rule in the Hybrid-Grounding prototype.
+Using the theoretical results that one can ground parts of a program by traditional means and parts by Body-decoupled Grounding (resulting in newground), 
+one separates these two parts with the **#program rules.** rule in the newground prototype.
 All rules which are placed *above* **#program rules.** are grounded by traditional means,
 and all rules placed *below* **#program rules.** are grounded by Body-decoupled Grounding.
 
@@ -42,8 +42,8 @@ By entering enter, you are able to choose from a variety of options:
 
 .. code-block:: console
 
-    $ hybrid_grounding --help    
-    usage: hybrid_grounding [files]
+    $ newground --help    
+    usage: newground [files]
 
     positional arguments:
       files
@@ -74,10 +74,10 @@ If specified, then no *#show* statements are generated, as they are not accepted
 Aggregate-Strategy
 ^^^^^^^^^^^^^^^^^^^
 
-Specifies the used aggregate-rewriting strategy, s.t. Hybrid-Grounding can be used in conjunction with aggregates.
+Specifies the used aggregate-rewriting strategy, s.t. newground can be used in conjunction with aggregates.
 The possible modes are:
 
-1. (Default) *RA*: Performs a light rewriting, meaning that the aggregates are not fully rewritten, therefore, aggregates are still present in the output program, although their elements are replaced, s.t. their elements can be grounded by Hybrid-Grounding.
+1. (Default) *RA*: Performs a light rewriting, meaning that the aggregates are not fully rewritten, therefore, aggregates are still present in the output program, although their elements are replaced, s.t. their elements can be grounded by newground.
 2. *RS*: The standard rewriting method that fully rewrites the aggregates. It facilitates results, which enable one to efficiently rewrite certain classes of aggregates.
 3. *RS-PLUS*: In certain contexts, this method outperforms the *RS* method.
 4. *RS-STAR*: A method primarily used to understand the *RS-PLUS* method, and is a hybrid between *RS* and *RS-PLUS*. 
@@ -89,7 +89,7 @@ Cyclic-Strategy
 Specifies the used method for handling non-tight programs. 
 In general all methods (with the exception of *assume-tight*) analyze the program into a set of strongly-connected-components (SCCs),
 and perform a certain method on each such SCC.
-Note that one only needs to intervene, if the SCCs intersect with the part of the program that shall be grounded via Hybrid-Grounding.
+Note that one only needs to intervene, if the SCCs intersect with the part of the program that shall be grounded via newground.
 
 1. (DEFAULT) *assume-tight*: Assumes a tight ASP program (does not work for non-tight ASP programs).
 2. *shared-cycle-body-predicates*: Balances Body-decoupled Grounding and traditional grounding, if needed.
@@ -101,8 +101,8 @@ Mode
 
 Defines the general mode of operation of the program.
 
-1. (Default) *rewrite-aggregates-ground-partly*: Aggregates are rewritten, and the Hybrid-Grounding reduction is performed, although the reduction uses some improvements that are only possible, when not the whole output is grounded (therefore delegating some effort to a traditional grounder).
-2. *rewrite-aggregates-no-ground*: Aggregates are rewritten, but no reduction is performed, i.e., not using Hybrid-Grounding.
+1. (Default) *rewrite-aggregates-ground-partly*: Aggregates are rewritten, and the newground reduction is performed, although the reduction uses some improvements that are only possible, when not the whole output is grounded (therefore delegating some effort to a traditional grounder).
+2. *rewrite-aggregates-no-ground*: Aggregates are rewritten, but no reduction is performed, i.e., not using newground.
 3. *rewrite-aggregates-ground-fully*: Aggregates are rewritten, and additionally fully performs the reduction s.t. the output is a fully grounded program.
 
 
@@ -139,7 +139,7 @@ The program is rewritten with the prototype and the *RS* strategy (but not using
 
 .. code-block:: console
 
-    $ hybrid_grounding aggregate_test.lp --mode rewrite-aggregates-no-ground --aggregate-strategy RS > output.lp
+    $ newground aggregate_test.lp --mode rewrite-aggregates-no-ground --aggregate-strategy RS > output.lp
 
 
 Then the (commented) output program (*output.lp*) is:
@@ -207,7 +207,7 @@ We use the *shared-cycle-body-predicates* strategy with the partly-grounded mode
 
 .. code-block:: console
 
-    $ hybrid_grounding --cyclic-strategy shared-cycle-body-predicates --mode rewrite-aggregates-ground-partly non_tight_test.lp > output.lp 
+    $ newground --cyclic-strategy shared-cycle-body-predicates --mode rewrite-aggregates-ground-partly non_tight_test.lp > output.lp 
 
 The contents of the (commented) *output.lp* file are the following:
 
@@ -269,7 +269,7 @@ The contents of the (commented) *output.lp* file are the following:
 
 Next we compare the output of *output.lp* with the original output, which holds.
 Note the *--project* option for clingo,
-which is due to the fact that the answer-sets produced by Hybrid-Grounding equal
+which is due to the fact that the answer-sets produced by newground equal
 the answer sets of traditional grounding only with intersection to the original predicates.
 Finally, note that if you want to execute the *non_tight_test.lp* program, you have to **remove** the *#program rules.* rule!
 
@@ -308,7 +308,7 @@ We use the *level-mappings-AAAI* strategy with the fully-grounded mode to ground
 
 .. code-block:: console
 
-    $ hybrid_grounding --cyclic-strategy level-mappings-AAAI --mode rewrite-aggregates-ground-fully non_tight_test.lp > output.lp 
+    $ newground --cyclic-strategy level-mappings-AAAI --mode rewrite-aggregates-ground-fully non_tight_test.lp > output.lp 
 
 The contents of the (commented) *output.lp* file are the following:
 

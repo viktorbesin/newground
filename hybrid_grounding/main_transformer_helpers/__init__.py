@@ -1,3 +1,0 @@
-"""
-Hybrid Grounding helper module
-"""

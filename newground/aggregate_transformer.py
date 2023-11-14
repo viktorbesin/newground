@@ -1,6 +1,6 @@
 # pylint: disable=C0103
 """
-Transformer that transforms the aggregates according to hybrid-grounding.
+Transformer that transforms the aggregates according to newground.
 """
 
 
@@ -17,7 +17,7 @@ from .grounding_modes import GroundingModes
 
 class AggregateTransformer(Transformer):
     """
-    Transformer that transforms the aggregates according to hybrid-grounding.
+    Transformer that transforms the aggregates according to newground.
     """
 
     def __init__(self, aggregate_mode, domain, grounding_mode):

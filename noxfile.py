@@ -14,12 +14,12 @@ if "GITHUB_ACTIONS" in os.environ:
 @nox.session
 def lint_flake8(session):
     session.install("-e", ".[lint_flake8]")
-    session.run("flake8", "hybrid_grounding")
+    session.run("flake8", "newground")
 
 @nox.session
 def lint_pylint(session):
     session.install("-e", ".[lint_pylint]")
-    session.run("pylint", "hybrid_grounding")    
+    session.run("pylint", "newground")    
 
 @nox.session
 def format(session):
@@ -32,19 +32,19 @@ def format(session):
         "--ignore-init-module-imports",
         "--remove-unused-variables",
         "-r",
-        "hybrid_grounding",
+        "newground",
     ]
     if check:
         autoflake_args.remove("--in-place")
     session.run("autoflake", *autoflake_args)
 
-    isort_args = ["--profile", "black", "hybrid_grounding"]
+    isort_args = ["--profile", "black", "newground"]
     if check:
         isort_args.insert(0, "--check")
         isort_args.insert(1, "--diff")
     session.run("isort", *isort_args)
 
-    black_args = ["hybrid_grounding"]
+    black_args = ["newground"]
     if check:
         black_args.insert(0, "--check")
         black_args.insert(1, "--diff")

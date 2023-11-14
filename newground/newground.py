@@ -1,7 +1,7 @@
 # pylint: disable=W0108
 """
 Main module.
-Contains the HybridGrounding class,
+Contains the Newground class,
 which is used for the tranformations.
 """
 
@@ -19,10 +19,10 @@ from .main_transformer_helpers.level_mappings_part import LevelMappingsPart
 from .term_transformer import TermTransformer
 
 
-class HybridGrounding:
+class Newground:
     """
     Main module.
-    Contains the HybridGrounding class,
+    Contains the Newground class,
     which is used for the tranformations.
     """
 
@@ -50,7 +50,7 @@ class HybridGrounding:
 
     def start(self, contents):
         """
-        Start method of the HybridGrounding.
+        Start method of the Newground.
         Call this method to start the rewriting procedure.
         """
         (

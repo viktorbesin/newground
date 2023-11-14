@@ -3,7 +3,7 @@
 hybrid\_grounding.domain\_transformer module
 ============================================
 
-.. automodule:: hybrid_grounding.domain_transformer
+.. automodule:: newground.domain_transformer
    :members:
    :undoc-members:
    :show-inheritance:

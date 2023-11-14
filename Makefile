@@ -1,4 +1,4 @@
-APPLICATION_NAME = hybrid_grounding
+APPLICATION_NAME = newground
 
 install:
 	python -m pip install .

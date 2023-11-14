@@ -1,7 +1,7 @@
 # pylint: disable=E1124
 """
 Main Entry Point into the prototype.
-Parses arguments and calls HybridGrounding class.
+Parses arguments and calls Newground class.
 """
 
 import argparse
@@ -11,13 +11,13 @@ from .aggregate_transformer import AggregateMode
 from .cyclic_strategy import CyclicStrategy
 from .default_output_printer import DefaultOutputPrinter
 from .grounding_modes import GroundingModes
-from .hybrid_grounding import HybridGrounding
+from .newground import Newground
 
 
 def main():
     """
     Main Entry Point into the prototype.
-    Parses arguments and calls HybridGrounding class.
+    Parses arguments and calls Newground class.
     """
 
     cyclic_choices = {
@@ -59,7 +59,7 @@ def main():
         },
     }
 
-    parser = argparse.ArgumentParser(prog="hybrid_grounding", usage="%(prog)s [files]")
+    parser = argparse.ArgumentParser(prog="newground", usage="%(prog)s [files]")
     parser.add_argument(
         "--no-show",
         action="store_true",
@@ -119,7 +119,7 @@ def main():
     for f in args.files:
         contents += f.read()
 
-    hybrid_grounding = HybridGrounding(
+    newground = Newground(
         no_show=no_show,
         ground_guess=ground_guess,
         output_printer=DefaultOutputPrinter(),
@@ -127,4 +127,4 @@ def main():
         cyclic_strategy=normal_strategy,
         grounding_mode=grounding_mode,
     )
-    hybrid_grounding.start(contents)
+    newground.start(contents)

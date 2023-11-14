@@ -7,18 +7,18 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   hybrid_grounding.main_transformer_helpers.generate_foundedness_part
-   hybrid_grounding.main_transformer_helpers.generate_foundedness_part_comparisons
-   hybrid_grounding.main_transformer_helpers.generate_foundedness_part_function
-   hybrid_grounding.main_transformer_helpers.generate_satisfiability_part
-   hybrid_grounding.main_transformer_helpers.guess_head_part
-   hybrid_grounding.main_transformer_helpers.helper_part
-   hybrid_grounding.main_transformer_helpers.level_mappings_part
+   newground.main_transformer_helpers.generate_foundedness_part
+   newground.main_transformer_helpers.generate_foundedness_part_comparisons
+   newground.main_transformer_helpers.generate_foundedness_part_function
+   newground.main_transformer_helpers.generate_satisfiability_part
+   newground.main_transformer_helpers.guess_head_part
+   newground.main_transformer_helpers.helper_part
+   newground.main_transformer_helpers.level_mappings_part
 
 Module contents
 ---------------
 
-.. automodule:: hybrid_grounding.main_transformer_helpers
+.. automodule:: newground.main_transformer_helpers
    :members:
    :undoc-members:
    :show-inheritance:

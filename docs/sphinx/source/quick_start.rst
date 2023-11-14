@@ -1,7 +1,7 @@
 Quick-Start
 =============
 
-Be sure that you have *hybrid_grounding* installed.
+Be sure that you have *newground* installed.
 Then create a logic program file *test.lp*:
 
 .. code-block::
@@ -17,17 +17,17 @@ Then create a logic program file *test.lp*:
 Note that the part above *#program rules* is grounded by traditional means,
 whereas the part below is grounded via Body-decoupled Grounding.
 
-With *test.lp* saved to disk you can use hybrid_grounding to create the rewritten program:
+With *test.lp* saved to disk you can use newground to create the rewritten program:
 
 .. code-block:: console
 
-    $ hybrid_grounding test.lp
+    $ newground test.lp
 
 The output should be:
 
 .. code-block:: console
 
-    $ hybrid_grounding test.lp
+    $ newground test.lp
     a(1).
     a(2).
     b(1).
@@ -62,7 +62,7 @@ You can directly save the output to disk by e.g.:
 
 .. code-block:: console
 
-    $ hybrid_grounding test.lp > output.lp
+    $ newground test.lp > output.lp
 
 By e.g. using clingo_ (or idlv_), you can convince yourself that the answer-sets are the same.
 Note that the answer-sets are equal with respect to the intersection of the output of the BDG-reduction with the predicates of the original program.

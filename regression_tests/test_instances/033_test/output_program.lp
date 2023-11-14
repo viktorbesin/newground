@@ -10,7 +10,7 @@ e(1).
 c(1) :- b(1),prec(b(1),c(1)).
 b(1) :- a(1),prec(a(1),b(1)).
 
-% Hybrid grounding...
+% Newground...
 r3_X(1).
 r3_X(1) :- sat.
 sat_r3 :- r3_X(1),a'(1).

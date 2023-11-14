@@ -1,7 +1,7 @@
 hybrid\_grounding.hybrid\_grounding module
 ==========================================
 
-.. automodule:: hybrid_grounding.hybrid_grounding
+.. automodule:: newground.newground
    :members:
    :undoc-members:
    :show-inheritance:

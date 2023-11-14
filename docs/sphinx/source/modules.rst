@@ -1,7 +1,7 @@
-Hybrid Grounding Code Documentation
+Newground Code Documentation
 ===================================
 
 .. toctree::
    :maxdepth: 4
 
-   hybrid_grounding
+   newground
