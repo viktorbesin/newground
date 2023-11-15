@@ -1,0 +1,176 @@
+name: Installation Check
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+      - format
+  pull_request:
+
+env:
+  FORCE_COLOR: "3"
+
+jobs:
+
+  build:
+    name: build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+
+    steps:
+    - name: "checkout repository"
+      uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+    - name: Install Newground
+      run: |
+        python -m pip install ./
+
+    - name: Run Newground help
+      run: |
+        newground --help
+
+
+  tests:
+    name: Tests (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.11"]
+    steps:
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+      - name: "checkout repository"
+        uses: actions/checkout@v3
+      - name: Conda info
+        run: conda info
+      - name: Conda list
+        run: conda list
+      - name: Create conda clingo environment
+        run: conda create -n potassco -c conda-forge clingo
+      - name: Conda Init bash
+        run: conda init bash
+      - name: Setup Newground
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python -m pip install -r requirements.txt
+          python start_newground.py --help
+      - name: Test Aggregate RS-STAR
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode aggregates-rs-star
+      - name: Test Aggregate RS-PLUS
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode aggregates-rs-plus
+      - name: Test Aggregate RS
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode aggregates-rs
+      - name: Test Aggregate RA
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode aggregates-ra
+      - name: Test Aggregate RECURSIVE
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode aggregates-recursive
+      - name: Test rewriting shared cycle partly
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode rewriting-shared-cycle
+      - name: Test rewriting level mappings 1 partly
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode rewriting-level-mappings-1
+      - name: Test rewriting level mappings 2 partyl
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode rewriting-level-mappings-2
+      - name: Test rewriting shared cycle fully
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode fully-grounded-shared-cycle 
+      - name: Test rewriting level mappings 1 fully
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode fully-grounded-level-mappings-1
+      - name: Test rewriting level mappings 2 fully
+        shell: bash -l {0}
+        run: |
+          conda activate potassco
+          python start_regression_tests.py --mode fully-grounded-level-mappings-2
+
+  lint_flake8:
+    name: lint flake8 on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+
+    steps:
+    - name: "checkout repository"
+      uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+    - name: Install Newground
+      run: |
+        python -m pip install ./[lint_flake8]
+
+    - name: run flake8
+      run: nox -e lint_flake8
+
+  lint_pylint:
+    name: lint pylint on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+
+    steps:
+    - name: "checkout repository"
+      uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+    - name: Install Newground
+      run: |
+        python -m pip install ./[lint_pylint]
+    - name: run pylint
+      run: nox -e lint_pylint

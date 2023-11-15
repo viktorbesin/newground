@@ -1,38 +1,9 @@
 # newground
-Reduction of **non-ground** logic programs to **disjunctive** logic programs using body-decoupled grounding.
 
-## Requirements
-* clingo 
-* clingo's Python module > *v5.5*
-* clingox
-* networkx
-* future-fstrings (for compatibility with older versions)
-```
-pip install -r requirements.txt
-```
+Documentation page: [Documentation](https://www.dbai.tuwien.ac.at/proj/hypar/newground/index.html).
 
-## Input Format
-The input format is equivalent to clingos input format. Currently the reduction of normal logic programs (including comparison operators) is implemented. 
+General project information: For more information visit the Documentation Page [project](https://www.dbai.tuwien.ac.at/proj/hypar/#systems).
 
-Based on the principle of partial reducability, inputs can be divided into parts that shall be part of the reduction. For this reason please use `#program rules.` for (non-ground) program parts that shall be reduced by **newground**. The sub-program `#program insts.` on the other hand can be used for instantiating the program.
+Reduction of **non-ground** logic programs to **disjunctive** logic programs using body-decoupled grounding, extended by Aggregates. This is the prototype, which is mentioned in the paper: Viktor Besin, Markus Hecher, and Stefan Woltran. Body-decoupled grounding via solving: A novel approach on the asp bottleneck. In Lud De Raedt, editor, Proceedings of the Thirty-First International Joint Conference on Artificial Intelligence, IJCAI-22, pages 2546–2552. International Joint Conferences on Artificial Intelligence Organization, 7 2022. Main Track. [LINK](https://www.ijcai.org/proceedings/2022/353).
 
-Without explicit domains given the reduction uses the complete set of terms to fill the variables in the grounding process. This process can be reduced by giving a domain for each variable, e.g. `_dom_X(1..5).`, or by `_dom_X(X) :- a(X,_).` in the instatiating-part of the program. This information is then processed automatically and considered in the reduction.
 
-## Usage
-```
-$ python3 main.py -h
-usage: newground [files]
-
-positional arguments:
-  file
-
-optional arguments:
-  -h, --help      show this help message and exit
-  --no-show       Do not print #show-statements to avoid compatibility issues.
-  --ground-guess  Additionally ground guesses which results in (fully) grounded output.
-  --ground        Output program fully grounded.
-```
-e.g. clingo can then be used to compute the answer-sets
-```
-python3 main.py [instance] | clingo -n 0 --project
-```
